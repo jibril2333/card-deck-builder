@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-bg: oklch(0.99 0.005 240);
+  --color-fg: oklch(0.18 0.01 240);
+  --color-muted: oklch(0.96 0.005 240);
+  --color-muted-fg: oklch(0.5 0.01 240);
+  --color-border: oklch(0.91 0.005 240);
+  --color-card: oklch(1 0 0);
+  --color-card-fg: oklch(0.18 0.01 240);
+  --color-accent: oklch(0.55 0.2 28);
+  --color-accent-fg: oklch(0.99 0 0);
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --radius: 0.625rem;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  @theme {
+    --color-bg: oklch(0.16 0.012 240);
+    --color-fg: oklch(0.96 0.005 240);
+    --color-muted: oklch(0.22 0.012 240);
+    --color-muted-fg: oklch(0.65 0.01 240);
+    --color-border: oklch(0.28 0.012 240);
+    --color-card: oklch(0.2 0.012 240);
+    --color-card-fg: oklch(0.96 0.005 240);
+    --color-accent: oklch(0.7 0.2 28);
+    --color-accent-fg: oklch(0.15 0.01 240);
   }
 }
 
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-muted);
+  color: var(--color-muted-fg);
+  white-space: nowrap;
+}
+
+.chip-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  display: inline-block;
+}
+
+.card-thumb {
+  aspect-ratio: 5 / 7;
+  background: var(--color-muted);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }

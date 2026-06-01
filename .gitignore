@@ -13,6 +13,13 @@
 # testing
 /coverage
 
+# playwright e2e artifacts — globalTeardown cleans test-results/ on green runs,
+# but keep these ignored so a failed run's traces don't get committed.
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/tests/e2e/.storageState.json
+
 # next.js
 /.next/
 /out/
