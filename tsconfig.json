@@ -38,7 +38,11 @@
     ".next/prod/types/**/*.ts",
     ".next/prod/dev/types/**/*.ts",
     ".next/e2e-prod/types/**/*.ts",
-    ".next/e2e-prod/dev/types/**/*.ts"
+    ".next/e2e-prod/dev/types/**/*.ts",
+    ".next.nosync/prod/types/**/*.ts",
+    ".next.nosync/prod/dev/types/**/*.ts",
+    ".next.nosync/dev/types/**/*.ts",
+    ".next.nosync/dev/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

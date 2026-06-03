@@ -15,7 +15,7 @@ The owner runs two parallel servers locally:
 
 1. `lsof -iTCP:3000 -sTCP:LISTEN` + `lsof -iTCP:3001 -sTCP:LISTEN` to find PIDs
 2. Walk up to parent `npm run dev` / `npm run start` processes (use `ps -o pid,ppid -p <pid>`) and `kill` those — that releases both worker PIDs cleanly
-3. **`rm -rf .next/prod`** — incremental `next build` over a populated dir leaves stale chunk hashes; the served HTML references chunks that no longer exist on disk → ChunkLoadError. Always start from a clean .next/prod.
+3. **`rm -rf .next.nosync/prod`** — incremental `next build` over a populated dir leaves stale chunk hashes; the served HTML references chunks that no longer exist on disk → ChunkLoadError. Always start from a clean prod dist dir. (Build output lives under `.next.nosync/` so macOS iCloud — the project sits in an iCloud-synced folder — can't create `server 2/` conflict copies that break `next start`.)
 4. `npm run build` (rebuilds 3001 from scratch)
 5. `npm run dev` in background (3000)
 6. `npm start -- -p 3001` in background (3001)

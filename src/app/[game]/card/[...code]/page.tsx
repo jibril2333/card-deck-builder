@@ -122,7 +122,7 @@ function DetailShell({
           fallback={`/${game}`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-4"
         >
-          ← 返回检索
+          ← 返回
         </BackLink>
         {children}
       </main>

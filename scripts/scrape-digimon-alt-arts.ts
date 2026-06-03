@@ -13,11 +13,11 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
-import os from "node:os";
 
 const DB_PATH = path.join(
-  os.homedir(),
-  "Desktop/workspace/digimon-deck-builder/data/digimon.db",
+  process.cwd(),
+  "data",
+  "digimon.db",
 );
 const BASE_URL = "https://world.digimoncard.com/images/cardlist/card";
 const MAX_PARALLEL_VARIANTS = 5; // probe _P1.._P5

@@ -1,11 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useSyncExternalStore } from "react";
 
 /**
- * 返回链接：优先用浏览器历史 (router.back())，保留原页面的滚动位置和搜索筛选。
- * 如果用户直接进入此页（没有同源 referrer），fallback 到指定 URL。
+ * "Back" link that returns to wherever you actually came from.
+ *
+ * It prefers real browser history (`router.back()`), which restores the
+ * previous page's scroll position and search filters and always lands on the
+ * page you navigated from — deck, search, collection, whatever. It only falls
+ * back to the explicit `fallback` URL when there's genuinely nothing to go
+ * back to (the card was opened as the first page in the tab) or the previous
+ * entry is on another site (e.g. a shared card link clicked from a chat app),
+ * in which case staying inside the app is friendlier than leaving it.
+ *
+ * Why not `document.referrer`: it's only set on full document loads, so with
+ * Next's client-side navigation (search → card, deck → card) it goes stale or
+ * empty and mis-decides — which made "back" sometimes jump to search even when
+ * you came from a deck.
  */
 export function BackLink({
   fallback,
@@ -17,21 +28,24 @@ export function BackLink({
   className?: string;
 }) {
   const router = useRouter();
-  // `document.referrer` is set once at navigation time and never changes for
-  // this mount, so we use a no-op `subscribe` and rely on the initial snapshot.
-  // The server snapshot is `false` (no document on the server) which keeps
-  // SSR's HTML stable — the actual value is filled in on hydration.
-  const canGoBack = useSyncExternalStore(
-    () => () => {},
-    () => document.referrer.startsWith(window.location.origin),
-    () => false,
-  );
+
+  function canGoBack(): boolean {
+    if (typeof window === "undefined") return false;
+    // Need a previous entry in this tab's history.
+    if (window.history.length <= 1) return false;
+    // Don't hop to another site. An empty referrer means same-tab SPA nav or
+    // a refresh/typed URL within the app, which is safe to go back through;
+    // a cross-origin referrer means we arrived from outside, so we'd rather
+    // land on the in-app fallback than bounce the user off the site.
+    const ref = document.referrer;
+    return ref === "" || ref.startsWith(window.location.origin);
+  }
 
   return (
     <a
       href={fallback}
       onClick={(e) => {
-        if (canGoBack) {
+        if (canGoBack()) {
           e.preventDefault();
           router.back();
         }

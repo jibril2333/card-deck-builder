@@ -19,7 +19,6 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
-import os from "node:os";
 import {
   parseDetailPage,
   parseListPage,
@@ -29,8 +28,9 @@ import {
 import { checkUASanity, formatUASanityReport } from "../src/lib/scraper/sanity-ua";
 
 const DB_PATH = path.join(
-  os.homedir(),
-  "Desktop/workspace/unionarena-deck-builder/data/unionarena.db",
+  process.cwd(),
+  "data",
+  "unionarena.db",
 );
 const BASE_URL = "https://www.unionarena-tcg.com";
 const SEARCH_URL = `${BASE_URL}/jp/cardlist/index.php?search=true`;

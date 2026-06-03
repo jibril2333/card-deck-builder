@@ -12,6 +12,7 @@ import {
 } from "@/app/[game]/actions";
 import { colorHex } from "@/lib/games";
 import { CardPriceInput } from "@/components/card-price-input";
+import { useCardPreview } from "@/components/card-preview";
 
 export type DeckCardData = {
   id: string;
@@ -57,6 +58,19 @@ export function DeckCard({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const href = `/${game}/card/${card.code.split("/").map(encodeURIComponent).join("/")}`;
+  // Hover preview (browse mode only) — reports the hovered card to the
+  // CardPreviewProvider, which floats a big image on the right. No-ops when
+  // there's no provider (build/purchase grids aren't wrapped).
+  const preview = useCardPreview();
+  const onHover =
+    mode === "browse" && preview
+      ? () =>
+          preview.set({
+            image_url: card.image_url ?? null,
+            name: card.name,
+            code: card.code,
+          })
+      : undefined;
 
   // Optimistic copy of the card row. Lets +/- and the quantity/purchased
   // inputs update the number on screen the instant the user clicks, while the
@@ -105,6 +119,7 @@ export function DeckCard({
 
   return (
     <div
+      onMouseEnter={onHover}
       className={`group rounded-lg overflow-hidden border bg-[var(--color-card)] transition-colors ${
         done
           ? "border-green-500/60 ring-1 ring-green-500/30"

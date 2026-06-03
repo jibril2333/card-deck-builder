@@ -9,8 +9,9 @@
  *     ATTACHed and (b) VACUUM INTO must target the connection's main schema.
  *   - Prunes snapshots older than 30 days.
  *
- *   File layout (next to the source DB):
- *     <dbDir>/backups/2026-05-25.db
+ *   File layout (next to the source DB), keyed by the source DB's name so
+ *   multiple databases sharing one folder don't overwrite each other:
+ *     <dbDir>/backups/<db-name>/2026-05-25.db
  *     ...
  */
 
@@ -33,7 +34,10 @@ export function maybeDailyBackup(sourceDbPath: string): void {
   if (lastChecked.get(sourceDbPath) === today) return;
   lastChecked.set(sourceDbPath, today);
 
-  const dir = path.join(path.dirname(sourceDbPath), "backups");
+  // Per-DB subfolder (e.g. backups/digimon-user/) so two databases in the
+  // same flat folder keep separate, non-colliding snapshot histories.
+  const dbName = path.basename(sourceDbPath).replace(/\.db$/, "");
+  const dir = path.join(path.dirname(sourceDbPath), "backups", dbName);
   const dest = path.join(dir, `${today}.db`);
 
   try {

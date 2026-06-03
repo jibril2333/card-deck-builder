@@ -9,19 +9,24 @@ const baseConfig: NextConfig = {
   typedRoutes: false,
 };
 
-// Use a phase-function so dev and prod write to fully separate dirs:
-//   next dev          → .next/dev         (Next 16 default; left untouched)
-//   next build        → .next/prod
-//   next start        → reads .next/prod
-//   e2e (CDB_E2E=1)   → .next/e2e-prod    (so the long-running prod server
-//                                          on 3001 can keep using .next/prod
-//                                          while Playwright builds to its own)
-// This avoids the previous bug where prod artifacts shared `.next/` root with
-// dev and the rebuild script had to use exclusion-pattern cleanup.
+// Build output lives under `.next.nosync/`. The project sits in an
+// iCloud-synced folder (~/Desktop), and iCloud kept creating conflict copies
+// of the build output — e.g. `.next/prod/server 2/` — which broke
+// `next start` (it looks for the manifest in `server/`, not `server 2/`).
+// macOS iCloud completely ignores any path containing `.nosync`, so putting
+// every phase's output under `.next.nosync/` keeps the build artifacts local
+// and untouched while staying inside the project. Separate subdirs keep dev /
+// prod / e2e from clobbering each other.
+//   dev               → .next.nosync/dev
+//   build / start     → .next.nosync/prod
+//   e2e (CDB_E2E=1)   → .next.nosync/e2e-prod
 export default function nextConfig(phase: string): NextConfig {
   const isProd =
     phase === PHASE_PRODUCTION_BUILD || phase === PHASE_PRODUCTION_SERVER;
-  if (!isProd) return baseConfig;
-  const distDir = process.env.CDB_E2E === "1" ? ".next/e2e-prod" : ".next/prod";
-  return { ...baseConfig, distDir };
+  const sub = isProd
+    ? process.env.CDB_E2E === "1"
+      ? "e2e-prod"
+      : "prod"
+    : "dev";
+  return { ...baseConfig, distDir: `.next.nosync/${sub}` };
 }

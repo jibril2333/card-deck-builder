@@ -14,11 +14,11 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
-import os from "node:os";
 
 const DB_PATH = path.join(
-  os.homedir(),
-  "Desktop/workspace/digimon-deck-builder/data/digimon.db",
+  process.cwd(),
+  "data",
+  "digimon.db",
 );
 const BASE = "https://world.digimoncard.com/images/cardlist/card";
 const CONCURRENCY = 16;

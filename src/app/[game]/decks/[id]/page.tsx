@@ -4,6 +4,7 @@ import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { TopNav } from "@/components/top-nav";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
+import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckMetaForm } from "@/components/deck-meta-form";
 import { DeckStats, type StatPanel } from "@/components/deck-stats";
 import { colorHex as colorHexFn } from "@/lib/games";
@@ -345,7 +346,10 @@ export default async function DeckEditPage({
   const mode: "browse" | "build" | "purchase" = mine
     ? requestedMode
     : "browse";
-  const missingOnly = mode === "purchase" && sp.missing === "1";
+  // Purchase mode defaults to "only still-missing cards" — that's the
+  // shopping view you actually want when you open it. Showing every card
+  // (including ones already bought) is opt-in via ?missing=0.
+  const missingOnly = mode === "purchase" && sp.missing !== "0";
 
   // In-deck card pool (quick-add drawer). Only for a LOCKED UA deck the
   // owner is building — the pool is every card matching the deck's locked
@@ -626,7 +630,7 @@ export default async function DeckEditPage({
               <div className="flex items-center justify-between gap-3 mt-2">
                 <div className="flex items-center gap-0.5 p-0.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)]">
                   <Link
-                    href={`/${game}/decks/${loaded.deck.id}?mode=purchase`}
+                    href={`/${game}/decks/${loaded.deck.id}?mode=purchase&missing=0`}
                     replace
                     scroll={false}
                     className={`px-2.5 h-6 rounded text-[11px] flex items-center transition-colors ${
@@ -638,7 +642,7 @@ export default async function DeckEditPage({
                     全部
                   </Link>
                   <Link
-                    href={`/${game}/decks/${loaded.deck.id}?mode=purchase&missing=1`}
+                    href={`/${game}/decks/${loaded.deck.id}?mode=purchase`}
                     replace
                     scroll={false}
                     className={`px-2.5 h-6 rounded text-[11px] flex items-center gap-1 transition-colors ${
@@ -684,7 +688,7 @@ export default async function DeckEditPage({
                 <div className="mt-6 p-12 text-sm text-center text-[var(--color-muted-fg)] border border-dashed border-[var(--color-border)] rounded-lg">
                   🎉 全部凑齐了！
                   <Link
-                    href={`/${game}/decks/${loaded.deck.id}?mode=purchase`}
+                    href={`/${game}/decks/${loaded.deck.id}?mode=purchase&missing=0`}
                     replace
                     className="underline ml-1 hover:text-[var(--color-fg)]"
                     scroll={false}
@@ -695,19 +699,21 @@ export default async function DeckEditPage({
               );
             }
             return (
-              <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {visibleCards.map((c) => (
-                  <DeckCard
-                    key={c.id}
-                    game={game}
-                    deckId={loaded.deck.id}
-                    card={c}
-                    isCover={c.id === loaded.deck.cover_card_id}
-                    mode={mode}
-                    mine={mine}
-                  />
-                ))}
-              </div>
+              <CardPreviewProvider>
+                <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {visibleCards.map((c) => (
+                    <DeckCard
+                      key={c.id}
+                      game={game}
+                      deckId={loaded.deck.id}
+                      card={c}
+                      isCover={c.id === loaded.deck.cover_card_id}
+                      mode={mode}
+                      mine={mine}
+                    />
+                  ))}
+                </div>
+              </CardPreviewProvider>
             );
           })()}
 

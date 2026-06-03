@@ -26,7 +26,6 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
-import os from "node:os";
 import {
   parseAll,
   type ScrapedCard,
@@ -36,10 +35,7 @@ import {
   formatSanityReport,
 } from "../src/lib/scraper/sanity";
 
-const DB_PATH = path.join(
-  os.homedir(),
-  "Desktop/workspace/digimon-deck-builder/data/digimon.db",
-);
+const DB_PATH = path.join(process.cwd(), "data", "digimon.db");
 const SEARCH_URL = "https://world.digimoncard.com/cards/index.php?search=true";
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";

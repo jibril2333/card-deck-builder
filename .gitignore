@@ -22,6 +22,7 @@
 
 # next.js
 /.next/
+/.next.nosync/
 /out/
 
 # production
@@ -30,6 +31,14 @@
 # misc
 .DS_Store
 *.pem
+
+# local databases — user decks/collection/accounts + scraped card data live
+# here (under the project per the owner's setup). NEVER commit: the repo is
+# public and these contain personal data. Includes sqlite WAL/SHM sidecars.
+/data/
+*.db
+*.db-wal
+*.db-shm
 
 # debug
 npm-debug.log*
