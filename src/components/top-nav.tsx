@@ -29,7 +29,7 @@ export async function TopNav({ game, active }: TopNavProps) {
 
   return (
     <header className="sticky top-0 z-30 backdrop-blur bg-[var(--color-bg)]/80 border-b border-[var(--color-border)]">
-      <div className="mx-auto max-w-7xl px-4 flex items-center justify-between h-14 gap-6">
+      <div className="mx-auto max-w-7xl px-4 flex items-center justify-between h-14 gap-2 sm:gap-6">
         <div className="flex items-center gap-2">
           <span
             aria-hidden
@@ -61,7 +61,8 @@ export async function TopNav({ game, active }: TopNavProps) {
                 }
               >
                 <span aria-hidden>{g.emoji}</span>
-                <span>{g.label}</span>
+                {/* Label eats width on phones — emoji alone is enough there. */}
+                <span className="hidden sm:inline">{g.label}</span>
               </Link>
             );
           })}
@@ -101,8 +102,11 @@ export async function TopNav({ game, active }: TopNavProps) {
         )}
       </div>
 
+      {/* Mobile tab bar: 5 tabs don't fit on a phone row, so let it scroll
+          horizontally (each tab keeps its size via shrink-0) instead of
+          clipping or squishing. Scrollbar hidden for a clean strip. */}
       <div className="md:hidden border-t border-[var(--color-border)]">
-        <div className="mx-auto max-w-7xl px-4 flex gap-1 text-sm h-10 items-center">
+        <div className="mx-auto max-w-7xl px-2 flex gap-1 text-sm h-10 items-center overflow-x-auto no-scrollbar">
           {visibleTabs.map((t) => {
             const href =
               t.id === "search" ? `/${game}` : `/${game}/${t.id}`;
@@ -112,7 +116,7 @@ export async function TopNav({ game, active }: TopNavProps) {
                 key={t.id}
                 href={href}
                 className={cn(
-                  "px-3 h-7 rounded-md flex items-center",
+                  "px-3 h-7 rounded-md flex items-center shrink-0 whitespace-nowrap",
                   isActive
                     ? "bg-[var(--color-muted)] font-medium"
                     : "text-[var(--color-muted-fg)]",

@@ -11,6 +11,7 @@ import {
 import { TopNav } from "@/components/top-nav";
 import { CardThumb, type CardLite } from "@/components/card-thumb";
 import { FilterForm, type FilterField } from "@/components/filter-form";
+import { FilterPanel } from "@/components/filter-panel";
 import { ActiveFilters, type ChipSpec } from "@/components/active-filters";
 import * as digimon from "@/lib/db/digimon";
 import * as ua from "@/lib/db/unionarena";
@@ -382,11 +383,13 @@ export default async function CardsPage({
       <TopNav game={game as GameId} active="search" />
       <main className="w-full mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
         <aside>
-          <FilterForm
-            basePath={`/${game}`}
-            fields={fields}
-            sortOptions={sortOptions}
-          />
+          <FilterPanel activeCount={chipSpecs.length}>
+            <FilterForm
+              basePath={`/${game}`}
+              fields={fields}
+              sortOptions={sortOptions}
+            />
+          </FilterPanel>
         </aside>
 
         <section className="min-w-0">

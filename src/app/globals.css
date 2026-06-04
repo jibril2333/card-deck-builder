@@ -83,3 +83,13 @@ body {
   object-fit: cover;
   display: block;
 }
+
+/* Hide scrollbar but keep scrollability — used for mobile horizontal tab/chip
+   strips so they scroll without an ugly bar on a short element. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
