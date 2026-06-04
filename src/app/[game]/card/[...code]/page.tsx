@@ -258,17 +258,64 @@ function DigimonDetail({
             ) : null}
             {card.card_type ? <Badge>{card.card_type}</Badge> : null}
             {card.rarity ? <Badge>{card.rarity}</Badge> : null}
-            {card.attribute ? <Badge>{card.attribute}</Badge> : null}
-            {card.form ? <Badge>{card.form}</Badge> : null}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)]">
+        <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)]">
           <Stat label="Lv" value={card.level} />
           <Stat label="Play Cost" value={card.play_cost} />
           <Stat label="DP" value={card.dp} />
-          <Stat label="Stage" value={card.stage} />
         </div>
+
+        {/* Type line — 形态 / 属性 / 特征 grouped + labeled. These define the
+            card's identity and used to be scattered as unlabeled badges. */}
+        {card.stage || card.form || card.attribute || card.digi_types ? (
+          <div className="rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)] p-3 space-y-2.5">
+            {card.stage || card.form || card.attribute ? (
+              <div className="flex flex-wrap gap-x-8 gap-y-2">
+                {card.stage || card.form ? (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+                      形态
+                    </div>
+                    <div className="text-sm font-medium">
+                      {card.stage || card.form}
+                    </div>
+                  </div>
+                ) : null}
+                {card.attribute ? (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+                      属性
+                    </div>
+                    <div className="text-sm font-medium">{card.attribute}</div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {card.digi_types ? (
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+                  特征
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {card.digi_types
+                    .split("/")
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                    .map((t) => (
+                      <span
+                        key={t}
+                        className="px-2 py-0.5 rounded-md text-sm bg-[var(--color-bg)] border border-[var(--color-border)]"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {card.evolution_cost || card.evolution_requirements ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -283,7 +330,6 @@ function DigimonDetail({
         <EffectBlock label="源池效果" text={card.source_effect} />
 
         <div className="grid grid-cols-2 gap-3 text-xs text-[var(--color-muted-fg)] pt-3 border-t border-[var(--color-border)]">
-          <Stat label="Digi Types" value={card.digi_types} />
           <Stat label="收录" value={card.set_names} />
           <Stat label="画师" value={card.artist} />
           {card.source_url ? (
