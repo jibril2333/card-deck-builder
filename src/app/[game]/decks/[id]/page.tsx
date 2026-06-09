@@ -6,6 +6,10 @@ import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckMetaForm } from "@/components/deck-meta-form";
+import {
+  computeDeckSearchTargets,
+  type SearchGroup,
+} from "@/lib/deck-search";
 import { DeckStats, type StatPanel } from "@/components/deck-stats";
 import { colorHex as colorHexFn } from "@/lib/games";
 import {
@@ -172,6 +176,8 @@ type Loaded = {
   cards: DeckCardData[];
   exportCards: DeckCardForExport[];
   statsPanels: StatPanel[];
+  /** Digimon only: cardId → per-slot groups of deck cards its search can fetch. */
+  searchTargets: Map<string, SearchGroup[]>;
   cover: {
     image_url: string | null;
     code: string;
@@ -241,6 +247,20 @@ export default async function DeckEditPage({
         purchased: c.purchased,
         price: c.price,
       })),
+      searchTargets: computeDeckSearchTargets(
+        cards.map((c) => ({
+          id: c.id,
+          code: c.code,
+          name: c.name,
+          card_type: c.card_type,
+          color: c.color,
+          digi_types: c.digi_types,
+          image_url: c.image_url,
+          main_effect: c.main_effect,
+          inherited_effect: c.inherited_effect,
+          security_effect: c.security_effect,
+        })),
+      ),
       exportCards: cards.map((c) => ({
         code: c.code,
         name: c.name,
@@ -308,6 +328,8 @@ export default async function DeckEditPage({
         purchased: c.purchased,
         price: c.price,
       })),
+      // UA cards have no trait-search mechanic in our data — no badges.
+      searchTargets: new Map(),
       exportCards: cards.map((c) => ({
         code: c.code,
         name: c.name,
@@ -710,6 +732,7 @@ export default async function DeckEditPage({
                       isCover={c.id === loaded.deck.cover_card_id}
                       mode={mode}
                       mine={mine}
+                      searchTargets={loaded.searchTargets.get(c.id)}
                     />
                   ))}
                 </div>

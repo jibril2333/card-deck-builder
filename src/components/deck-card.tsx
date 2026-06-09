@@ -13,6 +13,8 @@ import {
 import { colorHex } from "@/lib/games";
 import { CardPriceInput } from "@/components/card-price-input";
 import { useCardPreview } from "@/components/card-preview";
+import { SearchTargets } from "@/components/search-targets";
+import type { SearchGroup } from "@/lib/deck-search";
 
 export type DeckCardData = {
   id: string;
@@ -44,6 +46,7 @@ export function DeckCard({
   isCover,
   mode,
   mine,
+  searchTargets,
 }: {
   game: string;
   deckId: string;
@@ -54,6 +57,9 @@ export function DeckCard({
    *  so non-owners (friend viewing a shared deck) can't change someone else's
    *  cover. Always true when mode is build/purchase (those modes are owner-only). */
   mine: boolean;
+  /** Digimon only: per-slot groups of deck cards this card's search effect
+   *  can fetch. When present, a 🔍 badge opens a popover listing them. */
+  searchTargets?: SearchGroup[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -120,7 +126,7 @@ export function DeckCard({
   return (
     <div
       onMouseEnter={onHover}
-      className={`group rounded-lg overflow-hidden border bg-[var(--color-card)] transition-colors ${
+      className={`group relative rounded-lg overflow-hidden border bg-[var(--color-card)] transition-colors ${
         done
           ? "border-green-500/60 ring-1 ring-green-500/30"
           : missing
@@ -128,6 +134,13 @@ export function DeckCard({
             : "border-[var(--color-border)] hover:border-[var(--color-fg)]"
       } ${pending ? "opacity-90" : ""}`}
     >
+      {/* Search/tutor badge — sits outside the Link (nested anchors are
+          invalid) and below the quantity badge at top-left. */}
+      {searchTargets && searchTargets.length > 0 ? (
+        <div className="absolute top-8 left-1.5 z-20">
+          <SearchTargets game={game} groups={searchTargets} />
+        </div>
+      ) : null}
       <Link href={href} className="block relative">
         <div className="card-thumb relative">
           <CardImage
