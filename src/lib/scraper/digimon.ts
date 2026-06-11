@@ -37,6 +37,60 @@ export type ScrapedCard = {
   image_url: string;
 };
 
+/**
+ * The JP site (digimoncard.com) renders the exact same DOM as the EN site
+ * (world.digimoncard.com) but with localized field labels. Parsers take a
+ * LabelMap so the same code scrapes both.
+ */
+export type LabelMap = {
+  color: string;
+  cost: string;
+  form: string;
+  attribute: string;
+  type: string;
+  evoCost: string;
+  evoCondition: string;
+  effect: string;
+  security: string;
+  inherited: string;
+  source: string;
+  notes: string;
+  /** Absolute prefix for relative image srcs. */
+  imageBase: string;
+};
+
+export const EN_LABELS: LabelMap = {
+  color: "Color",
+  cost: "Cost",
+  form: "Form",
+  attribute: "Attribute",
+  type: "Type",
+  evoCost: "Digivolve Cost 1",
+  evoCondition: "[Special Digivolution Condition]",
+  effect: "[Effect]",
+  security: "[Security Effect]",
+  inherited: "[Inherited Effect]",
+  source: "[Source Effect]",
+  notes: "Notes",
+  imageBase: "https://world.digimoncard.com",
+};
+
+export const JA_LABELS: LabelMap = {
+  color: "色",
+  cost: "コスト",
+  form: "形態",
+  attribute: "属性",
+  type: "タイプ",
+  evoCost: "進化条件1",
+  evoCondition: "[特殊進化]",
+  effect: "[効果]",
+  security: "[セキュリティ効果]",
+  inherited: "[進化元効果]",
+  source: "[ソース効果]",
+  notes: "入手情報",
+  imageBase: "https://digimoncard.com",
+};
+
 export function normalize(s: string | undefined): string {
   return (s ?? "").replace(/\s+/g, " ").trim();
 }
@@ -61,6 +115,7 @@ export function levelFromText(s: string | null): number | null {
 export function parseCardBlock(
   $: cheerio.CheerioAPI,
   block: AnyNode,
+  L: LabelMap = EN_LABELS,
 ): ScrapedCard | null {
   const $el = $(block);
   const code = normalize($el.find(".cardNo").first().text());
@@ -81,7 +136,7 @@ export function parseCardBlock(
   const colors: string[] = [];
   $el.find("dl.cardInfoBox").each((_i, dl) => {
     const dt = $(dl).find(".cardInfoTit").first();
-    if (normalize(dt.text()) !== "Color") return;
+    if (normalize(dt.text()) !== L.color) return;
     $(dl)
       .find("dd span[class^='cardColor_']")
       .each((_j, s) => {
@@ -110,34 +165,30 @@ export function parseCardBlock(
     return result;
   }
 
-  const play_cost = toInt(dd("Cost"));
+  const play_cost = toInt(dd(L.cost));
   const dp = toInt(dd("DP"));
-  const form = ndOrNull(dd("Form") ?? "");
+  const form = ndOrNull(dd(L.form) ?? "");
   // Stage isn't a separate field on this site - reuse Form (DB has both)
   const stage = form;
-  const attribute = ndOrNull(dd("Attribute") ?? "");
-  const digi_types = ndOrNull(dd("Type") ?? "");
-  const evolution_cost = ndOrNull(dd("Digivolve Cost 1") ?? "");
-  const evolution_requirements = effectByLabel(
-    $,
-    $el,
-    "[Special Digivolution Condition]",
-  );
+  const attribute = ndOrNull(dd(L.attribute) ?? "");
+  const digi_types = ndOrNull(dd(L.type) ?? "");
+  const evolution_cost = ndOrNull(dd(L.evoCost) ?? "");
+  const evolution_requirements = effectByLabel($, $el, L.evoCondition);
 
-  const main_effect = effectByLabel($, $el, "[Effect]");
-  const security_effect = effectByLabel($, $el, "[Security Effect]");
-  const inherited_effect = effectByLabel($, $el, "[Inherited Effect]");
+  const main_effect = effectByLabel($, $el, L.effect);
+  const security_effect = effectByLabel($, $el, L.security);
+  const inherited_effect = effectByLabel($, $el, L.inherited);
   // Source/Pool effects vary by translation; capture if present
-  const source_effect = effectByLabel($, $el, "[Source Effect]");
+  const source_effect = effectByLabel($, $el, L.source);
 
-  const set_names = ndOrNull(dd("Notes") ?? "");
+  const set_names = ndOrNull(dd(L.notes) ?? "");
 
   // Image
   let img = $el.find(".cardImg img").attr("src") ?? "";
   if (img.startsWith("../")) {
-    img = "https://world.digimoncard.com/" + img.replace(/^\.\.\//, "");
+    img = `${L.imageBase}/` + img.replace(/^\.\.\//, "");
   } else if (img.startsWith("/")) {
-    img = "https://world.digimoncard.com" + img;
+    img = L.imageBase + img;
   }
   // Strip cache-buster query string
   img = img.replace(/\?[^"?]+$/, "");
@@ -199,11 +250,11 @@ export function effectByLabel(
  * all share the same id (= code). Dedupe by code, preferring the base-art
  * printing (image_url with no _P<digit> suffix).
  */
-export function parseAll(html: string): ScrapedCard[] {
+export function parseAll(html: string, labels: LabelMap = EN_LABELS): ScrapedCard[] {
   const $ = cheerio.load(html);
   const byCode = new Map<string, ScrapedCard>();
   $(".popupCol").each((_i, el) => {
-    const c = parseCardBlock($, el);
+    const c = parseCardBlock($, el, labels);
     if (!c) return;
     const isBase = !/_P\d+\.png$/i.test(c.image_url);
     const existing = byCode.get(c.code);

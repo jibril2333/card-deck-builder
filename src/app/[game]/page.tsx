@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { isGameId, type GameId } from "@/lib/games";
+import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import {
   pickStr,
   pickList,
@@ -29,6 +31,9 @@ export default async function CardsPage({
 }) {
   const { game } = await params;
   if (!isGameId(game)) notFound();
+  const cardLang = parseCardLang(
+    (await cookies()).get(CARD_LANG_COOKIE)?.value,
+  );
   const sp = await searchParams;
   const page = Math.max(1, pickNum(sp, "page") ?? 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -194,6 +199,10 @@ export default async function CardsPage({
     // → "base" bucket, anything else → "parallel".
     const priceMap = digimon.getExternalPrices(r.rows.map((c) => c.id));
     const restrictionMap = digimon.getRestrictionMap(r.rows.map((c) => c.id));
+    const tMap = digimon.getDisplayTranslations(
+      r.rows.map((c) => c.code),
+      cardLang,
+    );
     rows = r.rows.map((c) => {
       const baseHref = `/${game}/card/${encD(c.code)}`;
       const href = c.variant
@@ -201,9 +210,15 @@ export default async function CardsPage({
         : baseHref;
       const priceKey = `${c.id}|${c.variant === "" ? "base" : "parallel"}`;
       const priceRow = priceMap.get(priceKey);
+      const t = tMap.get(c.code);
       return {
         ...c,
-        image_url: c.display_image,
+        name: t?.name ?? c.name,
+        // Alt-art tiles are pinned to their specific printing's art; only the
+        // base tile swaps to the localized card image.
+        image_url: c.variant
+          ? c.display_image
+          : (t?.image_url ?? c.display_image),
         variant_count: c.variant_count,
         href,
         market_price: priceRow?.price_yen ?? null,

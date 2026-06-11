@@ -1,5 +1,7 @@
 import { getDB } from "./connection";
 import { createDeckRepo, OwnershipError } from "./deck-shared";
+import type { CardTranslation } from "./translations-ddl";
+import type { CardLang } from "../card-lang";
 
 export type DigimonCard = {
   id: string;
@@ -100,8 +102,15 @@ export function searchCards(filters: DigimonFilters = {}): {
   const params: Record<string, unknown> = {};
 
   if (filters.q) {
+    // Also match translated names/effects (any language) so 「天女兽」 or
+    // 「テイルモン」 finds the card regardless of the display language.
     where.push(
-      "(name LIKE @q OR code LIKE @q OR main_effect LIKE @q OR inherited_effect LIKE @q OR security_effect LIKE @q OR digi_types LIKE @q)",
+      `(name LIKE @q OR code LIKE @q OR main_effect LIKE @q OR inherited_effect LIKE @q OR security_effect LIKE @q OR digi_types LIKE @q
+        OR EXISTS (
+          SELECT 1 FROM card_translations t
+          WHERE t.code = cards.code
+            AND (t.name LIKE @q OR t.effect_main LIKE @q OR t.traits LIKE @q)
+        ))`,
     );
     params.q = `%${filters.q}%`;
   }
@@ -241,6 +250,71 @@ export function getCardByCode(code: string): DigimonCard | undefined {
   return db()
     .prepare(`SELECT * FROM cards WHERE code = ?`)
     .get(code) as DigimonCard | undefined;
+}
+
+// ---- Card translations (CN/JP text from the official sites) ----
+
+/** Full translation row — the card detail page renders every field. */
+export function getCardTranslation(
+  code: string,
+  lang: CardLang,
+): CardTranslation | undefined {
+  if (lang === "en") return undefined;
+  return db()
+    .prepare(`SELECT * FROM card_translations WHERE code = ? AND lang = ?`)
+    .get(code, lang) as CardTranslation | undefined;
+}
+
+/**
+ * Display fields (name + localized art) for a batch of codes — used to
+ * overlay card grids/lists without changing any query's shape.
+ */
+export function getDisplayTranslations(
+  codes: string[],
+  lang: CardLang,
+): Map<string, { name: string | null; image_url: string | null }> {
+  const out = new Map<string, { name: string | null; image_url: string | null }>();
+  if (lang === "en" || codes.length === 0) return out;
+  const unique = [...new Set(codes)];
+  // SQLite caps host parameters; chunk to stay well under it.
+  for (let i = 0; i < unique.length; i += 500) {
+    const chunk = unique.slice(i, i + 500);
+    const rows = db()
+      .prepare(
+        `SELECT code, name, image_url FROM card_translations
+         WHERE lang = ? AND code IN (${chunk.map(() => "?").join(",")})`,
+      )
+      .all(lang, ...chunk) as {
+      code: string;
+      name: string | null;
+      image_url: string | null;
+    }[];
+    for (const r of rows) out.set(r.code, { name: r.name, image_url: r.image_url });
+  }
+  return out;
+}
+
+/**
+ * Overlay translated display fields (name / image) onto card-shaped rows,
+ * leaving every other field untouched. Pass `keepImage: true` for surfaces
+ * pinned to a specific printing's art (collection variants, chosen covers).
+ */
+export function overlayDisplay<
+  T extends { code: string; name: string; image_url?: string | null },
+>(rows: T[], lang: CardLang, opts?: { keepImage?: boolean }): T[] {
+  if (lang === "en" || rows.length === 0) return rows;
+  const map = getDisplayTranslations(rows.map((r) => r.code), lang);
+  return rows.map((r) => {
+    const t = map.get(r.code);
+    if (!t) return r;
+    return {
+      ...r,
+      name: t.name ?? r.name,
+      ...(opts?.keepImage
+        ? {}
+        : { image_url: t.image_url ?? r.image_url ?? null }),
+    };
+  });
 }
 
 export function getCardById(id: string): DigimonCard | undefined {

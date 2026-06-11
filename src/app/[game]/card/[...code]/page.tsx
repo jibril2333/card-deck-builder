@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
+import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { TopNav } from "@/components/top-nav";
 import { Badge } from "@/components/ui/badge";
 import { AddToDeck } from "@/components/add-to-deck";
@@ -33,6 +35,26 @@ export default async function CardPage({
   if (game === "digimon") {
     const card = digimon.getCardByCode(decoded);
     if (!card) notFound();
+    const cardLang = parseCardLang(
+      (await cookies()).get(CARD_LANG_COOKIE)?.value,
+    );
+    // Per-field overlay: anything the CN/JP source doesn't have falls back
+    // to the EN base text, so a partially-translated card still reads fine.
+    const t = digimon.getCardTranslation(card.code, cardLang);
+    const view: digimon.DigimonCard = t
+      ? {
+          ...card,
+          name: t.name ?? card.name,
+          card_type: t.card_type ?? card.card_type,
+          form: t.form ?? card.form,
+          stage: t.form ?? card.stage,
+          attribute: t.attribute ?? card.attribute,
+          digi_types: t.traits ?? card.digi_types,
+          main_effect: t.effect_main ?? card.main_effect,
+          security_effect: t.effect_2 ?? card.security_effect,
+          inherited_effect: t.effect_3 ?? card.inherited_effect,
+        }
+      : card;
     const decks = me
       ? digimon.listDecksWithCardQty(meId, card.id).map((d) => ({
           id: d.id,
@@ -49,12 +71,21 @@ export default async function CardPage({
     if (variants.length === 0 && card.image_url) {
       variants = [{ variant: "", image_url: card.image_url }];
     }
+    // Localized card art leads the gallery (and is the default view) when
+    // the user picked a language that has one.
+    if (t?.image_url) {
+      variants = [
+        { variant: `lang-${cardLang}`, image_url: t.image_url },
+        ...variants,
+      ];
+    }
     // Cardrush per-illustrator market prices (each distinct printing).
     const listings = digimon.getExternalListings(card.id);
     return (
       <DetailShell game={game}>
         <DigimonDetail
-          card={card}
+          card={view}
+          subName={t?.name && t.name !== card.name ? card.name : undefined}
           decks={decks}
           variants={variants}
           defaultVariant={defaultVariant}
@@ -170,6 +201,7 @@ function EffectBlock({
 
 function DigimonDetail({
   card,
+  subName,
   decks,
   variants,
   defaultVariant,
@@ -178,6 +210,8 @@ function DigimonDetail({
   readonly,
 }: {
   card: digimon.DigimonCard;
+  /** Original EN name, shown small under a translated title. */
+  subName?: string;
   decks: {
     id: string;
     name: string;
@@ -237,6 +271,11 @@ function DigimonDetail({
             {card.code}
           </div>
           <h1 className="text-2xl font-bold leading-tight">{card.name}</h1>
+          {subName ? (
+            <div className="text-sm text-[var(--color-muted-fg)] mt-0.5">
+              {subName}
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             {card.color ? (
               <span className="chip">

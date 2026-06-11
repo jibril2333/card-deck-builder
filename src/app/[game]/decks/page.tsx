@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { isGameId, GAMES, type GameId } from "@/lib/games";
+import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { TopNav } from "@/components/top-nav";
 import { DecksToolbar } from "@/components/decks-toolbar";
 import { DecksGrid } from "@/components/decks-grid";
@@ -71,9 +73,15 @@ export default async function DecksPage({
   //   - 卡组对比 (any pair of decks): full card list per deck
   // Loading both eagerly is cheap — typical user has <20 decks × ~50 cards.
   const lib = game === "digimon" ? digimon : ua;
+  const cardLang = parseCardLang(
+    (await cookies()).get(CARD_LANG_COOKIE)?.value,
+  );
   const deckCardLists = decks.map((d) => ({
     meta: d,
-    cards: lib.getDeckCards(d.id),
+    cards:
+      game === "digimon"
+        ? digimon.overlayDisplay(digimon.getDeckCards(d.id), cardLang)
+        : lib.getDeckCards(d.id),
   }));
 
   // Multi-deck missing-cards / shopping-list tool: limited to YOUR own decks,

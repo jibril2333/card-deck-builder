@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
+import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { TopNav } from "@/components/top-nav";
 import { RestrictionBadge } from "@/components/restriction-badge";
 import * as digimon from "@/lib/db/digimon";
@@ -29,8 +31,33 @@ export default async function RestrictionsPage({
   if (!isGameId(game)) notFound();
 
   const lib = game === "digimon" ? digimon : ua;
-  const rows = lib.listRestrictions();
-  const pairEdges = lib.listBannedPairs();
+  let rows = lib.listRestrictions();
+  let pairEdges = lib.listBannedPairs();
+
+  // Digimon: localize the displayed card names per the user's language pick.
+  if (game === "digimon") {
+    const cardLang = parseCardLang(
+      (await cookies()).get(CARD_LANG_COOKIE)?.value,
+    );
+    const codes = [
+      ...rows.map((r) => r.card_code).filter((c): c is string => !!c),
+      ...pairEdges.flatMap((e) => [e.trigger_code, e.banned_code]),
+    ].filter((c): c is string => !!c);
+    const tMap = digimon.getDisplayTranslations(codes, cardLang);
+    if (tMap.size > 0) {
+      rows = rows.map((r) => {
+        const t = r.card_code ? tMap.get(r.card_code) : undefined;
+        return t?.name ? { ...r, card_name: t.name } : r;
+      });
+      pairEdges = pairEdges.map((e) => ({
+        ...e,
+        trigger_name:
+          (e.trigger_code && tMap.get(e.trigger_code)?.name) || e.trigger_name,
+        banned_name:
+          (e.banned_code && tMap.get(e.banned_code)?.name) || e.banned_name,
+      }));
+    }
+  }
 
   const banned = rows.filter((r) => r.status === "banned");
   const limited1 = rows.filter((r) => r.status === "limited_1");

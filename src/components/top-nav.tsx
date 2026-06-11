@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { GAMES, type GameId } from "@/lib/games";
 import { cn } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/auth/session";
 import { UserMenu } from "@/components/user-menu";
+import { CardLangSwitcher } from "@/components/card-lang-switcher";
+import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 
 type TopNavProps = {
   game: GameId;
@@ -20,6 +23,9 @@ const TABS: { id: TopNavProps["active"]; label: string; sub: string }[] = [
 export async function TopNav({ game, active }: TopNavProps) {
   const accent = GAMES[game].accent;
   const user = await getCurrentUser();
+  const cardLang = parseCardLang(
+    (await cookies()).get(CARD_LANG_COOKIE)?.value,
+  );
   // Anon: hide the personal tabs (collection is the *current* user's own,
   // which makes no sense without a user). Keep search / decks / restrictions
   // / about — those are public reads.
@@ -89,6 +95,8 @@ export async function TopNav({ game, active }: TopNavProps) {
             );
           })}
         </nav>
+
+        {game === "digimon" ? <CardLangSwitcher current={cardLang} /> : null}
 
         {user ? (
           <UserMenu user={user} />

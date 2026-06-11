@@ -17,7 +17,9 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { isGameId, type GameId } from "@/lib/games";
+import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import {
   pickStr,
   pickList,
@@ -181,10 +183,16 @@ export default async function CollectionPage({
     });
     const collMap = digimon.getCollectionMap(me.id);
     const restrictionMap = digimon.getRestrictionMap(r.rows.map((c) => c.id));
+    // Tiles here are per-PRINTING (alt arts expanded), so keep each tile's
+    // own art and only localize the name.
+    const tMap = digimon.getDisplayTranslations(
+      r.rows.map((c) => c.code),
+      parseCardLang((await cookies()).get(CARD_LANG_COOKIE)?.value),
+    );
     rows = r.rows.map((c) => ({
       card_id: c.id,
       code: c.code,
-      name: c.name,
+      name: tMap.get(c.code)?.name ?? c.name,
       color: c.color,
       rarity: c.rarity,
       image_url: c.display_image,

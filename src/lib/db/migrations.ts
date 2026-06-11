@@ -11,6 +11,7 @@
  */
 
 import type Database from "better-sqlite3";
+import { CARD_TRANSLATIONS_DDL } from "./translations-ddl";
 
 type Migration = {
   id: number; // monotonically increasing; equals the resulting user_version
@@ -503,6 +504,17 @@ const MIGRATIONS: Migration[] = [
           "ALTER TABLE user.decks ADD COLUMN accent_color2 TEXT DEFAULT NULL",
         );
       }
+    },
+  },
+  {
+    id: 16,
+    name: "card_translations (CN/JP card text)",
+    up: (db) => {
+      // Localized card text, keyed by BASE card code + lang. Lives in the
+      // MAIN (cards) db: scraper-maintained reference data, rebuildable any
+      // time, like `cards` itself. DDL is shared with the scraper scripts
+      // (which may create the table before the app ever migrates).
+      db.exec(CARD_TRANSLATIONS_DDL);
     },
   },
 ];

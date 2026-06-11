@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isGameId, type GameId, colorHex } from "@/lib/games";
+import { cookies } from "next/headers";
+import { isGameId, type GameId, colorHex, GAMES } from "@/lib/games";
+import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { TopNav } from "@/components/top-nav";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckMetaForm } from "@/components/deck-meta-form";
+import { DeckImageExport } from "@/components/deck-image-export";
 import {
   computeDeckSearchTargets,
   type SearchGroup,
@@ -218,6 +221,13 @@ export default async function DeckEditPage({
     const deck = digimon.getDeck(id);
     if (!deck) notFound();
     const cards = digimon.getDeckCards(id);
+    const cardLang = parseCardLang(
+      (await cookies()).get(CARD_LANG_COOKIE)?.value,
+    );
+    const tMap = digimon.getDisplayTranslations(
+      cards.map((c) => c.code),
+      cardLang,
+    );
     const coverCard = deck.cover_card_id
       ? cards.find((c) => c.id === deck.cover_card_id) ??
         digimon.getCardById(deck.cover_card_id)
@@ -236,31 +246,54 @@ export default async function DeckEditPage({
         updated_at: deck.updated_at,
         user_id: deck.user_id,
       },
-      cards: cards.map((c) => ({
-        id: c.id,
-        code: c.code,
-        name: c.name,
-        color: c.color,
-        rarity: c.rarity,
-        image_url: c.image_url,
-        quantity: c.quantity,
-        purchased: c.purchased,
-        price: c.price,
-      })),
-      searchTargets: computeDeckSearchTargets(
-        cards.map((c) => ({
+      cards: cards.map((c) => {
+        const t = tMap.get(c.code);
+        return {
           id: c.id,
           code: c.code,
-          name: c.name,
-          card_type: c.card_type,
+          name: t?.name ?? c.name,
           color: c.color,
-          digi_types: c.digi_types,
-          image_url: c.image_url,
-          main_effect: c.main_effect,
-          inherited_effect: c.inherited_effect,
-          security_effect: c.security_effect,
-        })),
-      ),
+          rarity: c.rarity,
+          image_url: t?.image_url ?? c.image_url,
+          quantity: c.quantity,
+          purchased: c.purchased,
+          price: c.price,
+        };
+      }),
+      // Search-target parsing relies on the EN effect wording — always feed
+      // it the raw EN rows; only the rendered target names/art get localized.
+      searchTargets: (() => {
+        const m = computeDeckSearchTargets(
+          cards.map((c) => ({
+            id: c.id,
+            code: c.code,
+            name: c.name,
+            card_type: c.card_type,
+            color: c.color,
+            digi_types: c.digi_types,
+            image_url: c.image_url,
+            main_effect: c.main_effect,
+            inherited_effect: c.inherited_effect,
+            security_effect: c.security_effect,
+          })),
+        );
+        if (tMap.size === 0) return m;
+        for (const groups of m.values()) {
+          for (const g of groups) {
+            g.targets = g.targets.map((tg) => {
+              const t = tMap.get(tg.code);
+              return t
+                ? {
+                    ...tg,
+                    name: t.name ?? tg.name,
+                    image_url: t.image_url ?? tg.image_url,
+                  }
+                : tg;
+            });
+          }
+        }
+        return m;
+      })(),
       exportCards: cards.map((c) => ({
         code: c.code,
         name: c.name,
@@ -523,7 +556,8 @@ export default async function DeckEditPage({
           </div>
 
           {/* mode switcher — only show build/purchase tabs if this deck is mine */}
-          <div className="flex items-center gap-1 mt-3 p-0.5 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)] w-fit">
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+          <div className="flex items-center gap-1 p-0.5 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)] w-fit">
             <Link
               href={`/${game}/decks/${loaded.deck.id}`}
               replace
@@ -564,6 +598,32 @@ export default async function DeckEditPage({
                 </Link>
               </>
             ) : null}
+          </div>
+
+          <Link
+            href={`/${game}/decks/${loaded.deck.id}/playtest`}
+            className="px-3 h-8 rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] flex items-center gap-1.5"
+            title="起手模拟 + 抽到概率计算"
+          >
+            🎲 试玩
+          </Link>
+          <DeckImageExport
+            deckName={loaded.deck.name}
+            accent={loaded.deck.accent_color}
+            accent2={loaded.deck.accent_color2}
+            gameLabel={GAMES[game as GameId].label}
+            subtitle={
+              loaded.isDigimon
+                ? `主卡组 ${main} 张 · 蛋卡 ${eggs} 张`
+                : `共 ${main} 张`
+            }
+            cards={loaded.cards.map((c) => ({
+              code: c.code,
+              name: c.name,
+              image_url: c.image_url ?? null,
+              quantity: c.quantity,
+            }))}
+          />
           </div>
 
           {cardPool ? (
