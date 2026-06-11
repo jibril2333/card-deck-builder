@@ -16,7 +16,7 @@
 import Database from "better-sqlite3";
 import path from "node:path";
 
-const DB_PATH = path.join(process.cwd(), "data", "digimon.db");
+const DB_PATH = path.join(process.cwd(), "data.nosync", "digimon.db");
 // Extensionless path — the `.php` form 301-redirects here.
 const API = "https://digimoncard.io/api-public/search";
 const IMG_BASE = "https://images.digimoncard.io/images/cards";

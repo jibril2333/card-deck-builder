@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/node_modules.nosync
 /.pnp
 .pnp.*
 .yarn/*
@@ -35,7 +36,10 @@
 # local databases — user decks/collection/accounts + scraped card data live
 # here (under the project per the owner's setup). NEVER commit: the repo is
 # public and these contain personal data. Includes sqlite WAL/SHM sidecars.
+# (.nosync suffix keeps iCloud from evicting/trashing the live SQLite files;
+# the plain /data/ entry stays as a guard against accidental re-creation.)
 /data/
+/data.nosync/
 *.db
 *.db-wal
 *.db-shm

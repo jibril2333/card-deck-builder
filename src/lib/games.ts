@@ -23,19 +23,23 @@ type GameInfo = {
 // folder into the iCloud Trash, which broke the open connections
 // (SQLITE_READONLY_DBMOVED) mid-session. ~/Library is never iCloud-synced,
 // so the databases stay put. Override with CDB_*_DB in .env.local if needed.
-// Single flat folder holds every database, inside the project at ./data
-// (resolved from the process cwd, which is the repo root for both the
-// Next servers and the tsx scripts). Cards DB and user DB for each game sit
-// side-by-side, distinguished by a "<game>-" filename prefix so the two
-// games' user data can't collide:
-//   data/digimon.db        data/digimon-user.db
-//   data/unionarena.db     data/unionarena-user.db
-//   data/backups/<db-name>/<date>.db
+// Single flat folder holds every database, inside the project at
+// ./data.nosync (resolved from the process cwd, which is the repo root for
+// both the Next servers and the tsx scripts). The ".nosync" suffix makes
+// iCloud skip the folder entirely — the project lives in an iCloud-synced
+// directory, and iCloud has both trashed live SQLite folders and evicted
+// file contents ("dataless" files) from a plain ./data. Cards DB and user
+// DB for each game sit side-by-side, distinguished by a "<game>-" filename
+// prefix so the two games' user data can't collide:
+//   data.nosync/digimon.db        data.nosync/digimon-user.db
+//   data.nosync/unionarena.db     data.nosync/unionarena-user.db
+//   data.nosync/backups/<db-name>/<date>.db
 //
-// `data/` is gitignored — it holds personal user data and the repo is public.
+// `data.nosync/` is gitignored — it holds personal user data and the repo
+// is public.
 // Override the base with CDB_DATA_DIR, or individual files with CDB_*_DB.
 const DATA_BASE =
-  process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data");
+  process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync");
 const DEFAULT_DIGIMON_DB = path.join(DATA_BASE, "digimon.db");
 const DEFAULT_UA_DB = path.join(DATA_BASE, "unionarena.db");
 const DEFAULT_DIGIMON_USER_DB = path.join(DATA_BASE, "digimon-user.db");

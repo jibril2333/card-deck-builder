@@ -4,6 +4,36 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+## iCloud is hostile to this project
+
+The repo lives in iCloud-synced ~/Desktop. iCloud has (a) moved live SQLite
+folders to its trash, (b) evicted file contents leaving 0-content "dataless"
+stubs (`ls -lO` shows `dataless`; reads return EMPTY, they do NOT
+auto-materialize), which silently broke `next build` and emptied DB backups.
+Defenses — keep all of these intact:
+
+- `data.nosync/` — all SQLite DBs + backups (`.nosync` suffix = iCloud ignores)
+- `.next.nosync/` — build output
+
+`node_modules` must stay a REAL directory. The symlink-to-`.nosync` trick was
+tried and REVERTED: with a symlinked node_modules, Next's
+`serverExternalPackages` no longer matches better-sqlite3 (realpath mismatch),
+webpack bundles it, and the native `better_sqlite3.node` fails to load at
+runtime (bindings searches inside `.next.nosync/prod/`). If iCloud evicts
+node_modules again (symptom: CLIs exit 0 silently / TransformError /
+"package could not be found"), repair = `npm ci`. Build traces are excluded
+from the `.nosync` dirs in next.config.ts and the build script raises the
+heap — keep both.
+
+Root cause of the aggressive eviction: the disk runs low on free space
+(~20GB), so macOS "Optimize Mac Storage" evicts iCloud-synced files
+constantly. The durable fix is moving the repo out of ~/Desktop entirely.
+
+If a file mysteriously reads as empty, check `ls -lO` for `dataless` and run
+`brctl download <path>` — but files renamed into a `.nosync` dir while still
+dataless are orphaned and unrecoverable locally (server copy may be in
+iCloud.com → Recently Deleted for 30 days).
+
 ## Local servers
 
 The owner runs two parallel servers locally:

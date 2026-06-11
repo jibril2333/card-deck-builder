@@ -16,7 +16,7 @@ import path from "node:path";
 
 const DB_PATH = path.join(
   process.cwd(),
-  "data",
+  "data.nosync",
   "digimon.db",
 );
 const BASE_URL = "https://world.digimoncard.com/images/cardlist/card";

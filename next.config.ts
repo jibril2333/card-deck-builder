@@ -7,6 +7,12 @@ import {
 const baseConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
   typedRoutes: false,
+  // Build-trace collection (deployment packaging metadata; unused by local
+  // `next start`) walks the whole project and OOMs on the huge .nosync dirs
+  // — keep it away from them.
+  outputFileTracingExcludes: {
+    "*": ["node_modules.nosync/**", "data.nosync/**", ".next.nosync/**"],
+  },
 };
 
 // Build output lives under `.next.nosync/`. The project sits in an

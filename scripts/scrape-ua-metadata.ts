@@ -29,7 +29,7 @@ import { checkUASanity, formatUASanityReport } from "../src/lib/scraper/sanity-u
 
 const DB_PATH = path.join(
   process.cwd(),
-  "data",
+  "data.nosync",
   "unionarena.db",
 );
 const BASE_URL = "https://www.unionarena-tcg.com";

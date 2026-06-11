@@ -35,7 +35,7 @@ import {
   formatSanityReport,
 } from "../src/lib/scraper/sanity";
 
-const DB_PATH = path.join(process.cwd(), "data", "digimon.db");
+const DB_PATH = path.join(process.cwd(), "data.nosync", "digimon.db");
 const SEARCH_URL = "https://world.digimoncard.com/cards/index.php?search=true";
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
