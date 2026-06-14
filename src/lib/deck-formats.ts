@@ -13,8 +13,11 @@
  *   blank lines and lines starting with "//" or "#" are comments
  *   "===", "---", "Eggs:" etc are treated as section dividers (ignored)
  *
- * On export we produce the canonical "<qty> <code> <name>" form. Egg-deck cards
- * (Digi-Egg type) are grouped under an "// Egg" comment for human readability.
+ * On export we produce the "<qty> <name> <code>" form (name BEFORE code) —
+ * DCGO's importer requires the code to be the LAST token on the line. Egg-deck
+ * cards (Digi-Egg type) come first, then a blank line, then the main deck, with
+ * NO "//" comment lines (DCGO rejects those too). digimoncard.io extracts the
+ * code by pattern regardless of position, so this stays compatible with both.
  *
  * We also accept a JSON-array export (used by app.digicamoe.cn and similar):
  *   ["exported from app.digicamoe.cn", "EX12-061", "EX12-061", "EX12-061", ...]
@@ -130,32 +133,29 @@ export type DeckCardForExport = {
 };
 
 /**
- * Canonical text format: lines `<qty> <code> <name>`, with Digi-Egg cards in
- * their own block at the top under a "// Egg" comment.
+ * Canonical text format: lines `<qty> <code> <name>`, Digi-Egg cards first,
+ * then a blank line, then the main deck.
+ *
+ * NO `//` comment lines (not even the deck name or section labels): DCGO's
+ * importer rejects comments, and every other tool detects egg vs. main by
+ * card type rather than by a label, so the comments were cosmetic-only and
+ * cost us cross-tool compatibility. A single blank line between the two
+ * blocks is universally treated as a skippable empty line.
  */
-export function exportDeckText(
-  name: string,
-  cards: DeckCardForExport[],
-): string {
+export function exportDeckText(cards: DeckCardForExport[]): string {
   const eggs = cards.filter((c) => c.card_type === "Digi-Egg");
   const main = cards.filter((c) => c.card_type !== "Digi-Egg");
 
+  // "<qty> <name> <code>" — code last (DCGO requires it); name omitted-safe.
+  const line = (c: DeckCardForExport) =>
+    `${c.quantity} ${c.name} ${c.code}`.replace(/\s+/g, " ").trim();
+  const block = (list: DeckCardForExport[]) =>
+    list.sort((a, b) => a.code.localeCompare(b.code)).map(line);
+
   const out: string[] = [];
-  out.push(`// ${name}`);
-  if (eggs.length) {
-    out.push("");
-    out.push("// Egg");
-    for (const c of eggs.sort((a, b) => a.code.localeCompare(b.code))) {
-      out.push(`${c.quantity} ${c.code} ${c.name}`.trim());
-    }
-  }
-  if (main.length) {
-    out.push("");
-    out.push("// Main");
-    for (const c of main.sort((a, b) => a.code.localeCompare(b.code))) {
-      out.push(`${c.quantity} ${c.code} ${c.name}`.trim());
-    }
-  }
+  if (eggs.length) out.push(...block(eggs));
+  if (eggs.length && main.length) out.push("");
+  if (main.length) out.push(...block(main));
   return out.join("\n") + "\n";
 }
 

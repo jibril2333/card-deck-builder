@@ -90,20 +90,23 @@ describe("parseDeckText", () => {
 });
 
 describe("exportDeckText / round-trip", () => {
-  it("groups Digi-Egg cards under // Egg and main under // Main", () => {
-    const out = exportDeckText("My Deck", [
+  it("emits '<qty> <name> <code>' (code last), eggs first, no // comments (DCGO)", () => {
+    const out = exportDeckText([
       { code: "BT1-084", name: "Greymon", card_type: "Digimon", quantity: 4 },
       { code: "BT1-001", name: "Botamon", card_type: "Digi-Egg", quantity: 4 },
       { code: "BT1-085", name: "MetalGreymon", card_type: "Digimon", quantity: 3 },
     ]);
-    expect(out).toContain("// My Deck");
-    expect(out).toContain("// Egg");
-    expect(out).toContain("4 BT1-001 Botamon");
-    expect(out).toContain("// Main");
-    expect(out).toContain("4 BT1-084 Greymon");
-    expect(out).toContain("3 BT1-085 MetalGreymon");
-    // Egg section appears before Main
-    expect(out.indexOf("// Egg")).toBeLessThan(out.indexOf("// Main"));
+    // DCGO rejects comments and requires the code as the LAST token.
+    expect(out).not.toMatch(/^\s*\/\//m);
+    expect(out).toContain("4 Botamon BT1-001");
+    expect(out).toContain("4 Greymon BT1-084");
+    expect(out).toContain("3 MetalGreymon BT1-085");
+    // Every non-blank line must end with the card code.
+    for (const ln of out.split("\n").filter((l) => l.trim())) {
+      expect(ln).toMatch(/[A-Z]+\d*-\d+(?:_[A-Za-z0-9]+)?$/);
+    }
+    // Egg card appears before the main-deck cards.
+    expect(out.indexOf("BT1-001")).toBeLessThan(out.indexOf("BT1-084"));
   });
 
   it("round-trips: export -> parse yields the same stacks", () => {
@@ -112,7 +115,7 @@ describe("exportDeckText / round-trip", () => {
       { code: "BT1-001", name: "Botamon", card_type: "Digi-Egg", quantity: 4 },
       { code: "BT1-085", name: "MetalGreymon", card_type: "Digimon", quantity: 3 },
     ];
-    const text = exportDeckText("My Deck", cards);
+    const text = exportDeckText(cards);
     const { lines, errors } = parseDeckText(text);
     expect(errors).toEqual([]);
     const sumByCode = new Map(lines.map((l) => [l.code, l.qty]));

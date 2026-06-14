@@ -463,7 +463,7 @@ export default async function DeckEditPage({
   const eggOk = loaded.isDigimon ? eggs <= target.egg : true;
 
   // Export strings
-  const exportText = exportDeckText(loaded.deck.name, loaded.exportCards);
+  const exportText = exportDeckText(loaded.exportCards);
   const exportUrl = exportDigimoncardIoUrl(loaded.exportCards);
 
   // Purchase stats
