@@ -49,7 +49,12 @@ export function CardImageGallery({
         type="button"
         onClick={() => setLightboxOpen(true)}
         aria-label={`查看大图：${name}`}
-        className="card-thumb max-w-[300px] mx-auto md:mx-0 border border-[var(--color-border)] cursor-zoom-in block hover:border-[var(--color-fg)] transition-colors"
+        /* w-full (not just `block`): a <button> sizes to fit-content by
+           default, and on iOS Safari `display:block` doesn't override that.
+           Without an explicit width the box collapses to ~0 until the image
+           loads, so aspect-ratio renders it tiny and it "grows" on relayout.
+           Filling the container (capped at 300px) keeps the box stable. */
+        className="card-thumb w-full max-w-[300px] mx-auto md:mx-0 border border-[var(--color-border)] cursor-zoom-in block hover:border-[var(--color-fg)] transition-colors"
       >
         <img src={cur.image_url} alt={name} referrerPolicy="no-referrer" />
       </button>
