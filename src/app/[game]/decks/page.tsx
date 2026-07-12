@@ -5,6 +5,7 @@ import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { TopNav } from "@/components/top-nav";
 import { DecksToolbar } from "@/components/decks-toolbar";
 import { DecksGrid } from "@/components/decks-grid";
+import { GroupsStrip } from "@/components/groups-strip";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import * as ua from "@/lib/db/unionarena";
@@ -118,6 +119,9 @@ export default async function DecksPage({
     })),
   }));
 
+  // Shared-pool groups (own decks that share one physical card set).
+  const groups = me ? lib.listGroups(me.id) : [];
+
   return (
     <>
       <TopNav game={game as GameId} active="decks" />
@@ -149,6 +153,10 @@ export default async function DecksPage({
             </a>
           </div>
         )}
+
+        {me && (groups.length > 0 || decks.some((d) => d.mine)) ? (
+          <GroupsStrip game={game} groups={groups} />
+        ) : null}
 
         {decks.length === 0 ? (
           <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">

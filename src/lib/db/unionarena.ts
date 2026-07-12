@@ -335,6 +335,18 @@ export const {
   adjustDeckCard,
   listRestrictions,
   listBannedPairs,
+  listGroups,
+  getGroup,
+  createGroup,
+  renameGroup,
+  deleteGroup,
+  setGroupDecks,
+  getGroupPool,
+  groupMemberDeckIds,
+  decksSharingPoolWith,
+  pooledOwnedForCard,
+  maxNeedForCard,
+  reconcilePoolCard,
 } = deckRepo;
 
 export function createDeck(input: {

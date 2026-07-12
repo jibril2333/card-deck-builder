@@ -250,6 +250,56 @@ export function effectByLabel(
  * all share the same id (= code). Dedupe by code, preferring the base-art
  * printing (image_url with no _P<digit> suffix).
  */
+/** One official Q&A entry for a card (from the JP site's カードQ&A block). */
+export type ScrapedRuling = {
+  code: string;
+  q_number: string; // "Q6309"
+  date: string; // "2026.05.08" (the "更新" suffix stripped)
+  question: string;
+  answer: string;
+};
+
+/**
+ * Parse the official card Q&A out of a result page. Each `.popupCol` (one per
+ * printing) may carry a `ul.cardFaqList`; we key the entries by the printing's
+ * code and dedupe by code+q_number across the parallel printings. Newlines in
+ * answers (the site uses <br>) are preserved.
+ *
+ * Source is the JP cardlist (digimoncard.com), the authoritative Q&A — the EN
+ * site doesn't carry these, and the CN site exposes no rulings API.
+ */
+export function parseRulingsAll(html: string): ScrapedRuling[] {
+  const $ = cheerio.load(html);
+  const out: ScrapedRuling[] = [];
+  const seen = new Set<string>(); // code|qnum
+  $(".popupCol").each((_i, el) => {
+    const $el = $(el);
+    const code = normalize($el.find(".cardNo").first().text());
+    if (!code) return;
+    $el.find("ul.cardFaqList li.cardFaqListItem").each((_j, li) => {
+      const $li = $(li);
+      const q_number = normalize($li.find(".cardFaqNum").first().text());
+      const date = normalize($li.find(".cardFaqDate").first().text())
+        .replace(/\s*更新\s*$/, "")
+        .trim();
+      const question = normalize($li.find(".cardFaqQuestion").first().text());
+      const $ans = $li.find(".cardFaqAnswer").first().clone();
+      const SENT = "__BR__";
+      $ans.find("br").replaceWith(SENT);
+      const answer = normalize($ans.text()).replace(
+        new RegExp(`\\s*${SENT}\\s*`, "g"),
+        "\n",
+      );
+      if (!q_number || (!question && !answer)) return;
+      const key = `${code}|${q_number}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ code, q_number, date, question, answer });
+    });
+  });
+  return out;
+}
+
 export function parseAll(html: string, labels: LabelMap = EN_LABELS): ScrapedCard[] {
   const $ = cheerio.load(html);
   const byCode = new Map<string, ScrapedCard>();

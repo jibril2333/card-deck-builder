@@ -1,6 +1,7 @@
 import { getDB } from "./connection";
 import { createDeckRepo, OwnershipError } from "./deck-shared";
 import type { CardTranslation } from "./translations-ddl";
+import type { CardRuling } from "./rulings-ddl";
 import type { CardLang } from "../card-lang";
 
 export type DigimonCard = {
@@ -252,6 +253,19 @@ export function getCardByCode(code: string): DigimonCard | undefined {
     .get(code) as DigimonCard | undefined;
 }
 
+// ---- Card rulings (official Q&A from the JP site) ----
+
+/** Official Q&A for a card, newest first. Empty if the card has no rulings. */
+export function getCardRulings(code: string): CardRuling[] {
+  return db()
+    .prepare(
+      `SELECT code, q_number, lang, date, question, answer
+       FROM card_rulings WHERE code = ?
+       ORDER BY date DESC, q_number DESC`,
+    )
+    .all(code) as CardRuling[];
+}
+
 // ---- Card translations (CN/JP text from the official sites) ----
 
 /** Full translation row — the card detail page renders every field. */
@@ -430,6 +444,18 @@ export const {
   adjustDeckCard,
   listRestrictions,
   listBannedPairs,
+  listGroups,
+  getGroup,
+  createGroup,
+  renameGroup,
+  deleteGroup,
+  setGroupDecks,
+  getGroupPool,
+  groupMemberDeckIds,
+  decksSharingPoolWith,
+  pooledOwnedForCard,
+  maxNeedForCard,
+  reconcilePoolCard,
 } = deckRepo;
 
 export function createDeck(input: {

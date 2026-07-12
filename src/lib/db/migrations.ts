@@ -12,6 +12,7 @@
 
 import type Database from "better-sqlite3";
 import { CARD_TRANSLATIONS_DDL } from "./translations-ddl";
+import { CARD_RULINGS_DDL } from "./rulings-ddl";
 
 type Migration = {
   id: number; // monotonically increasing; equals the resulting user_version
@@ -515,6 +516,42 @@ const MIGRATIONS: Migration[] = [
       // time, like `cards` itself. DDL is shared with the scraper scripts
       // (which may create the table before the app ever migrates).
       db.exec(CARD_TRANSLATIONS_DDL);
+    },
+  },
+  {
+    id: 17,
+    name: "card_rulings (official Q&A)",
+    up: (db) => {
+      db.exec(CARD_RULINGS_DDL);
+    },
+  },
+  {
+    id: 18,
+    name: "deck_groups (shared physical card pools)",
+    up: (db) => {
+      // A "deck group" models several decks that SHARE one physical set of
+      // cards: the owner buys each shared card only once (max copies any
+      // single member deck needs) and reassembles whichever deck they're
+      // playing. Membership is many-to-many and scoped to the group, so the
+      // pooled requirement ignores decks outside the group. Both tables live
+      // in user.db next to decks; deleting a deck or group cascades cleanly.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user.deck_groups (
+          id         TEXT PRIMARY KEY,
+          name       TEXT NOT NULL,
+          user_id    TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS user.deck_group_members (
+          group_id TEXT NOT NULL REFERENCES deck_groups(id) ON DELETE CASCADE,
+          deck_id  TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+          PRIMARY KEY (group_id, deck_id)
+        );
+        CREATE INDEX IF NOT EXISTS user.idx_deck_groups_user
+          ON deck_groups(user_id);
+        CREATE INDEX IF NOT EXISTS user.idx_deck_group_members_deck
+          ON deck_group_members(deck_id);
+      `);
     },
   },
 ];

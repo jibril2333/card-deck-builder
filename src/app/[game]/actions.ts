@@ -162,6 +162,83 @@ export async function deleteDeckAction(formData: FormData) {
   redirect(`/${game}/decks`);
 }
 
+// ---------- Deck groups (shared physical card pools) ----------
+
+function bumpGroups(game: GameId, groupId?: string): void {
+  revalidatePath(`/${game}/decks`);
+  if (groupId) revalidatePath(`/${game}/groups/${groupId}`);
+}
+
+/**
+ * After a card's quantity changes in a pooled deck, make ONLY THAT DECK inherit
+ * the pool's existing shared-held count (capped at its own quantity), so a
+ * freshly-added copy shows as already-owned. We deliberately do NOT reconcile
+ * the other member decks here: a quantity edit must never change how many
+ * copies you physically hold, so it must never lower a sibling deck's held.
+ * (Held only changes via explicit held edits — purchase mode ± / the pool
+ * stepper, which DO reconcile the whole pool.) No-op for non-pooled decks.
+ */
+function syncPoolForCard(
+  game: GameId,
+  userId: string,
+  deckId: string,
+  cardId: string,
+): boolean {
+  const peers = lib(game).decksSharingPoolWith(userId, deckId);
+  if (peers.length <= 1) return false;
+  const owned = lib(game).pooledOwnedForCard(peers, cardId);
+  lib(game).reconcilePoolCard([deckId], cardId, owned);
+  return true;
+}
+
+export async function createGroupAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const name = String(formData.get("name") ?? "").trim() || "新组合";
+  if (!isGameId(game)) throw new Error("invalid game");
+  backupBeforeWrite(game);
+  const id = lib(game).createGroup(me.id, name);
+  // A new group is empty; seed it with any decks ticked on the create form.
+  const deckIds = formData.getAll("deck_id").map(String).filter(Boolean);
+  if (deckIds.length) lib(game).setGroupDecks(me.id, id, deckIds);
+  bumpGroups(game);
+  redirect(`/${game}/groups/${id}`);
+}
+
+export async function renameGroupAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const id = String(formData.get("id"));
+  const name = String(formData.get("name") ?? "").trim();
+  if (!isGameId(game)) throw new Error("invalid game");
+  if (!name) return;
+  backupBeforeWrite(game);
+  lib(game).renameGroup(me.id, id, name);
+  bumpGroups(game, id);
+}
+
+export async function deleteGroupAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const id = String(formData.get("id"));
+  if (!isGameId(game)) throw new Error("invalid game");
+  backupBeforeWrite(game);
+  lib(game).deleteGroup(me.id, id);
+  bumpGroups(game);
+  redirect(`/${game}/decks`);
+}
+
+export async function setGroupDecksAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const id = String(formData.get("id"));
+  const deckIds = formData.getAll("deck_id").map(String).filter(Boolean);
+  if (!isGameId(game)) throw new Error("invalid game");
+  backupBeforeWrite(game);
+  lib(game).setGroupDecks(me.id, id, deckIds);
+  bumpGroups(game, id);
+}
+
 export async function adjustDeckCardAction(formData: FormData) {
   const me = await requireUser();
   const game = String(formData.get("game"));
@@ -171,7 +248,9 @@ export async function adjustDeckCardAction(formData: FormData) {
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
   lib(game).adjustDeckCard(me.id, deckId, cardId, delta);
-  bumpDeck(game, deckId);
+  // Pooled deck: a card just added/resized should inherit the pool's held.
+  if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
+  else bumpDeck(game, deckId);
 }
 
 export async function reorderDecksAction(formData: FormData) {
@@ -224,7 +303,8 @@ export async function setDeckCardQuantityAction(formData: FormData) {
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
   lib(game).setDeckCardQuantity(me.id, deckId, cardId, quantity);
-  bumpDeck(game, deckId);
+  if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
+  else bumpDeck(game, deckId);
 }
 
 export async function adjustDeckCardPurchasedAction(formData: FormData) {
@@ -235,8 +315,38 @@ export async function adjustDeckCardPurchasedAction(formData: FormData) {
   const delta = Number(formData.get("delta") ?? 0);
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  lib(game).adjustDeckCardPurchased(me.id, deckId, cardId, delta);
-  bumpDeck(game, deckId);
+  // Pooled deck: ±1 adjusts the SHARED held count (max across the pool), then
+  // re-applies it to every member deck (each capped at its own quantity).
+  const peers = lib(game).decksSharingPoolWith(me.id, deckId);
+  if (peers.length > 1) {
+    const cur = lib(game).pooledOwnedForCard(peers, cardId);
+    const owned = Math.min(
+      Math.max(0, cur + delta),
+      lib(game).maxNeedForCard(peers, cardId),
+    );
+    lib(game).reconcilePoolCard(peers, cardId, owned);
+    bumpGame(game);
+  } else {
+    lib(game).adjustDeckCardPurchased(me.id, deckId, cardId, delta);
+    bumpDeck(game, deckId);
+  }
+}
+
+/** Set a card's shared held count for a whole pool (from the pool view). */
+export async function setPoolCardOwnedAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const groupId = String(formData.get("group_id"));
+  const cardId = String(formData.get("card_id"));
+  const owned = Math.max(0, Number(formData.get("owned") ?? 0));
+  if (!isGameId(game)) throw new Error("invalid game");
+  // Ownership: getGroup returns undefined unless the caller owns the group.
+  if (!lib(game).getGroup(me.id, groupId)) throw new Error("not found");
+  backupBeforeWrite(game);
+  const members = lib(game).groupMemberDeckIds(groupId);
+  const capped = Math.min(owned, lib(game).maxNeedForCard(members, cardId));
+  lib(game).reconcilePoolCard(members, cardId, capped);
+  bumpGroups(game, groupId);
 }
 
 /**
@@ -550,8 +660,20 @@ export async function setDeckCardPurchasedAction(formData: FormData) {
   const purchased = Math.max(0, Number(formData.get("purchased") ?? 0));
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  lib(game).setDeckCardPurchased(me.id, deckId, cardId, purchased);
-  bumpDeck(game, deckId);
+  // If this deck shares a pool, held is a shared count — set it for the whole
+  // pool (each deck capped at its own quantity). Otherwise just this deck.
+  const peers = lib(game).decksSharingPoolWith(me.id, deckId);
+  if (peers.length > 1) {
+    const owned = Math.min(
+      purchased,
+      lib(game).maxNeedForCard(peers, cardId),
+    );
+    lib(game).reconcilePoolCard(peers, cardId, owned);
+    bumpGame(game);
+  } else {
+    lib(game).setDeckCardPurchased(me.id, deckId, cardId, purchased);
+    bumpDeck(game, deckId);
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────

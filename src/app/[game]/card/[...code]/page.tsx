@@ -8,6 +8,8 @@ import { AddToDeck } from "@/components/add-to-deck";
 import { BackLink } from "@/components/back-link";
 import { CardImageGallery } from "@/components/card-image-gallery";
 import { CardPriceInput } from "@/components/card-price-input";
+import { EffectText } from "@/components/effect-text";
+import { CardRulings } from "@/components/card-rulings";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import * as ua from "@/lib/db/unionarena";
@@ -91,6 +93,7 @@ export default async function CardPage({
           defaultVariant={defaultVariant}
           price={digimon.getCardPrice(meId, card.id)}
           marketListings={listings}
+          rulings={digimon.getCardRulings(card.code)}
           readonly={!me}
         />
       </DetailShell>
@@ -192,8 +195,8 @@ function EffectBlock({
       <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-fg)] mb-1">
         {label}
       </div>
-      <div className="text-sm whitespace-pre-wrap leading-relaxed bg-[var(--color-muted)] rounded-md p-3 border border-[var(--color-border)]">
-        {text}
+      <div className="text-sm bg-[var(--color-muted)] rounded-md p-3 border border-[var(--color-border)]">
+        <EffectText text={text} />
       </div>
     </div>
   );
@@ -207,11 +210,13 @@ function DigimonDetail({
   defaultVariant,
   price,
   marketListings,
+  rulings,
   readonly,
 }: {
   card: digimon.DigimonCard;
   /** Original EN name, shown small under a translated title. */
   subName?: string;
+  rulings: import("@/lib/db/rulings-ddl").CardRuling[];
   decks: {
     id: string;
     name: string;
@@ -367,6 +372,8 @@ function DigimonDetail({
         <EffectBlock label="安全区效果" text={card.security_effect} />
         <EffectBlock label="进化继承效果" text={card.inherited_effect} />
         <EffectBlock label="源池效果" text={card.source_effect} />
+
+        <CardRulings rulings={rulings} />
 
         <div className="grid grid-cols-2 gap-3 text-xs text-[var(--color-muted-fg)] pt-3 border-t border-[var(--color-border)]">
           <Stat label="收录" value={card.set_names} />
