@@ -49,6 +49,22 @@ function clean(s: string | null | undefined): string | null {
   return v && v !== "-" ? v : null;
 }
 
+/**
+ * Effect-text cleaner. digimoncard.cn encodes line breaks as the literal token
+ * "enter" (sometimes followed by a real newline, sometimes used alone as the
+ * only separator). Normalize every "enter" to a newline and collapse the blank
+ * lines that creates. Chinese card text never contains the English word, so
+ * this is unambiguous.
+ */
+function cleanEffect(s: string | null | undefined): string | null {
+  const v = (s ?? "").trim();
+  if (!v || v === "-") return null;
+  return v
+    .replace(/enter/g, "\n")
+    .replace(/[ \t]*\n[ \t]*(?:\n[ \t]*)*/g, "\n")
+    .trim();
+}
+
 async function fetchPage(pageNum: number): Promise<{
   list: CnCard[];
   totalPage: number;
@@ -91,9 +107,9 @@ async function main() {
           traits: clean(c.type),
           form: clean(c.form),
           attribute: clean(c.attribute),
-          effect_main: clean(c.effect),
-          effect_2: clean(c.safeEffect),
-          effect_3: clean(c.envolutionEffect),
+          effect_main: cleanEffect(c.effect),
+          effect_2: cleanEffect(c.safeEffect),
+          effect_3: cleanEffect(c.envolutionEffect),
           image_url: clean(c.imageCover),
         });
         total++;
