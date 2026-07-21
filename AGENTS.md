@@ -30,22 +30,47 @@ now ~17 s.
 ## Local servers
 
 - **3000** = dev (`npm run dev`) — start manually when developing.
-- **3001** = prod — **auto-started on login** by the LaunchAgent
-  `com.rei.card-deck-builder` (`~/Library/LaunchAgents/`), which runs
-  `scripts/serve-prod.sh` (reuses the existing `.next.nosync/prod` build,
-  building only if there is none). This is what the Cloudflare tunnel serves;
-  `KeepAlive` respawns it if it dies.
+- **3001** = prod — runs in **Docker** (see "Production deployment" below).
+  This is what the Cloudflare tunnel serves.
+
+The OLD native-process prod flow (LaunchAgent `com.rei.card-deck-builder` →
+`scripts/serve-prod.sh` → `npm start`) has been **retired and unloaded** — port
+3001 is now owned by the `card-deck-builder` Docker container. The plist and
+script are left in place for reference/rollback only; don't `launchctl
+bootstrap` it again while Docker holds 3001 (port conflict).
 
 **After a meaningful code change (feature / stage / bug-fix — not every Edit),
-redeploy prod:**
+just push to `main`** — a GitHub Actions workflow
+(`.github/workflows/deploy.yml`) running on a self-hosted runner on this same
+Mac rebuilds the Docker image and redeploys automatically:
 
-1. **`rm -rf .next.nosync/prod && npm run build`** — always build from a clean
-   prod dir (incremental build leaves stale chunk hashes → ChunkLoadError).
-   NEVER run this while `npm run dev` is going — they thrash disk I/O and the
-   build stalls indefinitely. Kill dev first if needed.
-2. Restart the launchd-managed prod so it serves the new build:
-   **`launchctl kickstart -k gui/501/com.rei.card-deck-builder`**
-   (a plain `kill` won't do it — KeepAlive respawns the OLD build; `kickstart -k`
-   re-runs serve-prod.sh). Verify `:3001` is listening + HTTP 200.
-3. If dev needs the new code too, `kill` its parent `npm run dev` and relaunch
-   `npm run dev` in the background.
+1. `git push origin main` (only the repo owner can — sole collaborator).
+2. The push triggers `.github/workflows/deploy.yml` on the self-hosted runner
+   (registered as the user-level LaunchAgent
+   `~/Library/LaunchAgents/actions.runner.jibril2333-card-deck-builder.cdb-mac-mini.plist`,
+   itself always-on). It runs `docker compose build && docker compose up -d`,
+   waits for `:3001` to answer, then prunes dangling images.
+3. Watch it with `gh run watch` (or `gh run list` for recent runs). Verify
+   `docker ps` shows a freshly-`Created` container and `curl localhost:3001`
+   returns 200.
+
+**Do NOT add `pull_request` / `pull_request_target` triggers to that
+workflow.** This repo is public; a self-hosted runner executing untrusted PR
+code would hand out arbitrary code execution on this Mac. `push` to `main` is
+safe only because the owner is the sole collaborator with push access —
+re-verify that invariant (`gh api repos/{owner}/{repo}/collaborators`) before
+ever loosening the trigger.
+
+If dev (3000) needs the new code too: `kill` its parent `npm run dev` process
+and relaunch `npm run dev` in the background — that flow is unchanged.
+
+### Manual Docker operations (rarely needed — CI does this automatically)
+
+- Rebuild + redeploy by hand: `docker compose build && docker compose up -d`
+- Logs: `docker compose logs -f`
+- The runner service: `cd ~/actions-runner && ./svc.sh status|start|stop`
+- **Known gap**: Docker Desktop's own "Start Docker Desktop when you log in"
+  setting is OFF. A full reboot will NOT bring the container back until
+  someone opens Docker Desktop (or flips that toggle in Docker Desktop →
+  Settings → General). Login-only restarts are unaffected — Docker Desktop
+  itself keeps running across those.
