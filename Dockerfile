@@ -26,8 +26,10 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# The build script already sets NODE_OPTIONS for the heap; CDB_E2E unset here
-# keeps the phase on the "prod" distDir branch.
+# CDB_DOCKER=1 makes next.config.ts use the STOCK `.next` distDir (the custom
+# .next.nosync/prod path breaks output:standalone). The build script sets
+# NODE_OPTIONS for the heap.
+ENV CDB_DOCKER=1
 RUN npm run build
 
 # ---- runner: copy only the standalone output + static assets ----
@@ -41,13 +43,13 @@ RUN groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs nextjs
 
 COPY --from=builder /app/public ./public
-# Standalone output preserves the distDir path inside itself, so with the
-# custom .next.nosync/prod distDir the tree looks like:
+# With the stock `.next` distDir the standalone tree is:
 #   standalone/server.js
-#   standalone/.next.nosync/prod/...   (server chunks/manifests)
-#   standalone/node_modules/...        (traced deps incl. better-sqlite3)
-COPY --from=builder --chown=nextjs:nodejs /app/.next.nosync/prod/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next.nosync/prod/static ./.next.nosync/prod/static
+#   standalone/.next/...            (server chunks/manifests)
+#   standalone/node_modules/...     (traced deps incl. better-sqlite3)
+# The static assets aren't part of standalone — copy them alongside.
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # data.nosync (SQLite DBs) is bind-mounted at runtime via docker-compose —
 # never baked into the image. Create the mountpoint so it exists even if the

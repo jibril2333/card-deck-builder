@@ -31,6 +31,11 @@ const baseConfig: NextConfig = {
 //   build / start     → .next.nosync/prod
 //   e2e (CDB_E2E=1)   → .next.nosync/e2e-prod
 export default function nextConfig(phase: string): NextConfig {
+  // Docker builds run on Linux (no iCloud) and use `output: "standalone"`,
+  // which mis-packages the webpack runtime when distDir isn't the stock
+  // `.next` (server chunks like webpack-runtime.js go missing → pages render
+  // to an empty 200). So inside Docker, keep the default distDir.
+  if (process.env.CDB_DOCKER === "1") return baseConfig;
   const isProd =
     phase === PHASE_PRODUCTION_BUILD || phase === PHASE_PRODUCTION_SERVER;
   const sub = isProd
