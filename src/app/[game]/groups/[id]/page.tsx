@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
-import { TopNav } from "@/components/top-nav";
 import { GroupEditor } from "@/components/group-editor";
 import { PoolHeldStepper } from "@/components/pool-held-stepper";
 import { PoolSwap } from "@/components/pool-swap";
@@ -87,7 +86,6 @@ export default async function GroupPage({
   const needTotal = decorate.reduce((s, c) => s + c.need, 0);
   const separateTotal = decorate.reduce((s, c) => s + c.separate, 0);
   const saved = separateTotal - needTotal;
-  const sharedCount = decorate.filter((c) => c.deckCount > 1).length;
   const missingTotal = decorate.reduce((s, c) => s + c.missing, 0);
 
   type Row = (typeof decorate)[number];
@@ -231,8 +229,7 @@ export default async function GroupPage({
 
   return (
     <>
-      <TopNav game={game as GameId} active="decks" />
-      <main className="w-full mx-auto max-w-5xl px-4 py-6">
+      <main className="w-full mx-auto max-w-[1500px] px-4 sm:px-6 py-6">
         <Link
           href={`/${game}/decks`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
@@ -271,11 +268,6 @@ export default async function GroupPage({
                 danger={missingTotal > 0}
               />
             </div>
-            <p className="text-xs text-[var(--color-muted-fg)] mt-2">
-              共 {decorate.length} 种卡，其中 <b>{sharedCount}</b> 种被多套共用
-              （高亮行）。「需备」= 这几套里需求最高的那套的张数；玩哪套就用这一份卡组装哪套。
-              「持有」是<b>池内共享</b>的——在这里或任意成员卡组的购买模式里增减，都会同步到本池其他卡组（每套不超过自己的张数），不影响池外的卡组。
-            </p>
 
             {memberDecks.length >= 2 ? (
               <PoolSwap
@@ -317,24 +309,30 @@ function Metric({
   danger?: boolean;
 }) {
   return (
-    <div className="rounded-lg bg-[var(--color-muted)] p-3">
-      <div className="text-[11px] text-[var(--color-muted-fg)]">{label}</div>
-      <div
-        className={`text-2xl font-bold tabular-nums ${
-          accent
-            ? "text-[var(--color-accent)]"
-            : danger
-              ? "text-red-500"
-              : muted
-                ? "text-[var(--color-muted-fg)]"
-                : ""
-        }`}
-      >
-        {value}
+    <div className="rounded-md bg-[var(--color-muted)] px-2.5 py-1.5">
+      <div className="text-[10px] text-[var(--color-muted-fg)] leading-tight">
+        {label}
       </div>
-      {hint ? (
-        <div className="text-[10px] text-[var(--color-muted-fg)]">{hint}</div>
-      ) : null}
+      <div className="flex items-baseline gap-1.5">
+        <span
+          className={`text-lg font-bold tabular-nums leading-tight ${
+            accent
+              ? "text-[var(--color-accent)]"
+              : danger
+                ? "text-red-500"
+                : muted
+                  ? "text-[var(--color-muted-fg)]"
+                  : ""
+          }`}
+        >
+          {value}
+        </span>
+        {hint ? (
+          <span className="text-[10px] text-[var(--color-muted-fg)] truncate">
+            {hint}
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

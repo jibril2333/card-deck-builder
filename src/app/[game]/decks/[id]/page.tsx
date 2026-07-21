@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex, GAMES } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
-import { TopNav } from "@/components/top-nav";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { CardPreviewProvider } from "@/components/card-preview";
@@ -495,8 +494,7 @@ export default async function DeckEditPage({
 
   return (
     <>
-      <TopNav game={game as GameId} active="decks" />
-      <main className="w-full mx-auto max-w-6xl px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
+      <main className="w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         <section className="min-w-0">
           <Link
             href={`/${game}/decks`}
@@ -782,7 +780,7 @@ export default async function DeckEditPage({
             }
             return (
               <CardPreviewProvider>
-                <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                <div className="mt-6 card-grid">
                   {visibleCards.map((c) => (
                     <DeckCard
                       key={c.id}

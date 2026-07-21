@@ -27,7 +27,6 @@ import {
   pickSort,
   type SearchParamsRecord,
 } from "@/lib/search-params";
-import { TopNav } from "@/components/top-nav";
 import {
   CollectionTile,
   type CollectionTileCard,
@@ -340,8 +339,7 @@ export default async function CollectionPage({
 
   return (
     <>
-      <TopNav game={game as GameId} active="collection" />
-      <main className="w-full mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+      <main className="w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
         <aside>
           <FilterForm
             basePath={`/${game}/collection`}
@@ -373,7 +371,7 @@ export default async function CollectionPage({
               没有符合条件的卡牌
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            <div className="card-grid">
               {rows.map((row) => (
                 <CollectionTile
                   key={`${row.card_id}|${row.variant}`}

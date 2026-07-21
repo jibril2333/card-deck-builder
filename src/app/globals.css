@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: oklch(0.99 0.005 240);
-  --color-fg: oklch(0.18 0.01 240);
-  --color-muted: oklch(0.96 0.005 240);
-  --color-muted-fg: oklch(0.5 0.01 240);
-  --color-border: oklch(0.91 0.005 240);
+  /* Warm neutral palette (hue ~65) + amber-gold accent — a lighter-mode
+     companion to the near-black/gold dark theme below. */
+  --color-bg: oklch(0.99 0.004 65);
+  --color-fg: oklch(0.2 0.008 65);
+  --color-muted: oklch(0.965 0.005 65);
+  --color-muted-fg: oklch(0.5 0.01 65);
+  --color-border: oklch(0.905 0.006 65);
   --color-card: oklch(1 0 0);
-  --color-card-fg: oklch(0.18 0.01 240);
-  --color-accent: oklch(0.55 0.2 28);
+  --color-card-fg: oklch(0.2 0.008 65);
+  --color-accent: oklch(0.6 0.15 62);
   --color-accent-fg: oklch(0.99 0 0);
 
   --radius: 0.625rem;
@@ -22,15 +24,17 @@
 
 @media (prefers-color-scheme: dark) {
   @theme {
-    --color-bg: oklch(0.16 0.012 240);
-    --color-fg: oklch(0.96 0.005 240);
-    --color-muted: oklch(0.22 0.012 240);
-    --color-muted-fg: oklch(0.65 0.01 240);
-    --color-border: oklch(0.28 0.012 240);
-    --color-card: oklch(0.2 0.012 240);
-    --color-card-fg: oklch(0.96 0.005 240);
-    --color-accent: oklch(0.7 0.2 28);
-    --color-accent-fg: oklch(0.15 0.01 240);
+    /* uptcg-style: warm near-black canvas, layered surfaces, amber-gold
+       accent (bright fill + dark text, like its buttons). */
+    --color-bg: oklch(0.15 0.006 65);
+    --color-fg: oklch(0.96 0.004 65);
+    --color-muted: oklch(0.215 0.008 65);
+    --color-muted-fg: oklch(0.67 0.008 65);
+    --color-border: oklch(0.29 0.009 65);
+    --color-card: oklch(0.185 0.007 65);
+    --color-card-fg: oklch(0.96 0.004 65);
+    --color-accent: oklch(0.79 0.145 72);
+    --color-accent-fg: oklch(0.18 0.03 72);
   }
 }
 
@@ -69,6 +73,19 @@ body {
   height: 0.5rem;
   border-radius: 9999px;
   display: inline-block;
+}
+
+/* Uniform card grid. Every card tile in the app — browse results, collection,
+   a deck's contents, and deck covers — uses this so cards are the SAME size
+   everywhere regardless of the container's width. auto-fill packs as many
+   fixed-width columns as fit and stretches them to fill the row.
+   (Kept as a real class rather than a Tailwind arbitrary value: the nested
+   parens/commas in `grid-cols-[repeat(auto-fill,minmax(150px,1fr))]` hung the
+   production build.) */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
 }
 
 .card-thumb {

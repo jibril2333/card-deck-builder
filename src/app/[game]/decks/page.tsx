@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, GAMES, type GameId } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
-import { TopNav } from "@/components/top-nav";
 import { DecksToolbar } from "@/components/decks-toolbar";
 import { DecksGrid } from "@/components/decks-grid";
 import { GroupsStrip } from "@/components/groups-strip";
@@ -124,8 +123,7 @@ export default async function DecksPage({
 
   return (
     <>
-      <TopNav game={game as GameId} active="decks" />
-      <main className="w-full mx-auto max-w-5xl px-4 py-6">
+      <main className="w-full px-4 sm:px-6 py-6">
         {/* Compact toolbar with create/import/diff/missing tools. For anon
             users we render just the title (no edit tools) — they can still
             scroll the deck grid below to browse. */}

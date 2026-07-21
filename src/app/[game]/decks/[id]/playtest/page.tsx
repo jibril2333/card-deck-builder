@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
-import { TopNav } from "@/components/top-nav";
 import { Playtest, type PlaytestCard } from "@/components/playtest";
 import * as digimon from "@/lib/db/digimon";
 import * as ua from "@/lib/db/unionarena";
@@ -56,8 +55,7 @@ export default async function PlaytestPage({
 
   return (
     <>
-      <TopNav game={game as GameId} active="decks" />
-      <main className="w-full mx-auto max-w-6xl px-4 py-6">
+      <main className="w-full mx-auto max-w-[1100px] px-4 sm:px-6 py-6">
         <Link
           href={`/${game}/decks/${id}`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"

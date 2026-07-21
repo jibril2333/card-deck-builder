@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { isGameId, GAMES } from "@/lib/games";
+import { Sidebar } from "@/components/sidebar";
 
 export async function generateMetadata({
   params,
@@ -20,5 +21,10 @@ export default async function GameLayout({
 }) {
   const { game } = await params;
   if (!isGameId(game)) notFound();
-  return <>{children}</>;
+  return (
+    <div className="lg:flex lg:items-start">
+      <Sidebar game={game} />
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  );
 }

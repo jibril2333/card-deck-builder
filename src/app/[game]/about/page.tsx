@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
-import { TopNav } from "@/components/top-nav";
 
 export default async function AboutPage({
   params,
@@ -11,7 +10,6 @@ export default async function AboutPage({
   if (!isGameId(game)) notFound();
   return (
     <>
-      <TopNav game={game as GameId} active="about" />
       <main className="w-full mx-auto max-w-3xl px-4 py-8 prose prose-sm">
         {game === "digimon" ? <DigimonAbout /> : <UAAbout />}
       </main>

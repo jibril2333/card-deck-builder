@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
-import { TopNav } from "@/components/top-nav";
 import { RestrictionBadge } from "@/components/restriction-badge";
 import * as digimon from "@/lib/db/digimon";
 import * as ua from "@/lib/db/unionarena";
@@ -100,8 +99,7 @@ export default async function RestrictionsPage({
 
   return (
     <>
-      <TopNav game={game as GameId} active="restrictions" />
-      <main className="w-full mx-auto max-w-6xl px-4 py-6">
+      <main className="w-full mx-auto max-w-[1500px] px-4 sm:px-6 py-6">
         <header className="mb-5">
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <span aria-hidden>🚫</span>

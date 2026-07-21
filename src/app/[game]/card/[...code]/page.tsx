@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
-import { TopNav } from "@/components/top-nav";
 import { Badge } from "@/components/ui/badge";
 import { AddToDeck } from "@/components/add-to-deck";
 import { BackLink } from "@/components/back-link";
@@ -150,8 +149,7 @@ function DetailShell({
 }) {
   return (
     <>
-      <TopNav game={game} active="search" />
-      <main className="w-full mx-auto max-w-5xl px-4 py-6">
+      <main className="w-full mx-auto max-w-6xl px-4 sm:px-6 py-6">
         <BackLink
           fallback={`/${game}`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-4"

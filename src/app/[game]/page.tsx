@@ -10,7 +10,6 @@ import {
   pickSort,
   type SearchParamsRecord,
 } from "@/lib/search-params";
-import { TopNav } from "@/components/top-nav";
 import { CardThumb, type CardLite } from "@/components/card-thumb";
 import { FilterForm, type FilterField } from "@/components/filter-form";
 import { FilterPanel } from "@/components/filter-panel";
@@ -395,8 +394,7 @@ export default async function CardsPage({
 
   return (
     <>
-      <TopNav game={game as GameId} active="search" />
-      <main className="w-full mx-auto max-w-7xl px-4 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+      <main className="w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
         <aside>
           <FilterPanel activeCount={chipSpecs.length}>
             <FilterForm
@@ -427,7 +425,7 @@ export default async function CardsPage({
               没有符合条件的卡牌
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            <div className="card-grid">
               {rows.map((c) => (
                 <CardThumb key={c.href ?? c.id} game={game} card={c} />
               ))}
