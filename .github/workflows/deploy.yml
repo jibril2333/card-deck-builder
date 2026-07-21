@@ -27,7 +27,12 @@ jobs:
         run: docker compose build
 
       - name: Deploy (recreate container with the new image)
-        run: docker compose up -d --remove-orphans
+        # The runner checks the repo out to its own _work dir, which has no
+        # data.nosync (gitignored). Mount the real DBs from the project dir by
+        # absolute path so the container sees the owner's actual data.
+        run: |
+          CDB_DATA_DIR="$HOME/card-deck-builder/data.nosync" \
+            docker compose up -d --remove-orphans
 
       - name: Wait for health check
         run: |

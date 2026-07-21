@@ -11,4 +11,11 @@ services:
       # data) so they persist across image rebuilds/redeploys. NEVER put
       # this in the image — data.nosync is gitignored and holds personal
       # data; the repo is public.
-      - ./data.nosync:/app/data.nosync
+      #
+      # CDB_DATA_DIR MUST be an absolute host path in CI: the GitHub Actions
+      # runner runs `docker compose up` from its own checkout dir (which has
+      # no data.nosync), so a relative `./data.nosync` would mount an empty
+      # dir and the app would 500 with "数据库文件不存在". The workflow sets
+      # it to $HOME/card-deck-builder/data.nosync. For local runs from the
+      # project root, the default `./data.nosync` resolves correctly.
+      - ${CDB_DATA_DIR:-./data.nosync}:/app/data.nosync
