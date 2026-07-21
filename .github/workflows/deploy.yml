@@ -1,0 +1,46 @@
+name: Deploy to Docker
+
+# SECURITY: this job runs on a SELF-HOSTED runner (the owner's own Mac, the
+# same machine that serves the app). It must NEVER trigger on pull_request /
+# pull_request_target — those events run untrusted contributor code and would
+# hand arbitrary code execution to anyone opening a PR against this public
+# repo. `push` to `main` is safe because only the repo owner has push access
+# (verified: sole collaborator, admin). Do not broaden the trigger without
+# re-checking collaborator/branch-protection state.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, cdb]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker compose build
+
+      - name: Deploy (recreate container with the new image)
+        run: docker compose up -d --remove-orphans
+
+      - name: Wait for health check
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:3001/digimon > /dev/null; then
+              echo "up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "app did not become healthy in time" >&2
+          docker compose logs --tail=100
+          exit 1
+
+      - name: Prune dangling images
+        if: always()
+        run: docker image prune -f

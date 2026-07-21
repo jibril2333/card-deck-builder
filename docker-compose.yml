@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    image: card-deck-builder:prod
+    container_name: card-deck-builder
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      # Bind-mount the real SQLite DBs (decks/collection/accounts + card
+      # data) so they persist across image rebuilds/redeploys. NEVER put
+      # this in the image — data.nosync is gitignored and holds personal
+      # data; the repo is public.
+      - ./data.nosync:/app/data.nosync
