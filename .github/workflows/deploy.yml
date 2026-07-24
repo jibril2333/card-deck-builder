@@ -47,15 +47,35 @@ jobs:
             docker compose up -d --remove-orphans
 
       - name: Wait for health check
+        # /api/health reads a row from both SQLite files, so a green gate means
+        # the DB is actually usable — not just that the port is open.
         run: |
           for i in $(seq 1 30); do
-            if curl -fs http://localhost:3001/digimon > /dev/null; then
-              echo "up"; exit 0
+            if curl -fs http://localhost:3001/api/health > /dev/null; then
+              echo "app responding"; ok=1; break
             fi
             sleep 2
           done
-          echo "app did not become healthy in time" >&2
-          docker compose logs --tail=100
+          if [ -z "$ok" ]; then
+            echo "app did not become healthy in time" >&2
+            docker compose logs --tail=100
+            exit 1
+          fi
+          # Also confirm Docker's own healthcheck agrees, so a broken
+          # healthcheck definition fails the deploy instead of silently
+          # leaving every future container stuck in "starting".
+          for i in $(seq 1 45); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' card-deck-builder 2>/dev/null || echo none)
+            case "$s" in
+              healthy) echo "docker health: healthy"; exit 0 ;;
+              unhealthy) echo "docker reports unhealthy" >&2
+                         docker inspect -f '{{json .State.Health}}' card-deck-builder >&2
+                         exit 1 ;;
+            esac
+            sleep 2
+          done
+          echo "docker health never left '$s'" >&2
+          docker inspect -f '{{json .State.Health}}' card-deck-builder >&2
           exit 1
 
       - name: Prune dangling images
