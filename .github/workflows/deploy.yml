@@ -23,6 +23,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Use a credential-helper-free Docker config
+        # The host's ~/.docker/config.json sets `credsStore: "desktop"`, which
+        # makes BuildKit shell out to `docker-credential-desktop` even for
+        # ANONYMOUS pulls of public images. That binary lives inside Docker.app
+        # and is NOT on the self-hosted runner's minimal PATH, so the build
+        # dies at "load metadata". We only ever pull public images here, so
+        # point DOCKER_CONFIG at a throwaway config with no credsStore — the
+        # pull goes out anonymously and the whole class of failure disappears.
+        run: |
+          mkdir -p "$RUNNER_TEMP/dockercfg"
+          printf '{}' > "$RUNNER_TEMP/dockercfg/config.json"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/dockercfg" >> "$GITHUB_ENV"
+
       - name: Build image
         run: docker compose build
 
