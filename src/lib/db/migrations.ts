@@ -554,6 +554,43 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: 19,
+    name: "card_images.lang (per-language alt arts)",
+    up: (db) => {
+      // card_images originally held ONLY English art (probed off
+      // world.digimoncard.com), so a zh/ja card page showed the localized
+      // base image followed by a gallery of English alt arts — the languages
+      // visibly mixed. Key the table by language so each locale can carry its
+      // own variants (JP art comes off digimoncard.com with the same _P1/_P2
+      // suffixes; CN art comes from the CN API's parallel rows).
+      //
+      // SQLite can't extend a PRIMARY KEY in place — rebuild the table and
+      // backfill every existing row as 'en', which is exactly what they are.
+      const cols = db
+        .prepare("SELECT name FROM pragma_table_info('card_images')")
+        .all() as { name: string }[];
+      if (cols.some((c) => c.name === "lang")) return;
+
+      db.exec(`
+        CREATE TABLE card_images_new (
+          code       TEXT NOT NULL,
+          lang       TEXT NOT NULL DEFAULT 'en',
+          variant    TEXT NOT NULL,
+          image_url  TEXT NOT NULL,
+          checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (code, lang, variant)
+        );
+        INSERT INTO card_images_new (code, lang, variant, image_url, checked_at)
+          SELECT code, 'en', variant, image_url, checked_at FROM card_images;
+        DROP TABLE card_images;
+        ALTER TABLE card_images_new RENAME TO card_images;
+        CREATE INDEX IF NOT EXISTS idx_card_images_code ON card_images(code);
+        CREATE INDEX IF NOT EXISTS idx_card_images_code_lang
+          ON card_images(code, lang);
+      `);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

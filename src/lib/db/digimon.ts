@@ -340,28 +340,55 @@ export function getCardById(id: string): DigimonCard | undefined {
 export type CardImageVariant = {
   variant: string;
   image_url: string;
+  /** Language the art itself is in — lets the UI flag a non-native fallback. */
+  lang: string;
 };
 
-export function getCardImages(code: string): CardImageVariant[] {
-  return db()
-    .prepare(
-      `SELECT variant, image_url FROM card_images WHERE code = ? ORDER BY variant`,
-    )
-    .all(code) as CardImageVariant[];
+/**
+ * Alt-art variants for a card, in the requested language.
+ *
+ * Falls back to English when that language has no art for the card at all (the
+ * CN/JP cardlists lag behind on new sets), so the gallery is never empty — but
+ * we never MIX languages: a zh page shows zh art, or English art, not both
+ * interleaved. Callers can tell which they got from `lang`.
+ */
+export function getCardImages(
+  code: string,
+  lang = "en",
+): CardImageVariant[] {
+  const stmt = db().prepare(
+    `SELECT variant, image_url, lang FROM card_images
+      WHERE code = ? AND lang = ? ORDER BY variant`,
+  );
+  const own = stmt.all(code, lang) as CardImageVariant[];
+  if (own.length > 0 || lang === "en") return own;
+  return stmt.all(code, "en") as CardImageVariant[];
 }
 
-/** Returns how many image variants each given code has, mapped by code. */
+/**
+ * Returns how many image variants each given code has, mapped by code.
+ * Counted in `lang`, falling back to the English count for codes that have no
+ * art in that language (mirrors getCardImages so badges match the gallery).
+ */
 export function getCardImageCounts(
   codes: string[],
+  lang = "en",
 ): Map<string, number> {
   if (codes.length === 0) return new Map();
   const placeholders = codes.map(() => "?").join(",");
-  const rows = db()
-    .prepare(
-      `SELECT code, COUNT(*) as n FROM card_images WHERE code IN (${placeholders}) GROUP BY code`,
-    )
-    .all(...codes) as { code: string; n: number }[];
-  return new Map(rows.map((r) => [r.code, r.n]));
+  const count = (l: string) =>
+    db()
+      .prepare(
+        `SELECT code, COUNT(*) as n FROM card_images
+          WHERE code IN (${placeholders}) AND lang = ? GROUP BY code`,
+      )
+      .all(...codes, l) as { code: string; n: number }[];
+
+  const out = new Map(count(lang).map((r) => [r.code, r.n]));
+  if (lang !== "en") {
+    for (const r of count("en")) if (!out.has(r.code)) out.set(r.code, r.n);
+  }
+  return out;
 }
 
 export function distinct(col: keyof DigimonCard): string[] {

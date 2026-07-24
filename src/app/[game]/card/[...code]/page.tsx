@@ -66,19 +66,24 @@ export default async function CardPage({
           total: d.total,
         }))
       : [];
-    let variants = digimon.getCardImages(card.code);
-    // Fallback: if scraper hasn't run for this code yet, use the card's
-    // own image_url so the page isn't empty.
-    if (variants.length === 0 && card.image_url) {
-      variants = [{ variant: "", image_url: card.image_url }];
-    }
-    // Localized card art leads the gallery (and is the default view) when
-    // the user picked a language that has one.
-    if (t?.image_url) {
+    // Art in the reader's language. getCardImages never interleaves languages:
+    // it returns this language's variants, or the EN set when we have no art
+    // for this card in that language at all.
+    let variants = digimon.getCardImages(card.code, cardLang);
+    const haveLocalizedArt = variants.some((v) => v.lang === cardLang);
+    // No probed art in this language, but the translation row carries the
+    // localized base scan — lead with it so the DEFAULT view is in-language
+    // and the EN variants read as clearly-labelled extras behind it.
+    if (!haveLocalizedArt && t?.image_url) {
       variants = [
-        { variant: `lang-${cardLang}`, image_url: t.image_url },
+        { variant: `lang-${cardLang}`, image_url: t.image_url, lang: cardLang },
         ...variants,
       ];
+    }
+    // Last resort: nothing probed for this code yet — use the card's own
+    // image_url so the page isn't empty.
+    if (variants.length === 0 && card.image_url) {
+      variants = [{ variant: "", image_url: card.image_url, lang: "en" }];
     }
     // Cardrush per-illustrator market prices (each distinct printing).
     const listings = digimon.getExternalListings(card.id);
@@ -90,6 +95,7 @@ export default async function CardPage({
           decks={decks}
           variants={variants}
           defaultVariant={defaultVariant}
+          cardLang={cardLang}
           price={digimon.getCardPrice(meId, card.id)}
           marketListings={listings}
           rulings={digimon.getCardRulings(card.code)}
@@ -206,6 +212,7 @@ function DigimonDetail({
   decks,
   variants,
   defaultVariant,
+  cardLang,
   price,
   marketListings,
   rulings,
@@ -225,6 +232,8 @@ function DigimonDetail({
   }[];
   variants: digimon.CardImageVariant[];
   defaultVariant?: string;
+  /** Reader's card language, so the gallery can flag non-native art. */
+  cardLang: string;
   price: number | null;
   marketListings: digimon.ExternalListing[];
   /** Anon viewer: hide the editable price input + the AddToDeck widget. */
@@ -237,6 +246,7 @@ function DigimonDetail({
           name={card.name}
           variants={variants}
           defaultVariant={defaultVariant}
+          cardLang={cardLang}
         />
         <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
           <MarketListingsBlock listings={marketListings} />

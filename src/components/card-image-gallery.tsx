@@ -7,7 +7,11 @@ export type Variant = {
   image_url: string;
   /** Optional display label (e.g. UA rarity "C★"). Falls back to variant. */
   label?: string;
+  /** Language of the artwork itself, when known ("en" | "zh" | "ja"). */
+  lang?: string;
 };
+
+const LANG_TAG: Record<string, string> = { en: "EN", zh: "中", ja: "日" };
 
 /**
  * Big card image with a thumbnail strip below for switching between variants.
@@ -19,11 +23,14 @@ export function CardImageGallery({
   name,
   variants,
   defaultVariant,
+  cardLang,
 }: {
   name: string;
   variants: Variant[];
   /** variant key (the `variant` field, e.g. a UA code) to show first */
   defaultVariant?: string;
+  /** Reader's card language — used to flag art that isn't in it. */
+  cardLang?: string;
 }) {
   const initial = defaultVariant
     ? Math.max(
@@ -63,12 +70,27 @@ export function CardImageGallery({
         <div>
           <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)] mb-1">
             异画 ({variants.length} 个版本)
+            {/* The CN/JP cardlists lag behind on alt arts, so we fall back to
+                the English scans. Say so rather than silently mixing them. */}
+            {cardLang && variants.some((v) => v.lang && v.lang !== cardLang) ? (
+              <span className="ml-1 normal-case opacity-80">
+                · 部分为{LANG_TAG[
+                  variants.find((v) => v.lang && v.lang !== cardLang)!.lang!
+                ] ?? "其他语言"}卡面
+              </span>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-1.5 max-w-[300px] mx-auto md:mx-0">
             {variants.map((v, i) => {
               const isActive = i === active;
+              const foreign = !!(cardLang && v.lang && v.lang !== cardLang);
+              // `lang-zh`/`lang-ja` is the localized BASE scan, not a parallel
+              // — show it as 原, same as an empty variant key.
+              const isBase = !v.variant || v.variant.startsWith("lang-");
               const chip =
-                v.label ?? (v.variant ? v.variant.replace("_", "") : "原");
+                v.label ??
+                (isBase ? "原" : v.variant.replace("_", "")) +
+                  (foreign ? ` ${LANG_TAG[v.lang!] ?? v.lang}` : "");
               return (
                 <button
                   key={`${v.image_url}-${i}`}
