@@ -4,6 +4,11 @@ services:
     image: card-deck-builder:prod
     container_name: card-deck-builder
     restart: unless-stopped
+    # Run as the host owner (uid 501 / gid 20 = staff on this Mac) so the
+    # bind-mounted SQLite DBs — owned by that user — are writable. The image's
+    # built-in `nextjs` (1001) user could only READ them, so deck edits /
+    # purchases / scraper writes would silently fail.
+    user: "501:20"
     ports:
       - "3001:3001"
     volumes:

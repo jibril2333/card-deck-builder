@@ -34,10 +34,19 @@ now ~17 s.
   This is what the Cloudflare tunnel serves.
 
 The OLD native-process prod flow (LaunchAgent `com.rei.card-deck-builder` →
-`scripts/serve-prod.sh` → `npm start`) has been **retired and unloaded** — port
-3001 is now owned by the `card-deck-builder` Docker container. The plist and
-script are left in place for reference/rollback only; don't `launchctl
-bootstrap` it again while Docker holds 3001 (port conflict).
+`scripts/serve-prod.sh` → `npm start`) has been **retired, unloaded, and
+permanently disabled** (`launchctl bootout` + `launchctl disable
+gui/501/com.rei.card-deck-builder`) so it no longer respawns on login and
+fights Docker for port 3001. Port 3001 is now solely owned by the
+`card-deck-builder` Docker container. The plist and script are left in place
+for reference/rollback only; to revive it you'd have to `launchctl enable` +
+`bootstrap` it — don't, while Docker holds 3001 (port conflict).
+
+The container runs as **`user: "501:20"`** (the host owner) — see the comment in
+`docker-compose.yml`. This is required: the SQLite DBs are bind-mounted from the
+host and owned by uid 501, so the image's built-in `nextjs` (1001) user could
+only READ them and every write (deck edits, collection changes, scraper runs)
+would silently fail.
 
 **After a meaningful code change (feature / stage / bug-fix — not every Edit),
 just push to `main`** — a GitHub Actions workflow
