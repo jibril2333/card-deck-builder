@@ -73,6 +73,31 @@ ever loosening the trigger.
 If dev (3000) needs the new code too: `kill` its parent `npm run dev` process
 and relaunch `npm run dev` in the background — that flow is unchanged.
 
+### ⚠️ NEVER write the SQLite DBs while the container is running
+
+The prod container mounts `data.nosync/*.db` via a Docker **bind mount** (macOS
+host ↔ Linux VM). SQLite coordinates multi-process access with POSIX advisory
+(`fcntl`) locks, and **those locks do NOT propagate across that bind-mount
+boundary**. So if a host process (e.g. any `scripts/scrape-digimon-*.ts`,
+`sqlite3`, a migration) writes a DB in WAL mode while the container has it open,
+the two connections get inconsistent WAL/shm views and the container starts
+throwing `SQLITE_CORRUPT: database disk image is malformed` — even though
+`PRAGMA integrity_check` on the file is still `ok`. (Happened 2026-07-24 while
+back-filling promo cards; recovered by stopping the container + `wal_checkpoint`,
+no data lost — but don't rely on that.)
+
+**Safe procedure for any DB write (scrapers, migrations, manual SQL):**
+```
+docker stop card-deck-builder
+# … run the scraper / sqlite3 / migration on the host now (single process) …
+sqlite3 data.nosync/digimon.db      "PRAGMA wal_checkpoint(TRUNCATE);"
+sqlite3 data.nosync/digimon-user.db "PRAGMA wal_checkpoint(TRUNCATE);"
+docker start card-deck-builder
+```
+Data-only changes still don't need a git push (the container reads the mounted
+DB live once it's the only writer) — they just need the container **stopped**
+during the write.
+
 ### Manual Docker operations (rarely needed — CI does this automatically)
 
 - Rebuild + redeploy by hand: `docker compose build && docker compose up -d`
