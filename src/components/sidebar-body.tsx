@@ -156,7 +156,11 @@ export function SidebarBody({
       <aside className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-[var(--color-border)] bg-[var(--color-card)] px-3 py-4 gap-4">
         <div className="px-1">{brand}</div>
         {gameSwitcher}
-        <div className="flex-1 overflow-y-auto no-scrollbar">{navList}</div>
+        {/* min-h-0 so this actually shrinks-and-scrolls in a short window
+            rather than overflowing the column and hiding the footer. */}
+        <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+          {navList}
+        </div>
         {footer}
       </aside>
 
@@ -185,7 +189,12 @@ export function SidebarBody({
             className="absolute inset-0 bg-black/60"
             onClick={() => setOpen(false)}
           />
-          <div className="relative w-64 max-w-[80%] h-full bg-[var(--color-card)] border-r border-[var(--color-border)] px-3 py-4 flex flex-col gap-4 overflow-y-auto">
+          {/* Same three-band layout as the desktop column: brand + switcher
+              pinned at the top, ONLY the nav scrolls, footer pinned at the
+              bottom. Scrolling the whole drawer instead pushes the last nav
+              item and the footer past the fold on short viewports (a phone in
+              landscape is ~375px tall — the 6th item landed at y=349). */}
+          <div className="relative w-64 max-w-[80%] h-full bg-[var(--color-card)] border-r border-[var(--color-border)] px-3 py-4 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               {brand}
               <button
@@ -198,7 +207,9 @@ export function SidebarBody({
               </button>
             </div>
             {gameSwitcher}
-            <div className="flex-1">{navList}</div>
+            {/* min-h-0: without it a flex child refuses to shrink below its
+                content height and never scrolls. */}
+            <div className="flex-1 min-h-0 overflow-y-auto">{navList}</div>
             {footer}
           </div>
         </div>
