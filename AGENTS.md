@@ -73,6 +73,50 @@ ever loosening the trigger.
 If dev (3000) needs the new code too: `kill` its parent `npm run dev` process
 and relaunch `npm run dev` in the background — that flow is unchanged.
 
+## Refreshing card data
+
+**Use `scripts/refresh-cards.sh` — don't run scrapers by hand against the live
+DB.** It snapshots the DB, runs the scrapers against the COPY (every scraper
+honours `CDB_DATA_DIR`), validates the result (`integrity_check`, and the card
+count must not shrink), and only then stops the container for the ~3 seconds it
+takes to swap the file in. It rolls back automatically if the new DB fails its
+health check, and keeps the last 5 backups.
+
+```
+scripts/refresh-cards.sh                 # everything (prices make it ~1h)
+scripts/refresh-cards.sh cards text art  # pick stages
+scripts/refresh-cards.sh --list
+```
+
+Stages: `cards` (discover/import new cards) · `text` (zh+ja) · `art` (en+ja alt
+arts) · `rulings` · `prices` · `restrictions`.
+
+`scripts/sync-cards.ts` is what makes new sets appear on their own: it diffs
+digimoncard.io's entire catalogue (empty `n=` query → all ~9.7k rows, no cap or
+pagination) against `cards`. It is INSERT-ONLY — TOKEN cards don't exist
+upstream and must never be deleted, and a truncated API response must not be
+able to empty the DB. `MODERN_CODE` in `src/lib/scraper/digimoncardio.ts` keeps
+out the 1999-era Bandai games the same API serves (`BO-`, `DD-`, `DV-`, `MD-`,
+`MO-`, `DM-`, bare `ST-`).
+
+Runs happen three ways:
+1. **Weekly** — LaunchAgent `com.rei.cdb-refresh-weekly`, Mondays 04:30.
+2. **The button** — `/[game]/admin` → "立即更新". The app only writes
+   `data.nosync/refresh-request`; the host agent `com.rei.cdb-refresh-watch`
+   (WatchPaths) picks it up and runs `scripts/refresh-on-request.sh`. **The
+   container deliberately has no Docker socket** — it's internet-facing through
+   the tunnel, so app-level RCE would otherwise mean host compromise. Don't
+   "simplify" this by mounting the socket.
+3. **By hand** — the command above.
+
+Admin access is an explicit allowlist, `CDB_ADMIN_EMAILS`, set in
+`~/card-deck-builder/.env.deploy` (host-only, gitignored, sourced by the deploy
+workflow). It fails closed: unset means nobody is an admin. Plain "logged in"
+is not enough — accounts go to friends, and a refresh restarts the container.
+
+Progress/results land in `data.nosync/refresh-status.json` (read by the admin
+UI) and `data.nosync/refresh.log`.
+
 ### ⚠️ NEVER write the SQLite DBs while the container is running
 
 The prod container mounts `data.nosync/*.db` via a Docker **bind mount** (macOS
