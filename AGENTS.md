@@ -33,14 +33,13 @@ now ~17 s.
 - **3001** = prod — runs in **Docker** (see "Production deployment" below).
   This is what the Cloudflare tunnel serves.
 
-The OLD native-process prod flow (LaunchAgent `com.rei.card-deck-builder` →
-`scripts/serve-prod.sh` → `npm start`) has been **retired, unloaded, and
-permanently disabled** (`launchctl bootout` + `launchctl disable
-gui/501/com.rei.card-deck-builder`) so it no longer respawns on login and
-fights Docker for port 3001. Port 3001 is now solely owned by the
-`card-deck-builder` Docker container. The plist and script are left in place
-for reference/rollback only; to revive it you'd have to `launchctl enable` +
-`bootstrap` it — don't, while Docker holds 3001 (port conflict).
+Port 3001 is owned solely by the `card-deck-builder` Docker container. The old
+native-process prod flow (LaunchAgent `com.rei.card-deck-builder` →
+`scripts/serve-prod.sh` → `npm start`) used to fight it for that port; it has
+been retired, disabled, and **deleted** — plist, `serve-prod.sh` and
+`rebuild-prod.sh` are all gone. Don't reintroduce a second thing that binds
+3001. (`launchctl print-disabled gui/501` still lists the old label as
+disabled; that's a harmless leftover flag, not a service.)
 
 The container runs as **`user: "501:20"`** (the host owner) — see the comment in
 `docker-compose.yml`. This is required: the SQLite DBs are bind-mounted from the

@@ -151,12 +151,14 @@ src/
     deck-formats.ts     # 文本格式 import/export
     search-params.ts    # URL 查询参数 ↔ filter state
 scripts/
+  sync-cards.ts         # 全目录 diff，发现并导入新卡（新弹自动进来）
   scrape-digimon-metadata.ts
   scrape-digimon-alt-arts.ts
   scrape-ua-metadata.ts
   fill-missing-digimon-cards.ts
   restore-user-db.ts
-  rebuild-prod.sh
+  refresh-cards.sh      # 更新编排：副本抓取 → 校验 → 秒级换库
+  refresh-on-request.sh # 后台按钮触发桥接（宿主机侧）
 tests/
   *.test.ts             # vitest 单元测试
   e2e/
