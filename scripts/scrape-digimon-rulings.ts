@@ -17,7 +17,13 @@ import path from "node:path";
 import { parseRulingsAll } from "../src/lib/scraper/digimon";
 import { CARD_RULINGS_DDL, UPSERT_RULING_SQL } from "../src/lib/db/rulings-ddl";
 
-const DB_PATH = path.join(process.cwd(), "data.nosync", "digimon.db");
+// CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
+// keeps serving the real one (host writes to the bind-mounted DB corrupt the
+// container's view — see AGENTS.md).
+const DB_PATH = path.join(
+  process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync"),
+  "digimon.db",
+);
 const SEARCH_URL = "https://digimoncard.com/cards/index.php?search=true";
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";

@@ -11,6 +11,11 @@ services:
     user: "501:20"
     ports:
       - "3001:3001"
+    environment:
+      # Who may open /[game]/admin and trigger a card-data refresh. The app is
+      # public through the tunnel and accounts go to friends, so this is an
+      # explicit allowlist rather than "any logged-in user". Unset = nobody.
+      CDB_ADMIN_EMAILS: "${CDB_ADMIN_EMAILS:-}"
     # The image has no curl/wget (node:22-bookworm-slim), so probe with node's
     # global fetch. /api/health reads a row from BOTH SQLite files, so this
     # reports unhealthy on DB corruption too — not just on a dead port.

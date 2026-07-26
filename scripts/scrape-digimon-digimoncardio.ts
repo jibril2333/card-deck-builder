@@ -15,45 +15,18 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
+import {
+  fetchCatalogue,
+  toCardRow,
+  UPSERT_CARD_SQL,
+} from "../src/lib/scraper/digimoncardio";
 
-const DB_PATH = path.join(process.cwd(), "data.nosync", "digimon.db");
-// Extensionless path — the `.php` form 301-redirects here.
-const API = "https://digimoncard.io/api-public/search";
-const IMG_BASE = "https://images.digimoncard.io/images/cards";
-
-type ApiCard = {
-  id: string;
-  name: string;
-  type: string | null;
-  level: number | null;
-  play_cost: number | null;
-  evolution_cost: number | null;
-  evolution_color: string | null;
-  evolution_level: number | null;
-  xros_req: string | null;
-  color: string | null;
-  color2: string | null;
-  digi_type: string | null;
-  digi_type2: string | null;
-  digi_type3: string | null;
-  digi_type4: string | null;
-  form: string | null;
-  dp: number | null;
-  attribute: string | null;
-  rarity: string | null;
-  stage: string | null;
-  artist: string | null;
-  main_effect: string | null;
-  // digimoncard.io's "second effect block": the INHERITED (digivolution-
-  // source) effect on Digimon-ish cards, but the SECURITY effect on
-  // Option / Tamer cards. We split it into our two columns by card type.
-  source_effect: string | null;
-  // The "[Digivolve] … Cost X" line (a.k.a. our evolution_requirements).
-  alt_effect: string | null;
-  series: string | null;
-  pretty_url: string | null;
-  set_name: string[] | string | null;
-};
+// CDB_DATA_DIR lets a run target a COPY of the DB while the prod container
+// keeps serving the real one (see AGENTS.md).
+const DB_PATH = path.join(
+  process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync"),
+  "digimon.db",
+);
 
 function arg(flag: string): string | null {
   for (const a of process.argv.slice(2)) {
@@ -72,12 +45,7 @@ async function main() {
   }
 
   console.log(`Fetching ${set} from digimoncard.io …`);
-  const res = await fetch(`${API}?n=${encodeURIComponent(set)}`, {
-    headers: { "user-agent": "card-deck-builder/0.1 (digimoncardio)" },
-    redirect: "follow",
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const all = (await res.json()) as ApiCard[];
+  const all = await fetchCatalogue(set);
 
   // The `n` search can fuzzy-match; keep only this set's base prints.
   const cards = all.filter((c) => c.id?.startsWith(`${set}-`));
@@ -87,50 +55,7 @@ async function main() {
     return;
   }
 
-  const rows = cards.map((c) => {
-    const type = c.type ?? "";
-    // The "second effect block" (API source_effect) is the inherited effect
-    // for Digimon-ish cards but the security effect for Option/Tamer cards —
-    // route it to the right column so the detail page labels it correctly.
-    const secondBlock = c.source_effect ?? "";
-    const isOptionOrTamer = type === "Option" || type === "Tamer";
-    // "[Digivolve] Lv.X w/[…]: Cost N" lives in alt_effect (xros_req mirrors it).
-    const evoLine = (c.alt_effect || c.xros_req || "").trim();
-    // Compose the "Yellow 3 from Lv.4"-style cost line when the structured
-    // pieces are present (they often aren't for newer JP/CN sets).
-    const evoCost = c.evolution_color
-      ? `${c.evolution_color} ${c.evolution_cost ?? ""} from Lv.${c.evolution_level ?? ""}`
-          .replace(/\s+/g, " ")
-          .trim()
-      : "";
-    return {
-      code: c.id,
-      name: c.name ?? "",
-      rarity: c.rarity ?? "",
-      card_type: type,
-      level: c.level ?? null,
-      color: c.color ?? "",
-      color2: c.color2 ?? "",
-      play_cost: c.play_cost ?? null,
-      dp: c.dp ?? null,
-      attribute: c.attribute ?? "",
-      form: c.form ?? "",
-      stage: c.stage ?? "",
-      digi_types: [c.digi_type, c.digi_type2, c.digi_type3, c.digi_type4]
-        .filter((t) => t && t.trim())
-        .join(" / "),
-      evolution_cost: evoCost,
-      evolution_requirements: evoLine,
-      main_effect: c.main_effect ?? "",
-      security_effect: isOptionOrTamer ? secondBlock : "",
-      inherited_effect: isOptionOrTamer ? "" : secondBlock,
-      source_effect: "", // legacy column — always empty, matches official scraper
-      set_names: Array.isArray(c.set_name)
-        ? c.set_name.join("; ")
-        : (c.set_name ?? ""),
-      image_url: `${IMG_BASE}/${c.id}.jpg`,
-    };
-  });
+  const rows = cards.map(toCardRow);
 
   if (dryRun) {
     for (const r of rows) {
@@ -149,35 +74,7 @@ async function main() {
         (r) => r.code,
       ),
     );
-    const ins = db.prepare(
-      `INSERT INTO cards (
-         id, code, name, rarity, card_type, level, color, color2,
-         play_cost, dp, attribute, form, stage, digi_types,
-         evolution_cost, evolution_requirements,
-         main_effect, security_effect, inherited_effect, source_effect,
-         set_names, image_url
-       ) VALUES (
-         @code, @code, @name, @rarity, @card_type, @level, @color, @color2,
-         @play_cost, @dp, @attribute, @form, @stage, @digi_types,
-         @evolution_cost, @evolution_requirements,
-         @main_effect, @security_effect, @inherited_effect, @source_effect,
-         @set_names, @image_url
-       )
-       ON CONFLICT(id) DO UPDATE SET
-         name = excluded.name, rarity = excluded.rarity,
-         card_type = excluded.card_type, level = excluded.level,
-         color = excluded.color, color2 = excluded.color2,
-         play_cost = excluded.play_cost, dp = excluded.dp,
-         attribute = excluded.attribute, form = excluded.form,
-         stage = excluded.stage, digi_types = excluded.digi_types,
-         evolution_cost = excluded.evolution_cost,
-         evolution_requirements = excluded.evolution_requirements,
-         main_effect = excluded.main_effect,
-         security_effect = excluded.security_effect,
-         inherited_effect = excluded.inherited_effect,
-         source_effect = excluded.source_effect,
-         set_names = excluded.set_names, image_url = excluded.image_url`,
-    );
+    const ins = db.prepare(UPSERT_CARD_SQL);
     let inserted = 0;
     let updated = 0;
     const tx = db.transaction((list: typeof rows) => {

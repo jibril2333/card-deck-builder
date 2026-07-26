@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import type { GameId } from "@/lib/games";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isAdmin } from "@/lib/auth/admin";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { SidebarBody } from "@/components/sidebar-body";
 
@@ -11,6 +12,7 @@ import { SidebarBody } from "@/components/sidebar-body";
  */
 export async function Sidebar({ game }: { game: GameId }) {
   const user = await getCurrentUser();
+  const admin = await isAdmin();
   const cardLang = parseCardLang((await cookies()).get(CARD_LANG_COOKIE)?.value);
   return (
     <SidebarBody
@@ -18,6 +20,7 @@ export async function Sidebar({ game }: { game: GameId }) {
       loggedIn={!!user}
       cardLang={cardLang}
       user={user}
+      isAdmin={admin}
     />
   );
 }

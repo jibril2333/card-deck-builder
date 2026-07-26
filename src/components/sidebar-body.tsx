@@ -9,7 +9,7 @@ import { UserMenu } from "@/components/user-menu";
 import { CardLangSwitcher } from "@/components/card-lang-switcher";
 import type { CardLang } from "@/lib/card-lang";
 
-type NavId = "search" | "decks" | "collection" | "restrictions" | "about";
+type NavId = "search" | "decks" | "collection" | "restrictions" | "about" | "admin";
 
 const NAV: { id: NavId; label: string; icon: string; sub: string }[] = [
   { id: "search", label: "卡牌检索", icon: "🔍", sub: "Cards" },
@@ -18,6 +18,10 @@ const NAV: { id: NavId; label: string; icon: string; sub: string }[] = [
   { id: "restrictions", label: "禁制限卡", icon: "🚫", sub: "Banlist" },
   { id: "about", label: "游戏知识", icon: "📖", sub: "About" },
 ];
+
+// Rendered only for admins (see lib/auth/admin.ts) — it drives the card-data
+// refresh, which restarts the container.
+const ADMIN_NAV = { id: "admin" as const, label: "管理", icon: "⚙️", sub: "Admin" };
 
 function hrefFor(id: NavId, game: string): string {
   return id === "search" ? `/${game}` : `/${game}/${id}`;
@@ -45,18 +49,21 @@ export function SidebarBody({
   loggedIn,
   cardLang,
   user,
+  isAdmin = false,
 }: {
   game: GameId;
   loggedIn: boolean;
   cardLang: CardLang;
   user: React.ComponentProps<typeof UserMenu>["user"] | null;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname() ?? `/${game}`;
   const active = activeFor(pathname, game);
   const [open, setOpen] = useState(false);
 
   // Collection is the current user's own — hide it for anon.
-  const items = loggedIn ? NAV : NAV.filter((n) => n.id !== "collection");
+  const base = loggedIn ? NAV : NAV.filter((n) => n.id !== "collection");
+  const items = isAdmin ? [...base, ADMIN_NAV] : base;
 
   const brand = (
     <Link href="/" className="flex items-center gap-2 min-w-0">

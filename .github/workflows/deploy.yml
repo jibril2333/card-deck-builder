@@ -43,6 +43,12 @@ jobs:
         # data.nosync (gitignored). Mount the real DBs from the project dir by
         # absolute path so the container sees the owner's actual data.
         run: |
+          # Host-only deploy config (admin allowlist etc). It lives outside the
+          # repo — this is a public repo, and the runner checks out into its
+          # own _work dir where a project-local .env wouldn't be visible anyway.
+          if [ -f "$HOME/card-deck-builder/.env.deploy" ]; then
+            set -a; . "$HOME/card-deck-builder/.env.deploy"; set +a
+          fi
           CDB_DATA_DIR="$HOME/card-deck-builder/data.nosync" \
             docker compose up -d --remove-orphans
 
