@@ -842,9 +842,6 @@ export default async function DeckEditPage({
             />
           ) : null}
 
-          {loaded.cards.length > 0 ? (
-            <DeckStats panels={loaded.statsPanels} />
-          ) : null}
         </section>
 
         <aside className="space-y-4">
@@ -898,21 +895,9 @@ export default async function DeckEditPage({
             )}
           </div>
 
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 text-xs text-[var(--color-muted-fg)] space-y-2">
-            <div className="font-semibold text-[var(--color-fg)]">提示</div>
-            <p>
-              添加卡牌：去
-              <Link href={`/${game}`} className="underline mx-1">
-                卡牌检索
-              </Link>
-              页点开任意卡牌，右侧选这个卡组并 +1。
-            </p>
-            <p>
-              {loaded.isDigimon
-                ? "Digimon 标准格：主卡组恰好 50 张，蛋卡 0–5 张，同名卡最多 4 张。本工具不强制，仅给出提示。"
-                : "Union Arena 标准格：50 张主卡组，同名卡最多 4 张，需为单一作品 + 单色。本工具不强制，仅给出提示。"}
-            </p>
-          </div>
+          {loaded.cards.length > 0 ? (
+            <DeckStats panels={loaded.statsPanels} />
+          ) : null}
         </aside>
       </main>
     </>

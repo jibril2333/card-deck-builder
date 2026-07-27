@@ -549,7 +549,9 @@ export async function importDeckAction(formData: FormData): Promise<{
   let pendingColor: string | null = null;
 
   const drops: Drop[] = [];
-  const missing: string[] = [];
+  /** Codes the parser read but the card DB doesn't have, with the requested
+   *  count — recorded in the notes so they aren't silently lost. */
+  const missing: { code: string; qty: number }[] = [];
   const plan: { cardId: string; qty: number }[] = [];
   const seenIdentities = new Set<string>();
   // Hero candidates for auto-naming / auto-cover when the user didn't
@@ -564,7 +566,7 @@ export async function importDeckAction(formData: FormData): Promise<{
         ? digimon.getCardByCode(code)
         : ua.getCardByCode(code);
     if (!card) {
-      missing.push(code);
+      missing.push({ code, qty });
       continue;
     }
     // `code` is the base identity since we already stripAltArt'd above and
@@ -686,6 +688,16 @@ export async function importDeckAction(formData: FormData): Promise<{
   const colorDrops = drops.filter(
     (d) => d.type === "wrong_color",
   ) as Extract<Drop, { type: "wrong_color" }>[];
+  if (missing.length) {
+    // These never made it into the deck at all: either the code is a typo, or
+    // it's a set our scrapers haven't imported yet. Writing them down means an
+    // import is never quietly incomplete — the user can re-add them by hand
+    // once the card exists.
+    notesParts.push(
+      `未找到的卡(未导入) ${missing.length}:\n` +
+        missing.map((m) => `  ${m.code} ×${m.qty}`).join("\n"),
+    );
+  }
   if (bannedDrops.length) {
     notesParts.push(
       `禁卡(已跳过) ${bannedDrops.length}:\n` +
@@ -764,7 +776,12 @@ export async function importDeckAction(formData: FormData): Promise<{
   }
 
   bumpDeckList(game);
-  return { ok: true, deckId, imported: plan.length, missing };
+  return {
+    ok: true,
+    deckId,
+    imported: plan.length,
+    missing: missing.map((m) => m.code),
+  };
 }
 
 export async function setDeckCardPurchasedAction(formData: FormData) {
