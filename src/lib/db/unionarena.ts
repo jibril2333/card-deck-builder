@@ -32,6 +32,8 @@ export type UADeck = {
   accent_color2: string | null;
   cover_card_id: string | null;
   sort_order: number;
+  /** 1 = a deck the owner actually plays; floats to the top of the deck list. */
+  pinned: number;
   created_at: string;
   updated_at: string;
   locale: string;
@@ -319,6 +321,7 @@ export const {
   listDecks,
   listDecksWithCover,
   reorderDecks,
+  setDeckPinned,
   setDeckCover,
   backfillLockFromCards,
   listDecksWithCardQty,

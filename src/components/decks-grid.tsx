@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { reorderDecksAction } from "@/app/[game]/actions";
+import {
+  reorderDecksAction,
+  setDeckPinnedAction,
+} from "@/app/[game]/actions";
 
 export type DeckCardInfo = {
   id: string;
@@ -17,6 +20,8 @@ export type DeckCardInfo = {
   owner_name: string | null;
   /** True iff this deck belongs to the currently-logged-in user. */
   mine: boolean;
+  /** True for decks the owner actually plays (vs. just keeps on record). */
+  pinned: boolean;
   /** True iff every card in this deck is already covered by the user's
    *  card_collection (sum across variants). Renders a green ✓ next to the
    *  deck name. Only meaningful for `mine` decks. */
@@ -68,6 +73,20 @@ export function DecksGrid({
   if (decks !== lastDecksProp) {
     setLastDecksProp(decks);
     setOrder(decks);
+  }
+
+  function togglePinned(d: DeckCardInfo) {
+    const fd = new FormData();
+    fd.set("game", game);
+    fd.set("deck_id", d.id);
+    fd.set("pinned", d.pinned ? "0" : "1");
+    startTransition(async () => {
+      await setDeckPinnedAction(fd);
+      // The tile moves between the 主力 / 其他 sections, which are separate
+      // grids rendered by the server — refresh rather than trying to animate
+      // it across two component trees.
+      router.refresh();
+    });
   }
 
   function persist(next: DeckCardInfo[]) {
@@ -137,7 +156,25 @@ export function DecksGrid({
           // positioned outside its box gets clipped invisible. The wrapper
           // is `relative` but doesn't clip, so we can paint the line into
           // the grid's gap (12px) centered between tiles.
-          <div key={d.id} className="relative">
+          <div key={d.id} className="relative group/tile">
+            {/* Sits OUTSIDE the <Link>: a <button> nested in an <a> is invalid
+                markup and the click would navigate. Own decks only — you
+                can't re-file someone else's deck. */}
+            {d.mine ? (
+              <button
+                type="button"
+                onClick={() => togglePinned(d)}
+                aria-pressed={d.pinned}
+                title={d.pinned ? "取消主力" : "标记为主力卡组"}
+                className={`absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-md flex items-center justify-center text-sm cursor-pointer transition-all ${
+                  d.pinned
+                    ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)] shadow"
+                    : "bg-black/60 text-white/70 opacity-0 group-hover/tile:opacity-100 hover:bg-black/80 hover:text-white focus-visible:opacity-100"
+                }`}
+              >
+                {d.pinned ? "★" : "☆"}
+              </button>
+            ) : null}
             {showLineLeft ? (
               <span
                 aria-hidden

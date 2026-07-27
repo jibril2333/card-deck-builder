@@ -30,6 +30,8 @@ type DeckCommon = {
   accent_color2: string | null;
   cover_card_id: string | null;
   sort_order: number;
+  /** 1 = a deck the owner actually plays; floats to the top of the deck list. */
+  pinned: number;
   created_at: string;
   updated_at: string;
   user_id: string | null;
@@ -334,9 +336,28 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
          FROM user.decks d
          LEFT JOIN cards c ON c.id = d.cover_card_id
          LEFT JOIN user.users u ON u.id = d.user_id
-         ORDER BY (d.user_id = ?) DESC, d.sort_order ASC, d.updated_at DESC`,
+         ORDER BY (d.user_id = ?) DESC, d.pinned DESC,
+                  d.sort_order ASC, d.updated_at DESC`,
       )
       .all(currentUserId) as DeckWithCover<TDeck>[];
+  }
+
+  /**
+   * Mark a deck as one the owner actually plays (pinned) or just keeps on
+   * record. Owner-scoped: the WHERE clause makes this a no-op for anyone
+   * else's deck, so a forged deck id can't touch another user's row.
+   *
+   * `updated_at` is deliberately NOT bumped — it means "last edited the deck's
+   * cards", and the deck list surfaces it as such.
+   */
+  function setDeckPinned(
+    currentUserId: string,
+    deckId: string,
+    pinned: boolean,
+  ): void {
+    db()
+      .prepare(`UPDATE user.decks SET pinned = ? WHERE id = ? AND user_id = ?`)
+      .run(pinned ? 1 : 0, deckId, currentUserId);
   }
 
   /**
@@ -1351,6 +1372,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     listDecks,
     listDecksWithCover,
     reorderDecks,
+    setDeckPinned,
     setDeckCover,
     backfillLockFromCards,
     listDecksWithCardQty,

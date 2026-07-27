@@ -265,6 +265,24 @@ export async function reorderDecksAction(formData: FormData) {
   bumpDeckList(game);
 }
 
+/**
+ * Mark a deck as one you actually play ("主力") or just keep on record.
+ * Affects the deck list's ordering only — shortfall/diff tools still see
+ * every deck.
+ */
+export async function setDeckPinnedAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const deckId = String(formData.get("deck_id") ?? "");
+  const pinned = String(formData.get("pinned")) === "1";
+  if (!isGameId(game)) throw new Error("invalid game");
+  if (!deckId) throw new Error("missing deck_id");
+  backupBeforeWrite(game);
+  // Owner-scoped in the repo: someone else's deck id is a silent no-op.
+  lib(game).setDeckPinned(me.id, deckId, pinned);
+  bumpDeckList(game);
+}
+
 export async function setCardPriceAction(formData: FormData) {
   const me = await requireUser();
   const game = String(formData.get("game"));

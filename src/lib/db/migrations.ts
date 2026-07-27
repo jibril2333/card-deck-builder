@@ -591,6 +591,28 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: 20,
+    name: "decks.pinned (main decks vs. ones just kept on record)",
+    up: (db) => {
+      // Not every deck is one you actually play — most of them are just kept
+      // as a record. `pinned` floats the ones you main to the top of the deck
+      // list; everything else still shows below, unchanged.
+      //
+      // Deliberately affects the deck list ONLY: shortfall/diff tools keep
+      // treating every deck equally.
+      // Name the schema explicitly — `decks` lives in the ATTACHed user DB,
+      // and the unqualified form would silently inspect main if it ever grew
+      // a table of the same name.
+      const cols = db
+        .prepare("SELECT name FROM pragma_table_info('decks','user')")
+        .all() as { name: string }[];
+      if (cols.some((c) => c.name === "pinned")) return;
+      db.exec(
+        `ALTER TABLE user.decks ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`,
+      );
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

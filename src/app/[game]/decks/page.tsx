@@ -49,6 +49,7 @@ export default async function DecksPage({
           owner_id: d.owner_id,
           owner_name: d.owner_name,
           mine: me !== null && d.user_id === me.id,
+          pinned: d.pinned === 1,
           complete: completedDeckIds.has(d.id),
           count: digimon.deckCardCount(d.id),
         }))
@@ -63,6 +64,7 @@ export default async function DecksPage({
           owner_id: d.owner_id,
           owner_name: d.owner_name,
           mine: me !== null && d.user_id === me.id,
+          pinned: d.pinned === 1,
           complete: completedDeckIds.has(d.id),
           count: ua.deckCardCount(d.id),
         }));
@@ -181,11 +183,54 @@ export default async function DecksPage({
                 updated_at: d.updated_at,
                 owner_name: d.owner_name,
                 mine: d.mine,
+                pinned: d.pinned,
                 complete: d.complete,
               });
               return (
                 <>
-                  {mineDecks.length > 0 ? (
+                  {/* Decks you actually play float to the top under their own
+                      heading; everything else still shows in full below. The
+                      split only appears once something is starred, so a user
+                      who never uses it sees the original single list. */}
+                  {mineDecks.some((d) => d.pinned) ? (
+                    <>
+                      <section className="mb-6">
+                        <header className="flex items-baseline justify-between mb-2">
+                          <h2 className="text-sm font-semibold text-[var(--color-accent)] uppercase tracking-wide">
+                            ★ 主力卡组{" "}
+                            <span className="text-[var(--color-muted-fg)] font-normal normal-case">
+                              ({mineDecks.filter((d) => d.pinned).length})
+                            </span>
+                          </h2>
+                          <span className="text-[11px] text-[var(--color-muted-fg)]">
+                            提示：拖动封面可调整顺序 · 点 ★ 取消
+                          </span>
+                        </header>
+                        <DecksGrid
+                          game={game}
+                          decks={mineDecks.filter((d) => d.pinned).map(toGridShape)}
+                        />
+                      </section>
+                      {mineDecks.some((d) => !d.pinned) ? (
+                        <section className="mb-6">
+                          <header className="mb-2">
+                            <h2 className="text-sm font-semibold text-[var(--color-muted-fg)] uppercase tracking-wide">
+                              其他卡组{" "}
+                              <span className="text-[var(--color-muted-fg)] font-normal normal-case">
+                                ({mineDecks.filter((d) => !d.pinned).length})
+                              </span>
+                            </h2>
+                          </header>
+                          <DecksGrid
+                            game={game}
+                            decks={mineDecks
+                              .filter((d) => !d.pinned)
+                              .map(toGridShape)}
+                          />
+                        </section>
+                      ) : null}
+                    </>
+                  ) : mineDecks.length > 0 ? (
                     <section className="mb-6">
                       <header className="flex items-baseline justify-between mb-2">
                         <h2 className="text-sm font-semibold text-[var(--color-muted-fg)] uppercase tracking-wide">
@@ -196,7 +241,7 @@ export default async function DecksPage({
                         </h2>
                         {mineDecks.length > 1 ? (
                           <span className="text-[11px] text-[var(--color-muted-fg)]">
-                            提示：拖动封面可调整顺序
+                            提示：拖动封面可调整顺序 · 点 ★ 标为主力
                           </span>
                         ) : null}
                       </header>
