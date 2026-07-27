@@ -326,10 +326,15 @@ function CoverToggleButton({
       onClick={onToggle}
       disabled={pending}
       title={isCover ? "已是封面（点击取消）" : "设为封面"}
-      className={`absolute top-1.5 right-1.5 w-7 h-7 rounded-md flex items-center justify-center text-base transition-colors cursor-pointer ${
+      // The ★ state stays visible — it tells you WHICH card is the cover. The
+      // empty ☆ is an affordance, not information, so `hover-reveal` keeps it
+      // off the art until you point at the tile (see globals.css: it also
+      // handles keyboard focus, and stays visible on touch where there is no
+      // hover to reveal it).
+      className={`absolute top-1.5 right-1.5 w-7 h-7 rounded-md flex items-center justify-center text-base transition-all cursor-pointer ${
         isCover
           ? "bg-yellow-400 text-yellow-900 hover:bg-yellow-300"
-          : "bg-black/55 text-white/60 hover:text-yellow-300 hover:bg-black/75"
+          : "hover-reveal bg-black/55 text-white/60 hover:text-yellow-300 hover:bg-black/75"
       }`}
     >
       {isCover ? "★" : "☆"}

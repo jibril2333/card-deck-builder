@@ -88,6 +88,26 @@ body {
   gap: 0.75rem;
 }
 
+/**
+ * A control that stays out of the way until you point at its tile: put
+ * `hover-reveal` on the control and `group` on the tile.
+ *
+ * Hidden ONLY where hovering is actually possible. Tailwind's `group-hover:`
+ * variant compiles to a rule inside `@media (hover: hover)`, so on a phone the
+ * hover state never arrives — an `opacity-0` base would leave the button
+ * invisible (though still tappable) forever. Inverting it this way means touch
+ * devices simply always see the control.
+ */
+@media (hover: hover) {
+  .hover-reveal {
+    opacity: 0;
+  }
+  .group:hover .hover-reveal,
+  .hover-reveal:focus-visible {
+    opacity: 1;
+  }
+}
+
 .card-thumb {
   aspect-ratio: 5 / 7;
   background: var(--color-muted);

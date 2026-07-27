@@ -156,7 +156,7 @@ export function DecksGrid({
           // positioned outside its box gets clipped invisible. The wrapper
           // is `relative` but doesn't clip, so we can paint the line into
           // the grid's gap (12px) centered between tiles.
-          <div key={d.id} className="relative group/tile">
+          <div key={d.id} className="relative group">
             {/* Sits OUTSIDE the <Link>: a <button> nested in an <a> is invalid
                 markup and the click would navigate. Own decks only — you
                 can't re-file someone else's deck. */}
@@ -169,7 +169,7 @@ export function DecksGrid({
                 className={`absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-md flex items-center justify-center text-sm cursor-pointer transition-all ${
                   d.pinned
                     ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)] shadow"
-                    : "bg-black/60 text-white/70 opacity-0 group-hover/tile:opacity-100 hover:bg-black/80 hover:text-white focus-visible:opacity-100"
+                    : "hover-reveal bg-black/60 text-white/70 hover:bg-black/80 hover:text-white"
                 }`}
               >
                 {d.pinned ? "★" : "☆"}
