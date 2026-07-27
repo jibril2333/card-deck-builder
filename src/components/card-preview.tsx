@@ -2,28 +2,42 @@
 
 import { createContext, useContext, useState } from "react";
 
+/** Viewport rect of the hovered tile, used to place the panel beside it. */
+type Anchor = { top: number; bottom: number; left: number; right: number };
+
 type Preview = {
   image_url: string | null;
   name: string;
   code: string;
+  anchor?: Anchor;
 } | null;
 
 const CardPreviewContext = createContext<{
   set: (p: Preview) => void;
 } | null>(null);
 
+// Panel geometry. Width is also declared in the className below; keep them in
+// sync — the placement math needs the number, Tailwind needs the literal.
+const PANEL_W = 420;
+const GAP = 12; // breathing room between the tile and the panel
+const MARGIN = 8; // keep this far from the viewport edges
+/** Card art is 5:7; plus ~52px of code/name caption underneath. */
+const PANEL_H = Math.round((PANEL_W * 7) / 5) + 52;
+
 /**
- * Hover-preview wiring for a card grid. Card tiles call `set(...)` on
- * mouse-enter; this provider renders a large floating image of the hovered
- * card pinned to the right edge of the viewport.
+ * Hover-preview wiring for a card grid. Card tiles report themselves (and
+ * their on-screen rect) on mouse-enter and this provider floats a large image
+ * of the hovered card NEXT TO the tile.
  *
- * The context is OPTIONAL — `useCardPreview()` returns null when a grid isn't
- * wrapped in a provider, so tiles that aren't in a preview context (e.g. in
- * build/purchase modes) simply no-op on hover.
+ * It used to be pinned to a fixed spot — vertically centred, with its right
+ * edge lined up against a `max-w-6xl` content column. Once the deck page went
+ * full-width that column stopped existing, so the panel landed in the middle
+ * of the grid and covered the very cards the user was hovering. Placing it
+ * relative to the anchor keeps it clear of whatever you're pointing at, at any
+ * window size.
  *
- * The floating panel is `pointer-events-none` and lg-only: it never
- * intercepts clicks, and on small/touch screens (where hover doesn't exist)
- * it isn't rendered at all.
+ * The panel is `pointer-events-none` and lg-only: it never intercepts clicks,
+ * and on small/touch screens (where hover doesn't exist) it isn't rendered.
  */
 export function CardPreviewProvider({
   children,
@@ -40,12 +54,8 @@ export function CardPreviewProvider({
 
       {preview && preview.image_url ? (
         <div
-          className="hidden lg:block fixed top-1/2 -translate-y-1/2 z-50 w-[420px] xl:w-[480px] pointer-events-none"
-          // Pin the panel's right edge to the right edge of the centered
-          // max-w-6xl (1152px) content column instead of the far viewport
-          // edge — so it sits over the deck-info / aside area (which the
-          // owner is fine covering) rather than floating off in the margin.
-          style={{ right: "max(0.75rem, calc((100vw - 1152px) / 2 + 0.75rem))" }}
+          className="hidden lg:block fixed z-50 w-[420px] pointer-events-none"
+          style={placement(preview.anchor)}
         >
           <img
             src={preview.image_url}
@@ -63,6 +73,32 @@ export function CardPreviewProvider({
       ) : null}
     </CardPreviewContext.Provider>
   );
+}
+
+/**
+ * Place the panel beside the hovered tile: to its right when there's room,
+ * otherwise flipped to its left (so cards in the last column don't push the
+ * panel off-screen), and vertically centred on the tile but clamped inside the
+ * viewport.
+ */
+function placement(anchor: Anchor | undefined): React.CSSProperties {
+  // No anchor (shouldn't happen, but the type allows it): fall back to the
+  // right margin so the panel is at least out of the way.
+  if (!anchor) return { top: MARGIN, right: MARGIN };
+
+  const vw = typeof window === "undefined" ? 1280 : window.innerWidth;
+  const vh = typeof window === "undefined" ? 800 : window.innerHeight;
+
+  const roomRight = vw - anchor.right - GAP - MARGIN;
+  const left =
+    roomRight >= PANEL_W
+      ? anchor.right + GAP
+      : Math.max(MARGIN, anchor.left - GAP - PANEL_W);
+
+  const centred = (anchor.top + anchor.bottom) / 2 - PANEL_H / 2;
+  const top = Math.min(Math.max(MARGIN, centred), Math.max(MARGIN, vh - PANEL_H - MARGIN));
+
+  return { left, top };
 }
 
 /** Returns the preview controller, or null when no provider is mounted. */

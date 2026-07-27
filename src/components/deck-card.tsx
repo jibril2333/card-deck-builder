@@ -70,12 +70,22 @@ export function DeckCard({
   const preview = useCardPreview();
   const onHover =
     mode === "browse" && preview
-      ? () =>
+      ? (e: React.MouseEvent<HTMLElement>) => {
+          // Pass the tile's rect so the panel can sit beside THIS card rather
+          // than at one fixed spot on screen (where it covered the grid).
+          const r = e.currentTarget.getBoundingClientRect();
           preview.set({
             image_url: card.image_url ?? null,
             name: card.name,
             code: card.code,
-          })
+            anchor: {
+              top: r.top,
+              bottom: r.bottom,
+              left: r.left,
+              right: r.right,
+            },
+          });
+        }
       : undefined;
 
   // Optimistic copy of the card row. Lets +/- and the quantity/purchased
