@@ -613,6 +613,24 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: 21,
+    name: "decks.cover_variant (use an alt art as the deck cover)",
+    up: (db) => {
+      // The cover was always the card's BASE art, because it resolved through
+      // `cards.image_url`. Alt arts live in `card_images` keyed by
+      // (code, lang, variant), so remember WHICH printing was picked.
+      // '' = base art, which is what every existing deck gets — their covers
+      // keep rendering exactly as before.
+      const cols = db
+        .prepare("SELECT name FROM pragma_table_info('decks','user')")
+        .all() as { name: string }[];
+      if (cols.some((c) => c.name === "cover_variant")) return;
+      db.exec(
+        `ALTER TABLE user.decks ADD COLUMN cover_variant TEXT NOT NULL DEFAULT ''`,
+      );
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

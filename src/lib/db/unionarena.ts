@@ -34,6 +34,9 @@ export type UADeck = {
   sort_order: number;
   /** 1 = a deck the owner actually plays; floats to the top of the deck list. */
   pinned: number;
+  /** Which printing of the cover card to show: '' = base art, else a
+   *  `card_images.variant` key such as '_P1'. */
+  cover_variant: string;
   created_at: string;
   updated_at: string;
   locale: string;
@@ -322,6 +325,7 @@ export const {
   listDecksWithCover,
   reorderDecks,
   setDeckPinned,
+  setDeckCoverVariant,
   setDeckCover,
   backfillLockFromCards,
   listDecksWithCardQty,

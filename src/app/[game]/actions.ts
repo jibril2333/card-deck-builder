@@ -266,6 +266,23 @@ export async function reorderDecksAction(formData: FormData) {
 }
 
 /**
+ * Pick WHICH printing of the cover card the deck shows — "" for the base art,
+ * or a `card_images.variant` key like "_P1" for an alt art.
+ */
+export async function setDeckCoverVariantAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const deckId = String(formData.get("deck_id") ?? "");
+  const variant = String(formData.get("variant") ?? "");
+  if (!isGameId(game)) throw new Error("invalid game");
+  if (!deckId) throw new Error("missing deck_id");
+  backupBeforeWrite(game);
+  lib(game).setDeckCoverVariant(me.id, deckId, variant);
+  bumpDeck(game, deckId);
+  bumpDeckList(game);
+}
+
+/**
  * Mark a deck as one you actually play ("主力") or just keep on record.
  * Affects the deck list's ordering only — shortfall/diff tools still see
  * every deck.

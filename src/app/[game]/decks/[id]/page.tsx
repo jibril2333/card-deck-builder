@@ -7,6 +7,7 @@ import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckMetaForm } from "@/components/deck-meta-form";
+import { CoverVariantPicker } from "@/components/cover-variant-picker";
 import { DeckImageExport } from "@/components/deck-image-export";
 import {
   computeDeckSearchTargets,
@@ -172,6 +173,8 @@ type Loaded = {
     /** UA only — null for Digimon (no column). */
     locked_color: string | null;
     cover_card_id: string | null;
+    /** Which printing of the cover card to show ('' = base art). */
+    cover_variant: string;
     updated_at: string;
     user_id: string | null;
   };
@@ -190,6 +193,10 @@ type Loaded = {
     /** Cover card's `color2`, mapped to hex. Null for single-color covers
      *  and always null on UA (UA cards have no color2 column). */
     accent2: string | null;
+    /** Every printing of the cover card (base + alt arts), so the owner can
+     *  choose which one the deck shows. Digimon only — on UA each printing is
+     *  its own card, so picking one is just picking a different cover card. */
+    arts: { variant: string; image_url: string }[];
   } | null;
   isDigimon: boolean;
 };
@@ -242,6 +249,7 @@ export default async function DeckEditPage({
         locked_series: null,
         locked_color: null,
         cover_card_id: deck.cover_card_id,
+        cover_variant: deck.cover_variant ?? "",
         updated_at: deck.updated_at,
         user_id: deck.user_id,
       },
@@ -311,14 +319,28 @@ export default async function DeckEditPage({
         })),
       ),
       cover: coverCard
-        ? {
-            image_url: coverCard.image_url,
-            code: coverCard.code,
-            name: coverCard.name,
-            accent: coverCard.color ? colorHex(coverCard.color) : null,
-            // Digimon `color2` may be empty string for single-color cards.
-            accent2: coverCard.color2 ? colorHex(coverCard.color2) : null,
-          }
+        ? (() => {
+            // English art: the cover is shown to everyone who can see the deck,
+            // so it shouldn't shift with the viewer's own language setting.
+            const arts = digimon
+              .getCardImages(coverCard.code, "en")
+              .map((v) => ({ variant: v.variant, image_url: v.image_url }));
+            // Resolve the SAME printing the deck list resolves, so the banner
+            // here and the tile over there never disagree. Unknown/blank
+            // variant falls back to the card's own art.
+            const picked = deck.cover_variant
+              ? arts.find((a) => a.variant === deck.cover_variant)
+              : undefined;
+            return {
+              image_url: picked?.image_url ?? coverCard.image_url,
+              code: coverCard.code,
+              name: coverCard.name,
+              accent: coverCard.color ? colorHex(coverCard.color) : null,
+              // Digimon `color2` may be empty string for single-color cards.
+              accent2: coverCard.color2 ? colorHex(coverCard.color2) : null,
+              arts,
+            };
+          })()
         : null,
       isDigimon: true,
     };
@@ -346,6 +368,7 @@ export default async function DeckEditPage({
         locked_series: deck.locked_series,
         locked_color: deck.locked_color,
         cover_card_id: deck.cover_card_id,
+        cover_variant: deck.cover_variant ?? "",
         updated_at: deck.updated_at,
         user_id: deck.user_id,
       },
@@ -387,6 +410,9 @@ export default async function DeckEditPage({
             accent: coverCard.color ? colorHex(coverCard.color) : null,
             // UA cards have no color2 column — single-color only.
             accent2: null,
+            // UA keeps each printing as its own card row, so "pick an alt art"
+            // is just picking a different cover card — nothing to choose here.
+            arts: [],
           }
         : null,
       isDigimon: false,
@@ -807,14 +833,28 @@ export default async function DeckEditPage({
           <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
             <h3 className="text-sm font-semibold mb-3">卡组信息</h3>
             {mine ? (
-              <DeckMetaForm
-                game={game}
-                deck={loaded.deck}
-                coverAccent={loaded.cover?.accent ?? null}
-                coverAccent2={loaded.cover?.accent2 ?? null}
-                exportText={exportText}
-                exportUrl={exportUrl}
-              />
+              <>
+                <DeckMetaForm
+                  game={game}
+                  deck={loaded.deck}
+                  coverAccent={loaded.cover?.accent ?? null}
+                  coverAccent2={loaded.cover?.accent2 ?? null}
+                  exportText={exportText}
+                  exportUrl={exportUrl}
+                />
+                {/* Only worth showing when the cover card actually has more
+                    than one printing to choose between. */}
+                {loaded.cover && loaded.cover.arts.length > 1 ? (
+                  <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
+                    <CoverVariantPicker
+                      game={game}
+                      deckId={loaded.deck.id}
+                      arts={loaded.cover.arts}
+                      current={loaded.deck.cover_variant ?? ""}
+                    />
+                  </div>
+                ) : null}
+              </>
             ) : (
               <div className="space-y-2 text-sm">
                 <div>

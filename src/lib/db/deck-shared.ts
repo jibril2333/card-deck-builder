@@ -32,6 +32,9 @@ type DeckCommon = {
   sort_order: number;
   /** 1 = a deck the owner actually plays; floats to the top of the deck list. */
   pinned: number;
+  /** Which printing of the cover card to show: '' = base art, else a
+   *  `card_images.variant` key such as '_P1'. */
+  cover_variant: string;
   created_at: string;
   updated_at: string;
   user_id: string | null;
@@ -329,7 +332,16 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     return db()
       .prepare(
         `SELECT d.*,
-                c.image_url AS cover_image_url,
+                -- '' means the card's base art, which is what every deck used
+                -- before cover_variant existed — keep resolving those through
+                -- cards.image_url so their covers don't silently switch CDN.
+                CASE WHEN COALESCE(d.cover_variant,'') = '' THEN c.image_url
+                     ELSE COALESCE(
+                       (SELECT ci.image_url FROM card_images ci
+                         WHERE ci.code = c.code AND ci.variant = d.cover_variant
+                         ORDER BY (ci.lang = 'en') DESC LIMIT 1),
+                       c.image_url)
+                END AS cover_image_url,
                 c.code AS cover_code,
                 u.id AS owner_id,
                 u.display_name AS owner_name
@@ -358,6 +370,29 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     db()
       .prepare(`UPDATE user.decks SET pinned = ? WHERE id = ? AND user_id = ?`)
       .run(pinned ? 1 : 0, deckId, currentUserId);
+  }
+
+  /**
+   * Choose WHICH printing of the cover card to show — '' for the base art, or
+   * a `card_images.variant` key like '_P1' for an alt art.
+   *
+   * The key is deliberately NOT validated against card_images: an unknown one
+   * falls back to the base image in listDecksWithCover, so if a printing ever
+   * disappears upstream the deck degrades to plain art instead of showing a
+   * broken cover.
+   */
+  function setDeckCoverVariant(
+    currentUserId: string,
+    deckId: string,
+    variant: string,
+  ): void {
+    const r = db()
+      .prepare(
+        `UPDATE user.decks SET cover_variant = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND user_id = ?`,
+      )
+      .run(variant, deckId, currentUserId);
+    if (r.changes === 0) throw new OwnershipError(deckId);
   }
 
   /**
@@ -468,7 +503,8 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
       const r = db()
         .prepare(
           `UPDATE user.decks
-             SET cover_card_id = NULL, updated_at = CURRENT_TIMESTAMP
+             SET cover_card_id = NULL, cover_variant = '',
+                 updated_at = CURRENT_TIMESTAMP
            WHERE id = ? AND user_id = ?`,
         )
         .run(deckId, currentUserId);
@@ -493,7 +529,9 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
       }
     }
 
-    const sets: string[] = ["cover_card_id = ?"];
+    // A variant key is only meaningful for the card it came from, so switching
+    // cover cards resets to that card's base art.
+    const sets: string[] = ["cover_card_id = ?", "cover_variant = ''"];
     const params: unknown[] = [cardId];
     if (shouldSync) {
       // Read the card's color(s). UA cards only have `color`; Digimon cards
@@ -1373,6 +1411,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     listDecksWithCover,
     reorderDecks,
     setDeckPinned,
+    setDeckCoverVariant,
     setDeckCover,
     backfillLockFromCards,
     listDecksWithCardQty,
