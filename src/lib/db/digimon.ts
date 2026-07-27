@@ -467,6 +467,7 @@ export const {
   addDeckAdjustment,
   removeDeckAdjustment,
   setDeckAdjustmentNote,
+  setDeckAdjustmentQuantity,
   setDeckCover,
   listDecksWithCardQty,
   getCompletedDeckIds,

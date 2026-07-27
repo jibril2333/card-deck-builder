@@ -7,6 +7,7 @@ import {
   addDeckAdjustmentAction,
   removeDeckAdjustmentAction,
   setDeckAdjustmentNoteAction,
+  setDeckAdjustmentQuantityAction,
   searchCardsForAdjustmentAction,
 } from "@/app/[game]/actions";
 
@@ -14,6 +15,8 @@ export type Adjustment = {
   id: string;
   card_id: string;
   kind: "add" | "remove";
+  /** How many copies the note is about. */
+  quantity: number;
   note: string | null;
   code: string;
   name: string;
@@ -102,7 +105,7 @@ export function DeckAdjustments({
       <header className="flex items-baseline gap-2 mb-3">
         <h2 className="text-sm font-semibold">调整备忘</h2>
         <span className="text-[11px] text-[var(--color-muted-fg)]">
-          只是记下想怎么改 · 不计入张数、价格、缺卡、共享卡池和导出
+          只是记下想怎么改（含张数）· 不计入卡组张数、价格、缺卡、共享卡池和导出
         </span>
       </header>
 
@@ -209,7 +212,7 @@ function Column({
       <div className={`text-xs font-semibold mb-1.5 ${accent}`}>
         {title}{" "}
         <span className="text-[var(--color-muted-fg)] font-normal">
-          ({items.length})
+          ({items.length} 种 · {items.reduce((n, i) => n + i.quantity, 0)} 张)
         </span>
       </div>
       {items.length === 0 ? (
@@ -274,7 +277,19 @@ function Row({
         <div className="text-[10px] font-mono text-[var(--color-muted-fg)] truncate">
           {item.code}
         </div>
-        <div className="text-xs font-medium truncate">{item.name}</div>
+        <div className="flex items-center gap-1.5">
+          <div className="text-xs font-medium truncate flex-1">{item.name}</div>
+          <Stepper
+            value={item.quantity}
+            pending={pending}
+            onChange={(q) => {
+              const fd = new FormData();
+              fd.set("id", item.id);
+              fd.set("quantity", String(q));
+              run(setDeckAdjustmentQuantityAction, fd);
+            }}
+          />
+        </div>
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
@@ -300,5 +315,46 @@ function Row({
         ×
       </button>
     </li>
+  );
+}
+
+/** Copy-count stepper. Clamped to the same 1..20 the server enforces. */
+function Stepper({
+  value,
+  pending,
+  onChange,
+}: {
+  value: number;
+  pending: boolean;
+  onChange: (q: number) => void;
+}) {
+  const btn =
+    "w-5 h-5 rounded flex items-center justify-center text-xs leading-none " +
+    "border border-[var(--color-border)] hover:border-[var(--color-fg)] " +
+    "cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
+  return (
+    <div className="flex items-center gap-1 shrink-0">
+      <button
+        type="button"
+        disabled={pending || value <= 1}
+        onClick={() => onChange(value - 1)}
+        aria-label="减少一张"
+        className={btn}
+      >
+        −
+      </button>
+      <span className="text-xs tabular-nums w-6 text-center font-medium">
+        ×{value}
+      </span>
+      <button
+        type="button"
+        disabled={pending || value >= 20}
+        onClick={() => onChange(value + 1)}
+        aria-label="增加一张"
+        className={btn}
+      >
+        ＋
+      </button>
+    </div>
   );
 }

@@ -295,6 +295,21 @@ export async function removeDeckAdjustmentAction(formData: FormData) {
   if (deckId) bumpDeck(game, deckId);
 }
 
+export async function setDeckAdjustmentQuantityAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const id = String(formData.get("id") ?? "");
+  const deckId = String(formData.get("deck_id") ?? "");
+  const quantity = Number(formData.get("quantity"));
+  if (!isGameId(game)) throw new Error("invalid game");
+  if (!id) throw new Error("missing id");
+  if (!Number.isFinite(quantity)) throw new Error("invalid quantity");
+  backupBeforeWrite(game);
+  // The repo clamps the range; this only rejects outright nonsense.
+  lib(game).setDeckAdjustmentQuantity(me.id, id, quantity);
+  if (deckId) bumpDeck(game, deckId);
+}
+
 export async function setDeckAdjustmentNoteAction(formData: FormData) {
   const me = await requireUser();
   const game = String(formData.get("game"));

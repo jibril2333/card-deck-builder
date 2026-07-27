@@ -658,6 +658,48 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: 23,
+    name: "deck_adjustments.quantity (how many copies to add/cut)",
+    up: (db) => {
+      // "Try this card" usually means a specific number of copies — swapping
+      // 2-for-2 is a different note than 1-for-1. Existing rows predate the
+      // idea and mean one copy.
+      const cols = db
+        .prepare("SELECT name FROM pragma_table_info('deck_adjustments','user')")
+        .all() as { name: string }[];
+      if (cols.some((c) => c.name === "quantity")) return;
+      db.exec(
+        `ALTER TABLE user.deck_adjustments
+           ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1`,
+      );
+      // One row per (deck, card, column) so re-adding a card bumps its count
+      // instead of stacking duplicate entries. Created here rather than in
+      // migration 22 because that's only true now that quantity exists.
+      //
+      // Migration 22 shipped without the constraint, so anything already
+      // entered could contain duplicates — collapse them (summing the copies,
+      // keeping the first note) or the index creation would fail.
+      db.exec(`
+        UPDATE deck_adjustments SET quantity = (
+          SELECT SUM(d2.quantity) FROM deck_adjustments d2
+           WHERE d2.deck_id = deck_adjustments.deck_id
+             AND d2.card_id = deck_adjustments.card_id
+             AND d2.kind    = deck_adjustments.kind
+        )
+        WHERE id IN (
+          SELECT MIN(id) FROM deck_adjustments GROUP BY deck_id, card_id, kind
+        );
+        DELETE FROM deck_adjustments WHERE id NOT IN (
+          SELECT MIN(id) FROM deck_adjustments GROUP BY deck_id, card_id, kind
+        );
+      `);
+      db.exec(
+        `CREATE UNIQUE INDEX IF NOT EXISTS user.idx_deck_adjustments_unique
+           ON deck_adjustments(deck_id, card_id, kind)`,
+      );
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

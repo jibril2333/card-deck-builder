@@ -330,6 +330,7 @@ export const {
   addDeckAdjustment,
   removeDeckAdjustment,
   setDeckAdjustmentNote,
+  setDeckAdjustmentQuantity,
   setDeckCover,
   backfillLockFromCards,
   listDecksWithCardQty,

@@ -102,6 +102,10 @@ export type DeckCardRow<TCard> = TCard & {
   price: number | null;
 };
 
+/** Upper bound for an adjustment's copy count — a memo, not a rules engine,
+ *  but an unbounded number is just a typo waiting to happen. */
+const MAX_ADJUSTMENT_QTY = 20;
+
 export class OwnershipError extends Error {
   constructor(deckId: string) {
     super(`deck ${deckId} not owned by current user (or does not exist)`);
@@ -747,6 +751,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     id: string;
     card_id: string;
     kind: "add" | "remove";
+    quantity: number;
     note: string | null;
     code: string;
     name: string;
@@ -754,7 +759,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
   }[] {
     return db()
       .prepare(
-        `SELECT a.id, a.card_id, a.kind, a.note,
+        `SELECT a.id, a.card_id, a.kind, a.quantity, a.note,
                 c.code, c.name, c.image_url
            FROM user.deck_adjustments a
            JOIN cards c ON c.id = a.card_id
@@ -775,12 +780,35 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
       .prepare(`SELECT 1 FROM user.decks WHERE id = ? AND user_id = ?`)
       .get(deckId, currentUserId);
     if (!owns) throw new OwnershipError(deckId);
+    // Re-adding a card you already noted bumps its count rather than stacking
+    // a second row for the same card in the same column.
     db()
       .prepare(
-        `INSERT INTO user.deck_adjustments (id, deck_id, card_id, kind)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO user.deck_adjustments (id, deck_id, card_id, kind, quantity)
+         VALUES (?, ?, ?, ?, 1)
+         ON CONFLICT(deck_id, card_id, kind)
+           DO UPDATE SET quantity = MIN(quantity + 1, ${MAX_ADJUSTMENT_QTY})`,
       )
       .run(crypto.randomUUID(), deckId, cardId, kind);
+  }
+
+  /**
+   * Set how many copies the note is about. Clamped to 1..MAX: zero would be a
+   * confusing way to spell "remove the note", and the ✕ already does that.
+   */
+  function setDeckAdjustmentQuantity(
+    currentUserId: string,
+    id: string,
+    quantity: number,
+  ): void {
+    const q = Math.max(1, Math.min(MAX_ADJUSTMENT_QTY, Math.trunc(quantity)));
+    db()
+      .prepare(
+        `UPDATE user.deck_adjustments SET quantity = ?
+          WHERE id = ?
+            AND deck_id IN (SELECT id FROM user.decks WHERE user_id = ?)`,
+      )
+      .run(q, id, currentUserId);
   }
 
   /**
@@ -1493,6 +1521,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     addDeckAdjustment,
     removeDeckAdjustment,
     setDeckAdjustmentNote,
+    setDeckAdjustmentQuantity,
     setDeckCover,
     backfillLockFromCards,
     listDecksWithCardQty,
