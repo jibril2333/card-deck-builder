@@ -631,6 +631,33 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: 22,
+    name: "deck_adjustments (a scratch list of swaps you're considering)",
+    up: (db) => {
+      // A per-deck note-to-self about cards you're thinking of adding or
+      // cutting. Deliberately its OWN table rather than a flag on deck_cards:
+      // every count, price, shortfall, shared-pool and export query reads
+      // deck_cards, so anything living there would inevitably leak into them.
+      // Keeping it separate makes "participates in nothing else" structural
+      // instead of something each query has to remember to filter out.
+      //
+      // ON DELETE CASCADE is real here — connection.ts sets
+      // `PRAGMA foreign_keys = ON`, which is what deleteDeck already relies on.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user.deck_adjustments (
+          id         TEXT PRIMARY KEY,
+          deck_id    TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+          card_id    TEXT NOT NULL,
+          kind       TEXT NOT NULL CHECK (kind IN ('add','remove')),
+          note       TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS user.idx_deck_adjustments_deck
+          ON deck_adjustments(deck_id);
+      `);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

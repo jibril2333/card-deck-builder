@@ -14,6 +14,10 @@ import {
   type SearchGroup,
 } from "@/lib/deck-search";
 import { DeckStats, type StatPanel } from "@/components/deck-stats";
+import {
+  DeckAdjustments,
+  type Adjustment,
+} from "@/components/deck-adjustments";
 import { colorHex as colorHexFn } from "@/lib/games";
 import {
   exportDeckText,
@@ -179,6 +183,8 @@ type Loaded = {
     user_id: string | null;
   };
   cards: DeckCardData[];
+  /** Considered swaps — display only; excluded from every other computation. */
+  adjustments: Adjustment[];
   exportCards: DeckCardForExport[];
   statsPanels: StatPanel[];
   /** Digimon only: cardId → per-slot groups of deck cards its search can fetch. */
@@ -253,6 +259,7 @@ export default async function DeckEditPage({
         updated_at: deck.updated_at,
         user_id: deck.user_id,
       },
+      adjustments: digimon.listDeckAdjustments(id),
       cards: cards.map((c) => {
         const t = tMap.get(c.code);
         return {
@@ -372,6 +379,7 @@ export default async function DeckEditPage({
         updated_at: deck.updated_at,
         user_id: deck.user_id,
       },
+      adjustments: ua.listDeckAdjustments(id),
       cards: cards.map((c) => ({
         id: c.id,
         code: c.code,
@@ -823,6 +831,16 @@ export default async function DeckEditPage({
               </CardPreviewProvider>
             );
           })()}
+
+          {/* Owner-only scratch list of swaps under consideration. Sits below
+              the deck itself and feeds into nothing else. */}
+          {mine ? (
+            <DeckAdjustments
+              game={game}
+              deckId={loaded.deck.id}
+              items={loaded.adjustments}
+            />
+          ) : null}
 
           {loaded.cards.length > 0 ? (
             <DeckStats panels={loaded.statsPanels} />

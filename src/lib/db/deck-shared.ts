@@ -734,6 +734,83 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     return r.n;
   }
 
+  // ── Adjustments ────────────────────────────────────────────────────────
+  // A scratch list of swaps the owner is considering. Read by NOTHING except
+  // its own panel: no count, price, shortfall, pool or export query touches
+  // this table, which is the whole point of it being separate from deck_cards.
+
+  /**
+   * The deck's considered swaps, joined to the card for display. Newest first
+   * within each column so a card you just jotted down is at the top.
+   */
+  function listDeckAdjustments(deckId: string): {
+    id: string;
+    card_id: string;
+    kind: "add" | "remove";
+    note: string | null;
+    code: string;
+    name: string;
+    image_url: string | null;
+  }[] {
+    return db()
+      .prepare(
+        `SELECT a.id, a.card_id, a.kind, a.note,
+                c.code, c.name, c.image_url
+           FROM user.deck_adjustments a
+           JOIN cards c ON c.id = a.card_id
+          WHERE a.deck_id = ?
+          ORDER BY a.created_at DESC`,
+      )
+      .all(deckId) as ReturnType<typeof listDeckAdjustments>;
+  }
+
+  /** Owner-scoped: the deck must belong to the caller or nothing is written. */
+  function addDeckAdjustment(
+    currentUserId: string,
+    deckId: string,
+    cardId: string,
+    kind: "add" | "remove",
+  ): void {
+    const owns = db()
+      .prepare(`SELECT 1 FROM user.decks WHERE id = ? AND user_id = ?`)
+      .get(deckId, currentUserId);
+    if (!owns) throw new OwnershipError(deckId);
+    db()
+      .prepare(
+        `INSERT INTO user.deck_adjustments (id, deck_id, card_id, kind)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run(crypto.randomUUID(), deckId, cardId, kind);
+  }
+
+  /**
+   * Ownership is checked through the parent deck, so passing someone else's
+   * row id deletes nothing rather than erroring — same shape as reorderDecks.
+   */
+  function removeDeckAdjustment(currentUserId: string, id: string): void {
+    db()
+      .prepare(
+        `DELETE FROM user.deck_adjustments
+          WHERE id = ?
+            AND deck_id IN (SELECT id FROM user.decks WHERE user_id = ?)`,
+      )
+      .run(id, currentUserId);
+  }
+
+  function setDeckAdjustmentNote(
+    currentUserId: string,
+    id: string,
+    note: string,
+  ): void {
+    db()
+      .prepare(
+        `UPDATE user.deck_adjustments SET note = ?
+          WHERE id = ?
+            AND deck_id IN (SELECT id FROM user.decks WHERE user_id = ?)`,
+      )
+      .run(note.trim() || null, id, currentUserId);
+  }
+
   function deleteDeck(currentUserId: string, id: string): void {
     const r = db()
       .prepare(`DELETE FROM user.decks WHERE id = ? AND user_id = ?`)
@@ -1412,6 +1489,10 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     reorderDecks,
     setDeckPinned,
     setDeckCoverVariant,
+    listDeckAdjustments,
+    addDeckAdjustment,
+    removeDeckAdjustment,
+    setDeckAdjustmentNote,
     setDeckCover,
     backfillLockFromCards,
     listDecksWithCardQty,

@@ -265,6 +265,71 @@ export async function reorderDecksAction(formData: FormData) {
   bumpDeckList(game);
 }
 
+// ── Deck adjustments ──────────────────────────────────────────────────────
+// The "considering these swaps" scratch list. Its own table, read by nothing
+// else, so none of these touch deck totals / prices / shortfalls / the pool.
+
+export async function addDeckAdjustmentAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const deckId = String(formData.get("deck_id") ?? "");
+  const cardId = String(formData.get("card_id") ?? "");
+  const kind = String(formData.get("kind"));
+  if (!isGameId(game)) throw new Error("invalid game");
+  if (!deckId || !cardId) throw new Error("missing deck_id/card_id");
+  if (kind !== "add" && kind !== "remove") throw new Error("invalid kind");
+  backupBeforeWrite(game);
+  lib(game).addDeckAdjustment(me.id, deckId, cardId, kind);
+  bumpDeck(game, deckId);
+}
+
+export async function removeDeckAdjustmentAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const id = String(formData.get("id") ?? "");
+  const deckId = String(formData.get("deck_id") ?? "");
+  if (!isGameId(game)) throw new Error("invalid game");
+  if (!id) throw new Error("missing id");
+  backupBeforeWrite(game);
+  lib(game).removeDeckAdjustment(me.id, id);
+  if (deckId) bumpDeck(game, deckId);
+}
+
+export async function setDeckAdjustmentNoteAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const id = String(formData.get("id") ?? "");
+  const deckId = String(formData.get("deck_id") ?? "");
+  const note = String(formData.get("note") ?? "");
+  if (!isGameId(game)) throw new Error("invalid game");
+  if (!id) throw new Error("missing id");
+  backupBeforeWrite(game);
+  lib(game).setDeckAdjustmentNote(me.id, id, note);
+  if (deckId) bumpDeck(game, deckId);
+}
+
+/**
+ * Card lookup for the adjustment panel's picker. Read-only, capped, and
+ * requires a session — the app is public through the tunnel, so an unbounded
+ * anonymous query endpoint isn't something to hand out.
+ */
+export async function searchCardsForAdjustmentAction(
+  game: string,
+  q: string,
+): Promise<{ id: string; code: string; name: string; image_url: string | null }[]> {
+  await requireUser();
+  if (!isGameId(game)) throw new Error("invalid game");
+  const query = q.trim();
+  if (query.length < 2) return [];
+  const { rows } = lib(game).searchCards({ q: query, limit: 12 });
+  return rows.map((r) => ({
+    id: r.id,
+    code: r.code,
+    name: r.name,
+    image_url: r.image_url,
+  }));
+}
+
 /**
  * Pick WHICH printing of the cover card the deck shows — "" for the base art,
  * or a `card_images.variant` key like "_P1" for an alt art.
