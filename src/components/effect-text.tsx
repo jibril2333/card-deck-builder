@@ -1,33 +1,54 @@
 /**
- * Renders Digimon card effect text with the bracketed tokens highlighted, the
- * way community card viewers (e.g. digicamoe) present them:
+ * Renders Digimon effect text with its tokens as chips, the way community card
+ * viewers (digicamoe et al.) present them. Three families, three treatments:
  *
- *   - TIMING / CONDITION brackets — 【登场时】 [On Play] 〔进化〕 [When Digivolving]
- *     and EN trait tags like [Angel] — bold accent text. These mark when an
- *     effect fires (and traits), so they read as the structure of the text.
- *   - KEYWORD ABILITIES — 《阻挡者》 ≪天昇≫ ＜Recovery +1＞ — a small filled pill,
- *     since they're named, rules-defined abilities.
+ *   TIMING / CONDITION — 【登场时】 [On Play] 〔进化〕 [When Digivolving], and the
+ *     EN trait tags that share the bracket ([Angel], [Lucemon]). These are the
+ *     skeleton of the text: when the effect fires. Dark filled chip.
  *
- * Plain text (including the line breaks the source provides) is preserved via
- * `whitespace-pre-wrap`, so multi-clause effects keep their line structure.
+ *   KEYWORD ABILITY — 《阻挡者》 ≪天昇≫ ＜Rush＞ ＜Recovery +1＞. Named,
+ *     rules-defined abilities. Amber filled chip so they pop out of a
+ *     paragraph the way they do on the printed card.
  *
- * Pure presentational + deterministic; works for EN / 中文 / 日本語 alike since
- * all three use the same bracket families.
+ *   QUOTED NAME — 「スカモン」 “亚古兽”. References to another card or trait by
+ *     name; emphasised rather than chipped, since they're part of the sentence
+ *     and are often long.
+ *
+ * Everything else is plain text, and the source's line breaks survive via
+ * `whitespace-pre-wrap` so multi-clause effects keep their structure.
+ *
+ * Purely presentational and deterministic. All three languages use the same
+ * bracket families, so one pass covers EN / 中文 / 日本語.
  */
 
-// One capturing split regex so `String.split` returns text and brackets
-// interleaved. Order doesn't matter (the families don't nest in this data).
-const BRACKET_RE =
-  /(【[^】]*】|〔[^〕]*〕|\[[^\]]+\]|《[^》]*》|≪[^≫]*≫|＜[^＞]*＞)/g;
+// A single capturing split regex, so `String.split` hands back text and tokens
+// interleaved. The families don't nest in this data, so order doesn't matter.
+const TOKEN_RE =
+  /(【[^】]*】|〔[^〕]*〕|\[[^\]]+\]|《[^》]*》|≪[^≫]*≫|＜[^＞]*＞|「[^」]*」|“[^”]*”)/g;
 
-function isTiming(tok: string): boolean {
-  const c = tok[0];
-  return c === "【" || c === "〔" || c === "[";
+type Kind = "timing" | "keyword" | "name" | "text";
+
+function kindOf(tok: string): Kind {
+  switch (tok[0]) {
+    case "【":
+    case "〔":
+    case "[":
+      return "timing";
+    case "《":
+    case "≪":
+    case "＜":
+      return "keyword";
+    case "「":
+    case "“": // opening curly double quote, used by the CN text
+      return "name";
+    default:
+      return "text";
+  }
 }
-function isKeyword(tok: string): boolean {
-  const c = tok[0];
-  return c === "《" || c === "≪" || c === "＜";
-}
+
+const CHIP =
+  "inline-block px-1.5 rounded align-[0.05em] text-[0.92em] font-medium " +
+  "leading-[1.5] whitespace-nowrap";
 
 export function EffectText({
   text,
@@ -36,32 +57,42 @@ export function EffectText({
   text: string;
   className?: string;
 }) {
-  const parts = text.split(BRACKET_RE);
+  const parts = text.split(TOKEN_RE);
   return (
     <span className={`whitespace-pre-wrap leading-relaxed ${className}`}>
       {parts.map((p, i) => {
         if (!p) return null;
-        if (isTiming(p)) {
-          return (
-            <b
-              key={i}
-              className="font-semibold text-[var(--color-accent)]"
-            >
-              {p}
-            </b>
-          );
+        switch (kindOf(p)) {
+          case "timing":
+            return (
+              <span
+                key={i}
+                // Deliberately NOT the accent colour: timings are by far the
+                // most common token, and a paragraph of amber would drown the
+                // keywords that actually need to stand out.
+                className={`${CHIP} bg-[var(--color-fg)]/85 text-[var(--color-bg)]`}
+              >
+                {p}
+              </span>
+            );
+          case "keyword":
+            return (
+              <span
+                key={i}
+                className={`${CHIP} bg-[var(--color-accent)] text-[var(--color-accent-fg)]`}
+              >
+                {p}
+              </span>
+            );
+          case "name":
+            return (
+              <b key={i} className="font-semibold italic">
+                {p}
+              </b>
+            );
+          default:
+            return <span key={i}>{p}</span>;
         }
-        if (isKeyword(p)) {
-          return (
-            <span
-              key={i}
-              className="inline-block px-1 rounded bg-[var(--color-accent)]/12 text-[var(--color-accent)] font-medium"
-            >
-              {p}
-            </span>
-          );
-        }
-        return <span key={i}>{p}</span>;
       })}
     </span>
   );
