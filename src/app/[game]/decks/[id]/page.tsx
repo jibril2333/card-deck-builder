@@ -661,9 +661,9 @@ export default async function DeckEditPage({
               quantity: c.quantity,
             }))}
           />
-          </div>
-
-          {/* Build mode: find and add cards without leaving the deck. */}
+          {/* Build mode: find and add cards without leaving the deck. Shares
+              the toolbar row, pushed to the right edge by ml-auto — it wraps
+              onto its own line on narrow screens like the rest of the row. */}
           {mode === "build" ? (
             <DeckCardSearch
               game={game}
@@ -671,6 +671,7 @@ export default async function DeckEditPage({
               lang={cardLangForPage}
             />
           ) : null}
+          </div>
 
           {cardPool ? (
             <div className="mt-3">

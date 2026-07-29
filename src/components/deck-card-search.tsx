@@ -98,17 +98,19 @@ export function DeckCardSearch({
   }
 
   return (
-    <div ref={boxRef} className="relative mt-3">
+    // Sits at the right end of the deck toolbar; capped so it doesn't crowd
+    // the mode tabs, and full-width once the row wraps on a narrow screen.
+    <div ref={boxRef} className="relative ml-auto w-full sm:w-72">
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted-fg)] text-sm">
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-muted-fg)] text-sm">
           🔍
         </span>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => setOpen(true)}
-          placeholder="搜卡片加入这个卡组（名称或编号）…"
-          className="w-full h-10 pl-9 pr-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
+          placeholder="搜卡加入卡组…"
+          className="w-full h-8 pl-8 pr-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
         />
       </div>
 
