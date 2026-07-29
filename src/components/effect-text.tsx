@@ -24,7 +24,7 @@
 // A single capturing split regex, so `String.split` hands back text and tokens
 // interleaved. The families don't nest in this data, so order doesn't matter.
 const TOKEN_RE =
-  /(【[^】]*】|〔[^〕]*〕|\[[^\]]+\]|《[^》]*》|≪[^≫]*≫|＜[^＞]*＞|「[^」]*」|“[^”]*”)/g;
+  /(【[^】]*】|〔[^〕]*〕|\[[^\]]+\]|\{[^}]+\}|《[^》]*》|≪[^≫]*≫|＜[^＞]*＞|「[^」]*」|“[^”]*”)/g;
 
 type Kind = "timing" | "keyword" | "name" | "text";
 
@@ -33,6 +33,9 @@ function kindOf(tok: string): Kind {
     case "【":
     case "〔":
     case "[":
+    // 126 cards spell the play-location tag with braces — {Hand}[Counter] —
+    // instead of brackets. Same kind of token, so treat it the same.
+    case "{":
       return "timing";
     case "《":
     case "≪":
