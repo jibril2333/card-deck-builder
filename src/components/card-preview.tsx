@@ -9,6 +9,8 @@ type Preview = {
   image_url: string | null;
   name: string;
   code: string;
+  /** Products this card can be pulled from — often more than one. */
+  sets?: string[];
   anchor?: Anchor;
 } | null;
 
@@ -68,6 +70,15 @@ export function CardPreviewProvider({
               {preview.code}
             </div>
             <div className="text-base font-medium truncate">{preview.name}</div>
+            {/* Which packs this card comes out of. Worth space here because
+                the code only names ONE set, while promos in particular are
+                reprinted across many products. */}
+            {preview.sets && preview.sets.length > 0 ? (
+              <div className="mt-1.5 text-[11px] text-[var(--color-muted-fg)] leading-snug">
+                <span className="opacity-70">收录：</span>
+                {preview.sets.join(" · ")}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

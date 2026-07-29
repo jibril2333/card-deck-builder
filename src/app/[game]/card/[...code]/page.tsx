@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { splitSetNames } from "@/lib/card-sets";
 import { Badge } from "@/components/ui/badge";
 import { AddToDeck } from "@/components/add-to-deck";
 import { BackLink } from "@/components/back-link";
@@ -381,10 +382,11 @@ function DigimonDetail({
         <EffectBlock label="进化继承效果" text={card.inherited_effect} />
         <EffectBlock label="源池效果" text={card.source_effect} />
 
+        <SetList sets={splitSetNames(card.set_names)} />
+
         <CardRulings rulings={rulings} />
 
         <div className="grid grid-cols-2 gap-3 text-xs text-[var(--color-muted-fg)] pt-3 border-t border-[var(--color-border)]">
-          <Stat label="收录" value={card.set_names} />
           <Stat label="画师" value={card.artist} />
           {card.source_url ? (
             <div className="flex flex-col gap-0.5">
@@ -592,6 +594,32 @@ function MarketListingsBlock({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Products this card can be pulled from. A list rather than the raw
+ * semicolon-joined string: promos run to seven entries and read as a wall of
+ * text otherwise.
+ */
+function SetList({ sets }: { sets: string[] }) {
+  if (sets.length === 0) return null;
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-fg)] mb-1">
+        收录信息{sets.length > 1 ? `（${sets.length} 个产品）` : ""}
+      </div>
+      <ul className="text-sm bg-[var(--color-muted)] rounded-md p-3 border border-[var(--color-border)] space-y-1">
+        {sets.map((s) => (
+          <li key={s} className="flex items-start gap-2">
+            <span aria-hidden className="text-[var(--color-muted-fg)]">
+              ·
+            </span>
+            <span>{s}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

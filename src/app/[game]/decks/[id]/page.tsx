@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex, GAMES } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { splitSetNames } from "@/lib/card-sets";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { DeckCardSearch } from "@/components/deck-card-search";
@@ -271,6 +272,7 @@ export default async function DeckEditPage({
           id: c.id,
           code: c.code,
           name: t?.name ?? c.name,
+          sets: splitSetNames(c.set_names),
           color: c.color,
           rarity: c.rarity,
           image_url: t?.image_url ?? c.image_url,

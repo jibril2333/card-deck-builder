@@ -11,6 +11,7 @@ import {
   setDeckCardPurchasedAction,
 } from "@/app/[game]/actions";
 import { colorHex } from "@/lib/games";
+import { shortSetName } from "@/lib/card-sets";
 import { CardPriceInput } from "@/components/card-price-input";
 import { useCardPreview } from "@/components/card-preview";
 import { SearchTargets } from "@/components/search-targets";
@@ -20,6 +21,8 @@ export type DeckCardData = {
   id: string;
   code: string;
   name: string;
+  /** Products this card can be pulled from (parsed from cards.set_names). */
+  sets?: string[];
   color?: string | null;
   rarity?: string | null;
   image_url?: string | null;
@@ -78,6 +81,7 @@ export function DeckCard({
             image_url: card.image_url ?? null,
             name: card.name,
             code: card.code,
+            sets: card.sets,
             anchor: {
               top: r.top,
               bottom: r.bottom,
@@ -193,6 +197,16 @@ export function DeckCard({
               />
             ) : null}
             <span className="truncate">{card.code}</span>
+            {/* Only shown when the card is reprinted across products — the
+                code already names the single-set case. */}
+            {card.sets && card.sets.length > 1 ? (
+              <span
+                className="shrink-0 px-1 rounded bg-[var(--color-muted)] text-[9px] font-sans"
+                title={`收录于 ${card.sets.length} 个产品：\n${card.sets.join("\n")}`}
+              >
+                {card.sets.length}包
+              </span>
+            ) : null}
           </div>
           <div className="text-xs font-medium truncate group-hover:text-[var(--color-accent)]">
             {card.name}

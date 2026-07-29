@@ -3,6 +3,7 @@ import { createDeckRepo, OwnershipError } from "./deck-shared";
 import type { CardTranslation } from "./translations-ddl";
 import type { CardRuling } from "./rulings-ddl";
 import type { CardLang } from "../card-lang";
+import { splitSetNames } from "../card-sets";
 
 export type DigimonCard = {
   id: string;
@@ -419,8 +420,8 @@ export function distinct(col: keyof DigimonCard): string[] {
 }
 
 /**
- * Splits the `set_names` field (which contains multiple set descriptors joined
- * by " | ") into a deduped, sorted list of individual set strings.
+ * Every individual product name across the whole card pool, deduped + sorted,
+ * for the browse page's set filter.
  */
 export function distinctSetNames(): string[] {
   const rows = db()
@@ -430,10 +431,7 @@ export function distinctSetNames(): string[] {
     .all() as { set_names: string }[];
   const sets = new Set<string>();
   for (const r of rows) {
-    for (const part of r.set_names.split(" | ")) {
-      const t = part.trim();
-      if (t) sets.add(t);
-    }
+    for (const part of splitSetNames(r.set_names)) sets.add(part);
   }
   return [...sets].sort();
 }
