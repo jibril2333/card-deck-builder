@@ -77,6 +77,10 @@ export type DigimonFilters = {
   has_security?: boolean;
   /** If false (default), parallel / alt-art versions are hidden. */
   show_alt_arts?: boolean;
+  /** Which language's printings to expand / count. card_images holds a row
+   *  per (code, lang, variant), so without this every card multiplies by the
+   *  number of languages we have art for. */
+  art_lang?: string;
   sort_field?: string;
   sort_dir?: "asc" | "desc";
   limit?: number;
@@ -206,7 +210,11 @@ export function searchCards(filters: DigimonFilters = {}): {
   //  - show_alt_arts: expand to one tile per image variant. Every tile keeps the
   //    same card `code` (variants share it); the page links each to ?v=<variant>.
   const showAll = filters.show_alt_arts === true;
-  const VC = `(SELECT COUNT(*) FROM card_images WHERE card_images.code = cards.code)`;
+  const artLang = filters.art_lang ?? "en";
+  params.art_lang = artLang;
+  const VC = `(SELECT COUNT(*) FROM card_images
+                WHERE card_images.code = cards.code
+                  AND card_images.lang = @art_lang)`;
 
   let rows: DigimonSearchRow[];
   let total: number;
@@ -234,8 +242,11 @@ export function searchCards(filters: DigimonFilters = {}): {
          SELECT base.*,
            COALESCE(ci.variant, '') AS variant,
            COALESCE(ci.image_url, base.image_url) AS display_image,
-           (SELECT COUNT(*) FROM card_images WHERE card_images.code = base.code) AS variant_count
-         FROM base LEFT JOIN card_images ci ON ci.code = base.code
+           (SELECT COUNT(*) FROM card_images
+             WHERE card_images.code = base.code
+               AND card_images.lang = @art_lang) AS variant_count
+         FROM base LEFT JOIN card_images ci
+           ON ci.code = base.code AND ci.lang = @art_lang
          ${orderQualified} LIMIT @limit OFFSET @offset`,
       )
       .all({ ...params, limit, offset }) as DigimonSearchRow[];
@@ -243,7 +254,8 @@ export function searchCards(filters: DigimonFilters = {}): {
       db()
         .prepare(
           `SELECT COUNT(*) as n FROM (SELECT * FROM cards ${whereSql}) base
-           LEFT JOIN card_images ci ON ci.code = base.code`,
+           LEFT JOIN card_images ci
+             ON ci.code = base.code AND ci.lang = @art_lang`,
         )
         .get(params) as { n: number }
     ).n;

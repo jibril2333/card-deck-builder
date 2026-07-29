@@ -187,6 +187,9 @@ export default async function CardsPage({
       has_inherited: pickStr(sp, "has_inherited") === "1",
       has_security: pickStr(sp, "has_security") === "1",
       show_alt_arts: pickStr(sp, "show_alt_arts") === "1",
+      // Expand printings in the language being read. Without this the join
+      // multiplies each card by however many languages we hold art for.
+      art_lang: cardLang,
       sort_field: sort.field,
       sort_dir: sort.dir,
       limit: PAGE_SIZE,

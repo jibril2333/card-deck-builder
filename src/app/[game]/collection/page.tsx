@@ -19,7 +19,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId } from "@/lib/games";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import type { CardLang } from "@/lib/card-lang";
+
+/**
+ * The collection is a record of physical cards, and those are Japanese
+ * printings — so this page pins itself to Japanese names and Japanese art
+ * rather than following the site's language toggle (which is about what you
+ * want to READ, not what you own).
+ */
+const COLLECTION_LANG: CardLang = "ja";
 import {
   pickStr,
   pickList,
@@ -175,6 +183,10 @@ export default async function CollectionPage({
       has_inherited: pickStr(sp, "has_inherited") === "1",
       has_security: pickStr(sp, "has_security") === "1",
       show_alt_arts: true, // ← collection page forces alt-art expansion
+      // The physical cards on the shelf are the Japanese printings, so this
+      // page always shows those — independent of the site language toggle,
+      // which only decides what language you want to READ cards in.
+      art_lang: COLLECTION_LANG,
       sort_field: sort.field,
       sort_dir: sort.dir,
       limit: PAGE_SIZE,
@@ -186,7 +198,7 @@ export default async function CollectionPage({
     // own art and only localize the name.
     const tMap = digimon.getDisplayTranslations(
       r.rows.map((c) => c.code),
-      parseCardLang((await cookies()).get(CARD_LANG_COOKIE)?.value),
+      COLLECTION_LANG,
     );
     rows = r.rows.map((c) => ({
       card_id: c.id,
