@@ -9,6 +9,7 @@ import { BackLink } from "@/components/back-link";
 import { CardImageGallery } from "@/components/card-image-gallery";
 import { CardPriceInput } from "@/components/card-price-input";
 import { EffectText } from "@/components/effect-text";
+import { EvolutionCost } from "@/components/evolution-cost";
 import { CardRulings } from "@/components/card-rulings";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
@@ -372,8 +373,27 @@ function DigimonDetail({
 
         {card.evolution_cost || card.evolution_requirements ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <Stat label="进化消费" value={card.evolution_cost} />
-            <Stat label="进化条件" value={card.evolution_requirements} />
+            {card.evolution_cost ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+                  进化消费
+                </span>
+                <EvolutionCost value={card.evolution_cost} />
+              </div>
+            ) : null}
+            {card.evolution_requirements ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+                  进化条件
+                </span>
+                {/* DigiXros / special-digivolve lines carry the same bracket
+                    tokens as effect text, so chip them the same way. */}
+                <EffectText
+                  text={card.evolution_requirements}
+                  className="text-sm"
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
