@@ -536,7 +536,7 @@ export async function importDeckAction(formData: FormData): Promise<{
   type Drop =
     | { type: "banned"; code: string; requested: number }
     | { type: "limited"; code: string; requested: number; cap: number }
-    | { type: "overlimit"; code: string; requested: number }
+    | { type: "overlimit"; code: string; requested: number; cap: number }
     | { type: "pair"; code: string; conflictWith: string }
     | { type: "wrong_series"; code: string; expected: string; got: string }
     | { type: "wrong_color"; code: string; expected: string; got: string };
@@ -634,11 +634,18 @@ export async function importDeckAction(formData: FormData): Promise<{
         drops.push({ type: "limited", code, requested: qty, cap: r.max_count });
         finalQty = r.max_count;
       }
-    } else if (qty > STANDARD_MAX) {
-      // Standard 4-of cap. Some sloppy import sources (text dumps) request
-      // higher numbers — clamp and note rather than silently truncate.
-      drops.push({ type: "overlimit", code, requested: qty });
-      finalQty = STANDARD_MAX;
+    } else {
+      // A few cards license their own higher limit in rules text ("(Rule) You
+      // can include up to 50 copies…" — Vemmon, Eosmon, …). Ask the repo so
+      // this matches what the deck editor would actually allow, instead of
+      // reporting a legal 8-of as over the limit.
+      const cap = l.selfDeclaredCopyLimit(card.id) ?? STANDARD_MAX;
+      if (qty > cap) {
+        // Some sloppy import sources (text dumps) request higher numbers —
+        // clamp and note rather than silently truncate.
+        drops.push({ type: "overlimit", code, requested: qty, cap });
+        finalQty = cap;
+      }
     }
 
     plan.push({ cardId: card.id, qty: finalQty });
@@ -711,8 +718,11 @@ export async function importDeckAction(formData: FormData): Promise<{
       `超出上限(已截到上限) ${limitedDrops.length}:\n` +
         limitedDrops
           .map((d) => {
-            const cap = d.type === "limited" ? d.cap : STANDARD_MAX;
-            const reason = d.type === "limited" ? `限${d.cap}` : "标准 4 张";
+            const cap = d.cap;
+            const reason =
+              d.type === "limited"
+                ? `限${d.cap}`
+                : `上限 ${d.cap} 张`;
             return `  ${d.code}(${d.requested} → ${cap}, ${reason})`;
           })
           .join("\n"),

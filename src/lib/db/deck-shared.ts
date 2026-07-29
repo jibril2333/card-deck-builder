@@ -246,6 +246,29 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
    * That self-heals broken decks one edit at a time without us having to
    * proactively mutate user data on banlist updates.)
    */
+  /**
+   * Some cards license their own copy limit in rules text — Digimon's
+   * "(Rule) You can include up to 50 copies of cards with this card's card
+   * number in your deck." (Vemmon, Eosmon, ADR-02 Searcher, …). Without this
+   * they'd be clamped to the standard 4 and the deck would silently lose
+   * copies.
+   *
+   * Read off `cards.main_effect`, which is the canonical ENGLISH text
+   * regardless of the language the user is reading in, so one pattern covers
+   * every locale. Returns null for ordinary cards.
+   */
+  function selfDeclaredCopyLimit(cardId: string): number | null {
+    const row = db()
+      .prepare(`SELECT main_effect FROM cards WHERE id = ?`)
+      .get(cardId) as { main_effect: string | null } | undefined;
+    const m = row?.main_effect?.match(
+      /include up to (\d+) copies of cards with this card's card number/i,
+    );
+    if (!m) return null;
+    const n = parseInt(m[1], 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
   function clampQuantityToRestriction(
     deckId: string,
     cardId: string,
@@ -253,11 +276,29 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
   ): number {
     const standardMax = 4;
     const restriction = getRestrictionFor(cardId);
-    const cap = restriction ? restriction.max_count : standardMax;
+    // A banlist entry always wins: an official restriction on one of these
+    // cards is precisely the case where its own rules text stops applying.
+    const selfLimit = restriction ? null : selfDeclaredCopyLimit(cardId);
+    const cap = restriction
+      ? restriction.max_count
+      : (selfLimit ?? standardMax);
 
     let otherSum = 0;
     if (restriction) {
       otherSum = deckIdentityCountExcluding(deckId, restriction.identity, cardId);
+    } else if (selfLimit !== null) {
+      // The allowance is worded per CARD NUMBER, so alt-art printings share
+      // the same pool of copies.
+      const row = db()
+        .prepare(`SELECT code FROM cards WHERE id = ?`)
+        .get(cardId) as { code: string } | undefined;
+      if (row) {
+        otherSum = deckIdentityCountExcluding(
+          deckId,
+          identityForCode(row.code),
+          cardId,
+        );
+      }
     }
     const allowed = Math.max(0, cap - otherSum);
     const capped = Math.min(requested, allowed);
@@ -1522,6 +1563,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     removeDeckAdjustment,
     setDeckAdjustmentNote,
     setDeckAdjustmentQuantity,
+    selfDeclaredCopyLimit,
     setDeckCover,
     backfillLockFromCards,
     listDecksWithCardQty,

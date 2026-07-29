@@ -480,6 +480,7 @@ export const {
   removeDeckAdjustment,
   setDeckAdjustmentNote,
   setDeckAdjustmentQuantity,
+  selfDeclaredCopyLimit,
   setDeckCover,
   listDecksWithCardQty,
   getCompletedDeckIds,
