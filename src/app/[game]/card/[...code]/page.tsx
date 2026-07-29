@@ -56,6 +56,11 @@ export default async function CardPage({
           main_effect: t.effect_main ?? card.main_effect,
           security_effect: t.effect_2 ?? card.security_effect,
           inherited_effect: t.effect_3 ?? card.inherited_effect,
+          // Localized digivolve blocks when the JP scrape captured them,
+          // otherwise the English ones — better a readable EN line than a
+          // missing DNA/DigiXros requirement.
+          evolution_cost: t.evo_cost ?? card.evolution_cost,
+          evolution_requirements: t.evo_req ?? card.evolution_requirements,
         }
       : card;
     const decks = me

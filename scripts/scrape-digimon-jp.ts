@@ -85,6 +85,11 @@ async function main() {
           effect_main: c.main_effect,
           effect_2: c.security_effect,
           effect_3: c.inherited_effect,
+          // Parsed all along, but there was nowhere to store them until
+          // migration 24 — this is why the JP text lacked ジョグレス/デジクロス
+          // lines that the CN text happened to inline.
+          evo_cost: c.evolution_cost,
+          evo_req: c.evolution_requirements,
           image_url: c.image_url || null,
         });
         n++;

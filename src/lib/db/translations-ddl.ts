@@ -23,6 +23,8 @@ export const CARD_TRANSLATIONS_DDL = `
     effect_main TEXT,                    -- digimon 主效果 / UA 效果
     effect_2    TEXT,                    -- digimon 安防效果 / UA 触发
     effect_3    TEXT,                    -- digimon 进化源效果
+    evo_cost    TEXT,                    -- 進化条件1 — colour/level/cost line
+    evo_req     TEXT,                    -- [特殊進化] — DNA / DigiXros / Assembly
     image_url   TEXT,                    -- localized card art, if any
     updated_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (code, lang)
@@ -43,16 +45,21 @@ export type CardTranslation = {
   effect_main: string | null;
   effect_2: string | null;
   effect_3: string | null;
+  /** Localized digivolve cost line (colour / level / cost). */
+  evo_cost: string | null;
+  /** Localized special-digivolve block: DNA / DigiXros / Assembly / Link. */
+  evo_req: string | null;
   image_url: string | null;
 };
 
 export const UPSERT_TRANSLATION_SQL = `
   INSERT INTO card_translations
     (code, lang, name, card_type, series, traits, form, attribute,
-     effect_main, effect_2, effect_3, image_url, updated_at)
+     effect_main, effect_2, effect_3, evo_cost, evo_req, image_url, updated_at)
   VALUES
     (@code, @lang, @name, @card_type, @series, @traits, @form, @attribute,
-     @effect_main, @effect_2, @effect_3, @image_url, CURRENT_TIMESTAMP)
+     @effect_main, @effect_2, @effect_3, @evo_cost, @evo_req, @image_url,
+     CURRENT_TIMESTAMP)
   ON CONFLICT(code, lang) DO UPDATE SET
     name = excluded.name,
     card_type = excluded.card_type,
@@ -63,6 +70,10 @@ export const UPSERT_TRANSLATION_SQL = `
     effect_main = excluded.effect_main,
     effect_2 = excluded.effect_2,
     effect_3 = excluded.effect_3,
+    -- COALESCE: the CN feed has no separate requirement fields, so a CN pass
+    -- must not blank out what the JP scrape already captured.
+    evo_cost = COALESCE(excluded.evo_cost, evo_cost),
+    evo_req  = COALESCE(excluded.evo_req, evo_req),
     image_url = excluded.image_url,
     updated_at = CURRENT_TIMESTAMP
 `;

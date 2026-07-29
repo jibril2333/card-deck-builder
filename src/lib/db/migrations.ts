@@ -700,6 +700,27 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: 24,
+    name: "card_translations.evo_cost / evo_req (localized digivolve blocks)",
+    up: (db) => {
+      // The official-site parser already reads 進化条件1 and [特殊進化] — the
+      // DNA / DigiXros / Assembly / Link requirement lines — but the
+      // translations table had nowhere to put them, so every scrape threw
+      // them away and those blocks existed in English only. EX12-060's
+      // ジョグレス line was missing from the JP text for exactly this reason.
+      const cols = db
+        .prepare("SELECT name FROM pragma_table_info('card_translations')")
+        .all() as { name: string }[];
+      const have = new Set(cols.map((c) => c.name));
+      if (!have.has("evo_cost")) {
+        db.exec(`ALTER TABLE card_translations ADD COLUMN evo_cost TEXT`);
+      }
+      if (!have.has("evo_req")) {
+        db.exec(`ALTER TABLE card_translations ADD COLUMN evo_req TEXT`);
+      }
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

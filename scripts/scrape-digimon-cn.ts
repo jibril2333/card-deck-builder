@@ -210,6 +210,11 @@ async function main() {
           effect_main: cleanEffect(c.effect),
           effect_2: cleanEffect(c.safeEffect),
           effect_3: cleanEffect(c.envolutionEffect),
+          // The CN feed has no separate requirement fields (it inlines them in
+          // the effect text). NULL here, and the upsert COALESCEs so a CN pass
+          // never blanks what the JP scrape captured.
+          evo_cost: null,
+          evo_req: null,
           image_url: clean(c.imageCover),
         });
         total++;
