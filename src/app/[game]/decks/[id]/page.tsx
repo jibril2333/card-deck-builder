@@ -5,6 +5,7 @@ import { isGameId, type GameId, colorHex, GAMES } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
+import { DeckCardSearch } from "@/components/deck-card-search";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckMetaForm } from "@/components/deck-meta-form";
 import { CoverVariantPicker } from "@/components/cover-variant-picker";
@@ -228,14 +229,18 @@ export default async function DeckEditPage({
         : "browse";
   if (!isGameId(game)) notFound();
 
+  // Read once for the whole page: the deck grid, the adjustment picker and the
+  // build-mode picker all need to agree on what language cards read in.
+  const cardLangForPage = parseCardLang(
+    (await cookies()).get(CARD_LANG_COOKIE)?.value,
+  );
+
   let loaded: Loaded;
   if (game === "digimon") {
     const deck = digimon.getDeck(id);
     if (!deck) notFound();
     const cards = digimon.getDeckCards(id);
-    const cardLang = parseCardLang(
-      (await cookies()).get(CARD_LANG_COOKIE)?.value,
-    );
+    const cardLang = cardLangForPage;
     const tMap = digimon.getDisplayTranslations(
       cards.map((c) => c.code),
       cardLang,
@@ -658,6 +663,15 @@ export default async function DeckEditPage({
           />
           </div>
 
+          {/* Build mode: find and add cards without leaving the deck. */}
+          {mode === "build" ? (
+            <DeckCardSearch
+              game={game}
+              deckId={loaded.deck.id}
+              lang={cardLangForPage}
+            />
+          ) : null}
+
           {cardPool ? (
             <div className="mt-3">
               <CardPoolDrawer
@@ -839,6 +853,7 @@ export default async function DeckEditPage({
               game={game}
               deckId={loaded.deck.id}
               items={loaded.adjustments}
+              lang={cardLangForPage}
             />
           ) : null}
 

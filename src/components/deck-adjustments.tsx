@@ -8,7 +8,7 @@ import {
   removeDeckAdjustmentAction,
   setDeckAdjustmentNoteAction,
   setDeckAdjustmentQuantityAction,
-  searchCardsForAdjustmentAction,
+  searchCardsAction,
 } from "@/app/[game]/actions";
 
 export type Adjustment = {
@@ -40,10 +40,13 @@ export function DeckAdjustments({
   game,
   deckId,
   items,
+  lang,
 }: {
   game: string;
   deckId: string;
   items: Adjustment[];
+  /** Reader's card language, so picker results read like the rest of the page. */
+  lang: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -65,7 +68,7 @@ export function DeckAdjustments({
       }
       if (!cancelled) setSearching(true);
       try {
-        const r = await searchCardsForAdjustmentAction(game, query);
+        const r = await searchCardsAction(game, query, { lang });
         if (!cancelled) setHits(r);
       } catch {
         if (!cancelled) setHits([]);
@@ -77,7 +80,7 @@ export function DeckAdjustments({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [q, game]);
+  }, [q, game, lang]);
 
   function run(action: (fd: FormData) => Promise<void>, fd: FormData) {
     fd.set("game", game);

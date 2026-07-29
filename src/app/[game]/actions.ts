@@ -323,25 +323,56 @@ export async function setDeckAdjustmentNoteAction(formData: FormData) {
   if (deckId) bumpDeck(game, deckId);
 }
 
+export type CardPickerHit = {
+  id: string;
+  code: string;
+  name: string;
+  image_url: string | null;
+  /** Copies already in the deck this picker belongs to (0 when unrelated). */
+  in_deck: number;
+};
+
 /**
- * Card lookup for the adjustment panel's picker. Read-only, capped, and
- * requires a session — the app is public through the tunnel, so an unbounded
- * anonymous query endpoint isn't something to hand out.
+ * Card lookup for the in-page pickers (deck build mode, adjustment memo).
+ * Read-only, capped, and requires a session — the app is public through the
+ * tunnel, so an unbounded anonymous query endpoint isn't something to hand out.
+ *
+ * Names come back in `lang` so results match what the rest of the page shows.
+ * Pass `deckId` to have each hit report how many copies that deck already has.
  */
-export async function searchCardsForAdjustmentAction(
+export async function searchCardsAction(
   game: string,
   q: string,
-): Promise<{ id: string; code: string; name: string; image_url: string | null }[]> {
+  opts?: { lang?: string; deckId?: string },
+): Promise<CardPickerHit[]> {
   await requireUser();
   if (!isGameId(game)) throw new Error("invalid game");
   const query = q.trim();
   if (query.length < 2) return [];
   const { rows } = lib(game).searchCards({ q: query, limit: 12 });
+
+  const lang = opts?.lang;
+  const names =
+    game === "digimon" && (lang === "zh" || lang === "ja")
+      ? digimon.getDisplayTranslations(
+          rows.map((r) => r.code),
+          lang,
+        )
+      : null;
+
+  const inDeck = new Map<string, number>();
+  if (opts?.deckId) {
+    for (const c of lib(game).getDeckCards(opts.deckId)) {
+      inDeck.set(c.id, c.quantity);
+    }
+  }
+
   return rows.map((r) => ({
     id: r.id,
     code: r.code,
-    name: r.name,
+    name: names?.get(r.code)?.name ?? r.name,
     image_url: r.image_url,
+    in_deck: inDeck.get(r.id) ?? 0,
   }));
 }
 
