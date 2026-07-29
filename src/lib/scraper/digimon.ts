@@ -49,7 +49,12 @@ export type LabelMap = {
   attribute: string;
   type: string;
   evoCost: string;
+  /** 【特殊進化】 — DNA digivolve / ジョグレス and friends. */
   evoCondition: string;
+  /** 【特殊登場】 — Assembly / DigiXros and other alternative PLAY costs.
+   *  A separate block from evoCondition on the official site; missing it is
+   *  why Assembly requirements never appeared outside English. */
+  specialPlay: string;
   effect: string;
   security: string;
   inherited: string;
@@ -67,6 +72,7 @@ export const EN_LABELS: LabelMap = {
   type: "Type",
   evoCost: "Digivolve Cost 1",
   evoCondition: "[Special Digivolution Condition]",
+  specialPlay: "[Special Play Condition]",
   effect: "[Effect]",
   security: "[Security Effect]",
   inherited: "[Inherited Effect]",
@@ -83,6 +89,7 @@ export const JA_LABELS: LabelMap = {
   type: "タイプ",
   evoCost: "進化条件1",
   evoCondition: "[特殊進化]",
+  specialPlay: "[特殊登場]",
   effect: "[効果]",
   security: "[セキュリティ効果]",
   inherited: "[進化元効果]",
@@ -173,7 +180,15 @@ export function parseCardBlock(
   const attribute = ndOrNull(dd(L.attribute) ?? "");
   const digi_types = ndOrNull(dd(L.type) ?? "");
   const evolution_cost = ndOrNull(dd(L.evoCost) ?? "");
-  const evolution_requirements = effectByLabel($, $el, L.evoCondition);
+  // Both blocks describe "how else this card can hit the field", so they share
+  // one field. Kept in page order (digivolve first) and newline-joined.
+  const evolution_requirements =
+    [
+      effectByLabel($, $el, L.evoCondition),
+      effectByLabel($, $el, L.specialPlay),
+    ]
+      .filter((v): v is string => !!v && v.trim() !== "")
+      .join("\n") || null;
 
   const main_effect = effectByLabel($, $el, L.effect);
   const security_effect = effectByLabel($, $el, L.security);

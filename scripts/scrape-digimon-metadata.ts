@@ -125,7 +125,13 @@ async function main() {
        @main_effect, @security_effect, @inherited_effect, @source_effect,
        @set_names, @image_url
      )
-     ON CONFLICT(id) DO UPDATE SET
+     -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase
+     -- what another source found. The official site carries no Link block, so
+     -- a plain assignment wiped 20 cards' Link requirements on every run.
+     -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase what
+  -- another source found (the official site has no Link block, digimoncard.io
+  -- has no [Special Play Condition]).
+  ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        rarity = excluded.rarity,
        card_type = excluded.card_type,
@@ -134,17 +140,17 @@ async function main() {
        color2 = excluded.color2,
        play_cost = excluded.play_cost,
        dp = excluded.dp,
-       attribute = excluded.attribute,
-       form = excluded.form,
-       stage = excluded.stage,
-       digi_types = excluded.digi_types,
-       evolution_cost = excluded.evolution_cost,
-       evolution_requirements = excluded.evolution_requirements,
-       main_effect = excluded.main_effect,
-       security_effect = excluded.security_effect,
-       inherited_effect = excluded.inherited_effect,
-       source_effect = excluded.source_effect,
-       set_names = excluded.set_names,
+       attribute = COALESCE(NULLIF(excluded.attribute, ''), attribute),
+       form = COALESCE(NULLIF(excluded.form, ''), form),
+       stage = COALESCE(NULLIF(excluded.stage, ''), stage),
+       digi_types = COALESCE(NULLIF(excluded.digi_types, ''), digi_types),
+       evolution_cost = COALESCE(NULLIF(excluded.evolution_cost, ''), evolution_cost),
+       evolution_requirements = COALESCE(NULLIF(excluded.evolution_requirements, ''), evolution_requirements),
+       main_effect = COALESCE(NULLIF(excluded.main_effect, ''), main_effect),
+       security_effect = COALESCE(NULLIF(excluded.security_effect, ''), security_effect),
+       inherited_effect = COALESCE(NULLIF(excluded.inherited_effect, ''), inherited_effect),
+       source_effect = COALESCE(NULLIF(excluded.source_effect, ''), source_effect),
+       set_names = COALESCE(NULLIF(excluded.set_names, ''), set_names),
        image_url = excluded.image_url`,
   );
   // Track which codes already exist so we can report inserts vs updates accurately.

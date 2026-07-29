@@ -159,20 +159,24 @@ export const UPSERT_CARD_SQL = `
     @main_effect, @security_effect, @inherited_effect, @source_effect,
     @set_names, @image_url
   )
+  -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase what
+  -- another found. The official site has no Link block; this feed has no
+  -- [Special Play Condition]. Whichever runs last used to win, blanking the
+  -- other's rows — 20 cards lost their Link requirements every scrape.
   ON CONFLICT(id) DO UPDATE SET
     name = excluded.name, rarity = excluded.rarity,
     card_type = excluded.card_type, level = excluded.level,
     color = excluded.color, color2 = excluded.color2,
     play_cost = excluded.play_cost, dp = excluded.dp,
-    attribute = excluded.attribute, form = excluded.form,
-    stage = excluded.stage, digi_types = excluded.digi_types,
-    evolution_cost = excluded.evolution_cost,
-    evolution_requirements = excluded.evolution_requirements,
-    main_effect = excluded.main_effect,
-    security_effect = excluded.security_effect,
-    inherited_effect = excluded.inherited_effect,
-    source_effect = excluded.source_effect,
-    set_names = excluded.set_names, image_url = excluded.image_url`;
+    attribute = COALESCE(NULLIF(excluded.attribute, ''), attribute), form = COALESCE(NULLIF(excluded.form, ''), form),
+    stage = COALESCE(NULLIF(excluded.stage, ''), stage), digi_types = COALESCE(NULLIF(excluded.digi_types, ''), digi_types),
+    evolution_cost = COALESCE(NULLIF(excluded.evolution_cost, ''), evolution_cost),
+    evolution_requirements = COALESCE(NULLIF(excluded.evolution_requirements, ''), evolution_requirements),
+    main_effect = COALESCE(NULLIF(excluded.main_effect, ''), main_effect),
+    security_effect = COALESCE(NULLIF(excluded.security_effect, ''), security_effect),
+    inherited_effect = COALESCE(NULLIF(excluded.inherited_effect, ''), inherited_effect),
+    source_effect = COALESCE(NULLIF(excluded.source_effect, ''), source_effect),
+    set_names = COALESCE(NULLIF(excluded.set_names, ''), set_names), image_url = excluded.image_url`;
 
 /** Set prefix of a card code ("EX12-001" → "EX12"), for grouped reporting. */
 export function setOf(code: string): string {
