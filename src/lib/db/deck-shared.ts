@@ -377,16 +377,18 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     return db()
       .prepare(
         `SELECT d.*,
-                -- '' means the card's base art, which is what every deck used
-                -- before cover_variant existed — keep resolving those through
-                -- cards.image_url so their covers don't silently switch CDN.
-                CASE WHEN COALESCE(d.cover_variant,'') = '' THEN c.image_url
-                     ELSE COALESCE(
-                       (SELECT ci.image_url FROM card_images ci
-                         WHERE ci.code = c.code AND ci.variant = d.cover_variant
-                         ORDER BY (ci.lang = 'en') DESC LIMIT 1),
-                       c.image_url)
-                END AS cover_image_url,
+                -- Japanese art first: the physical cards are the JP printings,
+                -- and the cover is a picture of the deck you actually own. Falls
+                -- back to English, then to the card's own image for anything we
+                -- haven't probed.
+                COALESCE(
+                  (SELECT ci.image_url FROM card_images ci
+                    WHERE ci.code = c.code
+                      AND ci.variant = COALESCE(d.cover_variant, '')
+                    ORDER BY (ci.lang = 'ja') DESC, (ci.lang = 'en') DESC
+                    LIMIT 1),
+                  c.image_url)
+                AS cover_image_url,
                 c.code AS cover_code,
                 u.id AS owner_id,
                 u.display_name AS owner_name

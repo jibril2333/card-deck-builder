@@ -334,17 +334,21 @@ export default async function DeckEditPage({
       ),
       cover: coverCard
         ? (() => {
-            // English art: the cover is shown to everyone who can see the deck,
-            // so it shouldn't shift with the viewer's own language setting.
+            // Japanese art: the covers picture the physical (JP) cards, and
+            // it must not shift with each viewer's language setting — the deck
+            // is shown to friends too. getCardImages falls back to English for
+            // cards with no JP art probed yet.
             const arts = digimon
-              .getCardImages(coverCard.code, "en")
+              .getCardImages(coverCard.code, "ja")
               .map((v) => ({ variant: v.variant, image_url: v.image_url }));
             // Resolve the SAME printing the deck list resolves, so the banner
-            // here and the tile over there never disagree. Unknown/blank
-            // variant falls back to the card's own art.
-            const picked = deck.cover_variant
-              ? arts.find((a) => a.variant === deck.cover_variant)
-              : undefined;
+            // here and the tile over there never disagree. Note the blank
+            // variant is a real entry in `arts` (the base print) — looking it
+            // up rather than falling straight through to coverCard.image_url
+            // is what keeps the banner Japanese like everything else.
+            const picked = arts.find(
+              (a) => a.variant === (deck.cover_variant ?? ""),
+            );
             return {
               image_url: picked?.image_url ?? coverCard.image_url,
               code: coverCard.code,
