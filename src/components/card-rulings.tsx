@@ -11,7 +11,15 @@ import { EffectText } from "@/components/effect-text";
  * Text is Japanese (the official wording); brackets get the same highlight as
  * effect text.
  */
-export function CardRulings({ rulings }: { rulings: CardRuling[] }) {
+export function CardRulings({
+  rulings,
+  keywords,
+}: {
+  rulings: CardRuling[];
+  /** Official keyword vocabulary, forwarded to EffectText so Q&A text chips
+   *  the same way the card's own text does. */
+  keywords?: string[];
+}) {
   const [open, setOpen] = useState(false);
   if (rulings.length === 0) return null;
 
@@ -52,13 +60,13 @@ export function CardRulings({ rulings }: { rulings: CardRuling[] }) {
                 <span className="shrink-0 font-bold text-[var(--color-accent)]">
                   Q
                 </span>
-                <EffectText text={r.question} />
+                <EffectText text={r.question} keywords={keywords} />
               </div>
               <div className="flex gap-2 text-sm">
                 <span className="shrink-0 font-bold text-[var(--color-muted-fg)]">
                   A
                 </span>
-                <EffectText text={r.answer} />
+                <EffectText text={r.answer} keywords={keywords} />
               </div>
             </li>
           ))}

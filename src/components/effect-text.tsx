@@ -14,6 +14,11 @@
  *     name; emphasised rather than chipped, since they're part of the sentence
  *     and are often long.
  *
+ * A few keywords are printed WITHOUT brackets — "アセンブリ-6:「ネガーモン」4枚",
+ * "デジクロス-2", "数码合体-2" — so there is nothing structural to key off.
+ * Pass `keywords` (the official vocabulary, scraped into `card_keywords`) and
+ * those get the keyword chip too, trailing "-N" included.
+ *
  * Everything else is plain text, and the source's line breaks survive via
  * `whitespace-pre-wrap` so multi-clause effects keep their structure.
  *
@@ -53,13 +58,35 @@ const CHIP =
   "inline-block px-1.5 rounded align-[0.05em] text-[0.92em] font-medium " +
   "leading-[1.5] whitespace-nowrap";
 
+/**
+ * Build a matcher for bare keywords. Longest-first so "セキュリティアタック+1"
+ * wins over "セキュリティアタック", and an optional "-N"/"+N" tail is absorbed so
+ * "アセンブリ-6" chips as one unit rather than leaving the number outside.
+ */
+function bareKeywordRe(keywords: string[]): RegExp | null {
+  const usable = keywords
+    .map((k) => k.trim())
+    .filter((k) => k.length >= 2)
+    .sort((a, b) => b.length - a.length);
+  if (usable.length === 0) return null;
+  const esc = usable.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  // The alternation MUST be wrapped: `(a|b(?:tail)?)` would attach the tail to
+  // the last alternative only, so with the real 106-keyword list "アセンブリ-6"
+  // chipped as "アセンブリ" and left "-6" outside.
+  return new RegExp(`((?:${esc.join("|")})(?:[-+－＋]\\d+)?)`, "g");
+}
+
 export function EffectText({
   text,
   className = "",
+  keywords,
 }: {
   text: string;
   className?: string;
+  /** Official keyword vocabulary, for the ones printed without brackets. */
+  keywords?: string[];
 }) {
+  const bareRe = keywords?.length ? bareKeywordRe(keywords) : null;
   const parts = text.split(TOKEN_RE);
   return (
     <span className={`whitespace-pre-wrap leading-relaxed ${className}`}>
@@ -94,7 +121,24 @@ export function EffectText({
               </b>
             );
           default:
-            return <span key={i}>{p}</span>;
+            // Plain run — still scan it for unbracketed keywords.
+            if (!bareRe) return <span key={i}>{p}</span>;
+            return (
+              <span key={i}>
+                {p.split(bareRe).map((frag, j) =>
+                  j % 2 === 1 ? (
+                    <span
+                      key={j}
+                      className={`${CHIP} bg-[var(--color-accent)] text-[var(--color-accent-fg)]`}
+                    >
+                      {frag}
+                    </span>
+                  ) : (
+                    frag
+                  ),
+                )}
+              </span>
+            );
         }
       })}
     </span>

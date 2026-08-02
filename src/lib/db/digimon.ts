@@ -423,6 +423,25 @@ export function distinct(col: keyof DigimonCard): string[] {
  * Every individual product name across the whole card pool, deduped + sorted,
  * for the browse page's set filter.
  */
+/**
+ * Official keyword vocabulary for a language, used by EffectText to chip the
+ * keywords that are printed WITHOUT brackets (アセンブリ-6, デジクロス-2).
+ * Empty until scrape-digimon-keywords.ts has run; the renderer just skips
+ * bare-keyword matching in that case.
+ */
+export function listKeywords(lang: string): string[] {
+  try {
+    return (
+      db()
+        .prepare(`SELECT keyword FROM card_keywords WHERE lang = ?`)
+        .all(lang) as { keyword: string }[]
+    ).map((r) => r.keyword);
+  } catch {
+    // Table not created yet (fresh DB, scraper never run).
+    return [];
+  }
+}
+
 export function distinctSetNames(): string[] {
   const rows = db()
     .prepare(

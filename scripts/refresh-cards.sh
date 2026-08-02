@@ -18,7 +18,7 @@
 #   scripts/refresh-cards.sh --list       # show available stages
 #
 # Stages: cards (sync-cards) · text (zh+ja translations) · art (en+ja alt arts)
-#         rulings · prices · restrictions
+#         keywords (official keyword vocabulary) · rulings · prices · restrictions
 #
 # Exit codes: 0 ok · 1 failure (live DB untouched or rolled back) · 2 bad usage
 #             3 another run holds the lock
@@ -38,7 +38,7 @@ LOCK_DIR="$DATA_DIR/.refresh.lock"
 STATUS_FILE="$DATA_DIR/refresh-status.json"
 LOG_FILE="$DATA_DIR/refresh.log"
 
-ALL_STAGES=(cards text art rulings prices restrictions)
+ALL_STAGES=(cards text art keywords rulings prices restrictions)
 
 if [ "${1:-}" = "--list" ]; then
   printf '%s\n' "${ALL_STAGES[@]}"
@@ -129,6 +129,8 @@ for stage in "${STAGES[@]}"; do
     text)    run text-zh      $TSX scripts/scrape-digimon-cn.ts || exit 1
              run text-ja      $TSX scripts/scrape-digimon-jp.ts || exit 1 ;;
     art)     run alt-arts     $TSX scripts/scrape-digimon-alt-arts.ts || exit 1 ;;
+    keywords)
+             run keywords     $TSX scripts/scrape-digimon-keywords.ts || exit 1 ;;
     rulings) run rulings      $TSX scripts/scrape-digimon-rulings.ts || exit 1 ;;
     prices)  run prices       $TSX scripts/scrape-cardrush-prices.ts || exit 1 ;;
     restrictions)

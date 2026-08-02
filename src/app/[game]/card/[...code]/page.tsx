@@ -94,6 +94,13 @@ export default async function CardPage({
     }
     // Cardrush per-illustrator market prices (each distinct printing).
     const listings = digimon.getExternalListings(card.id);
+    // Bracket-less keywords need the official vocabulary to be recognised.
+    // Fall back to the JA list for EN readers: it is the fuller of the two
+    // (the EN site hasn't published newer keywords like Assembly yet).
+    const keywords = [
+      ...digimon.listKeywords(cardLang === "zh" ? "ja" : cardLang),
+      ...(cardLang === "en" ? [] : digimon.listKeywords("en")),
+    ];
     return (
       <DetailShell game={game}>
         <DigimonDetail
@@ -106,6 +113,7 @@ export default async function CardPage({
           price={digimon.getCardPrice(meId, card.id)}
           marketListings={listings}
           rulings={digimon.getCardRulings(card.code)}
+          keywords={keywords}
           readonly={!me}
         />
       </DetailShell>
@@ -196,9 +204,11 @@ function Stat({
 function EffectBlock({
   label,
   text,
+  keywords,
 }: {
   label: string;
   text: string | null | undefined;
+  keywords?: string[];
 }) {
   if (!text) return null;
   return (
@@ -207,7 +217,7 @@ function EffectBlock({
         {label}
       </div>
       <div className="text-sm bg-[var(--color-muted)] rounded-md p-3 border border-[var(--color-border)]">
-        <EffectText text={text} />
+        <EffectText text={text} keywords={keywords} />
       </div>
     </div>
   );
@@ -223,6 +233,7 @@ function DigimonDetail({
   price,
   marketListings,
   rulings,
+  keywords,
   readonly,
 }: {
   card: digimon.DigimonCard;
@@ -243,6 +254,8 @@ function DigimonDetail({
   cardLang: string;
   price: number | null;
   marketListings: digimon.ExternalListing[];
+  /** Official keyword vocabulary, for keywords printed without brackets. */
+  keywords: string[];
   /** Anon viewer: hide the editable price input + the AddToDeck widget. */
   readonly: boolean;
 }) {
@@ -396,20 +409,21 @@ function DigimonDetail({
                 <EffectText
                   text={card.evolution_requirements}
                   className="text-sm"
+                  keywords={keywords}
                 />
               </div>
             ) : null}
           </div>
         ) : null}
 
-        <EffectBlock label="主要效果" text={card.main_effect} />
-        <EffectBlock label="安全区效果" text={card.security_effect} />
-        <EffectBlock label="进化继承效果" text={card.inherited_effect} />
-        <EffectBlock label="源池效果" text={card.source_effect} />
+        <EffectBlock label="主要效果" text={card.main_effect} keywords={keywords} />
+        <EffectBlock label="安全区效果" text={card.security_effect} keywords={keywords} />
+        <EffectBlock label="进化继承效果" text={card.inherited_effect} keywords={keywords} />
+        <EffectBlock label="源池效果" text={card.source_effect} keywords={keywords} />
 
         <SetList sets={splitSetNames(card.set_names)} />
 
-        <CardRulings rulings={rulings} />
+        <CardRulings rulings={rulings} keywords={keywords} />
 
         <div className="grid grid-cols-2 gap-3 text-xs text-[var(--color-muted-fg)] pt-3 border-t border-[var(--color-border)]">
           <Stat label="画师" value={card.artist} />
