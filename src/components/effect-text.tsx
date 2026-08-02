@@ -2,13 +2,18 @@
  * Renders Digimon effect text with its tokens as chips, the way community card
  * viewers (digicamoe et al.) present them. Three families, three treatments:
  *
- *   TIMING / CONDITION — 【登场时】 [On Play] 〔进化〕 [When Digivolving], and the
- *     EN trait tags that share the bracket ([Angel], [Lucemon]). These are the
- *     skeleton of the text: when the effect fires. Dark filled chip.
+ Colours match the printed card, sampled from the official art:
  *
- *   KEYWORD ABILITY — 《阻挡者》 ≪天昇≫ ＜Rush＞ ＜Recovery +1＞. Named,
- *     rules-defined abilities. Amber filled chip so they pop out of a
- *     paragraph the way they do on the printed card.
+ *   TIMING — 【登場時】 [On Play], plus the EN trait tags sharing that bracket.
+ *     NAVY on the card.
+ *
+ *   LIMITER — ［ターンに1回］ [Once Per Turn] ［1回合1次］. RED on the card, and
+ *     visibly distinct from the navy timing tag it usually sits next to.
+ *
+ *   KEYWORD ABILITY — 《阻挡者》 ≪Sアタック+1≫ ＜Rush＞. ORANGE on the card.
+ *
+ *   SPECIAL PLAY / DIGIVOLVE — 〔ジョグレス〕 アセンブリ-6 デジクロス-2. TEAL on
+ *     the card; a different mechanic from the keyword abilities above.
  *
  *   QUOTED NAME — 「スカモン」 “亚古兽”. References to another card or trait by
  *     name; emphasised rather than chipped, since they're part of the sentence
@@ -29,19 +34,31 @@
 // A single capturing split regex, so `String.split` hands back text and tokens
 // interleaved. The families don't nest in this data, so order doesn't matter.
 const TOKEN_RE =
-  /(【[^】]*】|〔[^〕]*〕|\[[^\]]+\]|\{[^}]+\}|《[^》]*》|≪[^≫]*≫|＜[^＞]*＞|「[^」]*」|“[^”]*”)/g;
+  /(【[^】]*】|〔[^〕]*〕|\[[^\]]+\]|［[^］]+］|\{[^}]+\}|《[^》]*》|≪[^≫]*≫|＜[^＞]*＞|「[^」]*」|“[^”]*”)/g;
 
-type Kind = "timing" | "keyword" | "name" | "text";
+type Kind = "timing" | "limiter" | "keyword" | "special" | "name" | "text";
+
+/**
+ * "Once per turn"-style limiters, which the card prints red rather than navy.
+ * EN shares the [] bracket with timings, so it has to be matched by phrase.
+ */
+const LIMITER_RE =
+  /ターンに\s*\d+\s*回|回合\s*\d+\s*次|Once Per (?:Turn|Match)|\d+\s*Per Turn/i;
 
 function kindOf(tok: string): Kind {
   switch (tok[0]) {
     case "【":
-    case "〔":
-    case "[":
-    // 126 cards spell the play-location tag with braces — {Hand}[Counter] —
-    // instead of brackets. Same kind of token, so treat it the same.
-    case "{":
       return "timing";
+    // 〔…〕 is the special-digivolve bracket — 〔進化〕〔ジョグレス〕 — a different
+    // mechanic (and colour) from a timing window.
+    case "〔":
+      return "special";
+    case "[":
+    // CN text uses the fullwidth bracket for the same tags — ［每回合1次］.
+    case "［":
+    // 126 cards spell the play-location tag with braces — {Hand}[Counter].
+    case "{":
+      return LIMITER_RE.test(tok) ? "limiter" : "timing";
     case "《":
     case "≪":
     case "＜":
@@ -50,9 +67,21 @@ function kindOf(tok: string): Kind {
     case "“": // opening curly double quote, used by the CN text
       return "name";
     default:
-      return "text";
+      return LIMITER_RE.test(tok) ? "limiter" : "text";
   }
 }
+
+/** Card-accurate chip colours. Fixed values, not theme tokens: they encode
+ *  what's printed on the card, so they must not drift with the site theme. */
+const CHIP_STYLE: Record<
+  "timing" | "limiter" | "keyword" | "special",
+  string
+> = {
+  timing: "bg-[#1f3a93] text-white",
+  limiter: "bg-[#d2232a] text-white",
+  keyword: "bg-[#e8830c] text-white",
+  special: "bg-[#158a7a] text-white",
+};
 
 const CHIP =
   "inline-block px-1.5 rounded align-[0.05em] text-[0.92em] font-medium " +
@@ -92,25 +121,14 @@ export function EffectText({
     <span className={`whitespace-pre-wrap leading-relaxed ${className}`}>
       {parts.map((p, i) => {
         if (!p) return null;
-        switch (kindOf(p)) {
+        const kind = kindOf(p);
+        switch (kind) {
           case "timing":
-            return (
-              <span
-                key={i}
-                // Deliberately NOT the accent colour: timings are by far the
-                // most common token, and a paragraph of amber would drown the
-                // keywords that actually need to stand out.
-                className={`${CHIP} bg-[var(--color-fg)]/85 text-[var(--color-bg)]`}
-              >
-                {p}
-              </span>
-            );
+          case "limiter":
           case "keyword":
+          case "special":
             return (
-              <span
-                key={i}
-                className={`${CHIP} bg-[var(--color-accent)] text-[var(--color-accent-fg)]`}
-              >
+              <span key={i} className={`${CHIP} ${CHIP_STYLE[kind]}`}>
                 {p}
               </span>
             );
@@ -129,7 +147,10 @@ export function EffectText({
                   j % 2 === 1 ? (
                     <span
                       key={j}
-                      className={`${CHIP} bg-[var(--color-accent)] text-[var(--color-accent-fg)]`}
+                      // Bare (bracket-less) keywords are the special play /
+                      // digivolve family — アセンブリ-6, デジクロス-2 — which the
+                      // card prints teal.
+                      className={`${CHIP} ${CHIP_STYLE.special}`}
                     >
                       {frag}
                     </span>
