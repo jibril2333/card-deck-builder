@@ -721,6 +721,52 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 25,
+    name: "Dual cards: the Option half gets its own columns",
+    up: (db) => {
+      // A Dual card (デジモン/オプション) is two cards printed on one: a
+      // Digimon on top, an Option on the bottom, each with its own name,
+      // colour, cost and text. Nothing modelled that, so all three sources
+      // improvised — and each improvised differently:
+      //   EN (digimoncard.io) → the whole Option side crammed into
+      //                          `inherited_effect`, i.e. labelled 进化元效果
+      //   JA (official site)  → dropped on the floor; the parser had no label
+      //                          for [デュアル効果] / [デュアルルール]
+      //   ZH (digimoncard.cn) → inside `effect_3`, prefixed "选项：<name>",
+      //                          and card_type left as 数码宝贝
+      // Hence "双力卡牌的文本显示有问题，每个语言问题不一样".
+      const addAll = (table: string, cols: [string, string][]) => {
+        const have = new Set(
+          (
+            db
+              .prepare(`SELECT name FROM pragma_table_info('${table}')`)
+              .all() as { name: string }[]
+          ).map((c) => c.name),
+        );
+        for (const [name, type] of cols) {
+          if (!have.has(name)) {
+            db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
+          }
+        }
+      };
+      addAll("cards", [
+        ["dual_name", "TEXT"],
+        // Canonical English colour run ("RedYellow"), same shape as
+        // evolution_cost so the front end can split it the same way.
+        ["dual_color", "TEXT"],
+        ["dual_cost", "INTEGER"],
+        ["dual_effect", "TEXT"],
+        ["dual_rule", "TEXT"],
+      ]);
+      // Colour and cost are language-independent, so they live only on `cards`.
+      addAll("card_translations", [
+        ["dual_name", "TEXT"],
+        ["dual_effect", "TEXT"],
+        ["dual_rule", "TEXT"],
+      ]);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

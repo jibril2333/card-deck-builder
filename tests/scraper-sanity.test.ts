@@ -25,6 +25,11 @@ function card(overrides: Partial<ScrapedCard> = {}): ScrapedCard {
     source_effect: null,
     set_names: null,
     image_url: "https://world.digimoncard.com/images/cardlist/card/BT1-001.png",
+    dual_name: null,
+    dual_color: null,
+    dual_cost: null,
+    dual_effect: null,
+    dual_rule: null,
     ...overrides,
   };
 }

@@ -13,6 +13,7 @@ import {
   FIXTURE_DIGI_EGG,
   FIXTURE_DIGIMON_BASE,
   FIXTURE_DUAL,
+  FIXTURE_DUAL_FULL,
   FIXTURE_FULL_PAGE,
 } from "./fixtures/digimon-card-blocks";
 
@@ -85,6 +86,45 @@ describe("parseCardBlock", () => {
     // Green is in the Color cell; Blue is only in Digivolve Cost — must not leak.
     expect(c!.color).toBe("Green");
     expect(c!.color2).toBeNull();
+  });
+
+  it("reads both faces of a Dual card without letting either leak into the other", () => {
+    const c = parseFirst(FIXTURE_DUAL_FULL);
+    expect(c).not.toBeNull();
+    expect(c!.code).toBe("BT25-057");
+    expect(c!.card_type).toBe("Dual");
+
+    // ---- Digimon half. `.dualCardCol` re-uses every one of these class
+    // names, so each assertion here is really "the Option half stayed out".
+    expect(c!.name).toBe("Monarchlizamon");
+    expect(c!.color).toBe("Green");
+    expect(c!.color2).toBe("Black");
+    expect(c!.dp).toBe(8000);
+    expect(c!.main_effect).toBe("[When Digivolving] Digimon-half effect.");
+    expect(c!.evolution_requirements).toBe(
+      "[Digivolve] Lv.4 w/[Glowing Dawn] trait: Cost 3",
+    );
+    // The Option side is NOT an inherited effect — that mislabelling is the
+    // whole bug this fixture exists for.
+    expect(c!.inherited_effect).toBeNull();
+
+    // ---- Option half.
+    expect(c!.dual_name).toBe("Final Judgment");
+    expect(c!.dual_color).toBe("RedYellow");
+    expect(c!.dual_cost).toBe(4);
+    expect(c!.dual_effect).toBe(
+      "<Use Req. ([Glowing Dawn] trait)>\n[Main] Option-half effect.",
+    );
+    expect(c!.dual_rule).toBe("<Arts Digivolve>");
+  });
+
+  it("leaves the dual_* fields null on an ordinary card", () => {
+    const c = parseFirst(FIXTURE_DIGIMON_BASE);
+    expect(c!.dual_name).toBeNull();
+    expect(c!.dual_color).toBeNull();
+    expect(c!.dual_cost).toBeNull();
+    expect(c!.dual_effect).toBeNull();
+    expect(c!.dual_rule).toBeNull();
   });
 
   it("normalizes lower-cased Digi-egg to Digi-Egg", () => {

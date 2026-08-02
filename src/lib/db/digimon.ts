@@ -31,6 +31,16 @@ export type DigimonCard = {
   artist: string | null;
   image_url: string | null;
   source_url: string | null;
+  /** ---- Dual cards (card_type 'Dual') ----------------------------------
+   *  Two cards printed on one: everything above describes the Digimon half,
+   *  these describe the Option half on the bottom. NULL on every other card.
+   *  `dual_color` is a run of canonical colour names ("RedYellow"), the same
+   *  shape as `evolution_cost`. */
+  dual_name: string | null;
+  dual_color: string | null;
+  dual_cost: number | null;
+  dual_effect: string | null;
+  dual_rule: string | null;
 };
 
 export type DigimonDeck = {

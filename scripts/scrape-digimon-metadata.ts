@@ -117,13 +117,15 @@ async function main() {
        play_cost, dp, attribute, form, stage, digi_types,
        evolution_cost, evolution_requirements,
        main_effect, security_effect, inherited_effect, source_effect,
-       set_names, image_url
+       set_names, image_url,
+       dual_name, dual_color, dual_cost, dual_effect, dual_rule
      ) VALUES (
        @code, @code, @name, @rarity, @card_type, @level, @color, @color2,
        @play_cost, @dp, @attribute, @form, @stage, @digi_types,
        @evolution_cost, @evolution_requirements,
        @main_effect, @security_effect, @inherited_effect, @source_effect,
-       @set_names, @image_url
+       @set_names, @image_url,
+       @dual_name, @dual_color, @dual_cost, @dual_effect, @dual_rule
      )
      -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase
      -- what another source found. The official site carries no Link block, so
@@ -151,7 +153,23 @@ async function main() {
        inherited_effect = COALESCE(NULLIF(excluded.inherited_effect, ''), inherited_effect),
        source_effect = COALESCE(NULLIF(excluded.source_effect, ''), source_effect),
        set_names = COALESCE(NULLIF(excluded.set_names, ''), set_names),
-       image_url = excluded.image_url`,
+       image_url = excluded.image_url,
+       dual_name   = COALESCE(NULLIF(excluded.dual_name, ''), dual_name),
+       dual_color  = COALESCE(NULLIF(excluded.dual_color, ''), dual_color),
+       dual_cost   = COALESCE(excluded.dual_cost, dual_cost),
+       dual_effect = COALESCE(NULLIF(excluded.dual_effect, ''), dual_effect),
+       dual_rule   = COALESCE(NULLIF(excluded.dual_rule, ''), dual_rule)`,
+  );
+  // Dual cards are the one case where the COALESCE guard actively preserves a
+  // WRONG value: digimoncard.io has no concept of a second card face, so it
+  // dumps the whole Option side into `inherited_effect` — where the card page
+  // renders it as 进化元效果. The official site knows better, so once it has
+  // told us the Option text, its verdict on the inherited slot is final
+  // (usually "there isn't one"). Without this the bad text would survive every
+  // future refresh.
+  const clearBogusInherited = db.prepare(
+    `UPDATE cards SET inherited_effect = NULLIF(@inherited_effect, '')
+      WHERE code = @code AND dual_effect IS NOT NULL`,
   );
   // Track which codes already exist so we can report inserts vs updates accurately.
   const existingCodes = new Set(
@@ -165,6 +183,12 @@ async function main() {
     for (const r of rows) {
       const wasExisting = existingCodes.has(r.code);
       upsert.run(r as unknown as Record<string, unknown>);
+      if (r.dual_effect) {
+        clearBogusInherited.run({
+          code: r.code,
+          inherited_effect: r.inherited_effect ?? "",
+        });
+      }
       if (wasExisting) updated++;
       else {
         inserted++;

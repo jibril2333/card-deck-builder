@@ -35,6 +35,19 @@ export type ScrapedCard = {
   source_effect: string | null;
   set_names: string | null;
   image_url: string;
+  /** ---- Dual cards (デジモン/オプション) -----------------------------------
+   *  A Dual card is literally two cards on one piece of cardboard: a Digimon
+   *  on top, an Option on the bottom. The official sites render the second
+   *  half in its own `.dualCardCol` with its own name, colour, cost and text.
+   *  Every field above describes the DIGIMON half only. */
+  dual_name: string | null;
+  /** Canonical English colour name, so `cards.dual_color` means the same
+   *  thing whichever official site filled it in. */
+  dual_color: string | null;
+  dual_cost: number | null;
+  dual_effect: string | null;
+  /** [デュアルルール] — how the two halves interact (≪アーツ進化≫ &c.). */
+  dual_rule: string | null;
 };
 
 /**
@@ -60,6 +73,11 @@ export type LabelMap = {
   inherited: string;
   source: string;
   notes: string;
+  /** ---- Dual cards ---- labels live inside `.dualCardCol`. */
+  dualColor: string;
+  dualCost: string;
+  dualEffect: string;
+  dualRule: string;
   /** Absolute prefix for relative image srcs. */
   imageBase: string;
 };
@@ -78,6 +96,10 @@ export const EN_LABELS: LabelMap = {
   inherited: "[Inherited Effect]",
   source: "[Source Effect]",
   notes: "Notes",
+  dualColor: "DUAL Color",
+  dualCost: "DUAL Cost",
+  dualEffect: "[DUAL Effect]",
+  dualRule: "[DUAL Rule]",
   imageBase: "https://world.digimoncard.com",
 };
 
@@ -95,8 +117,39 @@ export const JA_LABELS: LabelMap = {
   inherited: "[進化元効果]",
   source: "[ソース効果]",
   notes: "入手情報",
+  dualColor: "デュアル条件色",
+  dualCost: "デュアル使用コスト",
+  dualEffect: "[デュアル効果]",
+  dualRule: "[デュアルルール]",
   imageBase: "https://digimoncard.com",
 };
+
+/**
+ * Colour words → the canonical English names already used by `cards.color`
+ * (and by `colorHex` / `parseEvolutionCost` on the front end). The JP and EN
+ * sites print the same colour in their own language; storing one canon means
+ * a Dual card scraped from either site renders identically.
+ */
+const COLOR_CANON: Record<string, string> = {
+  赤: "Red",
+  青: "Blue",
+  黄: "Yellow",
+  緑: "Green",
+  黒: "Black",
+  紫: "Purple",
+  白: "White",
+  Red: "Red",
+  Blue: "Blue",
+  Yellow: "Yellow",
+  Green: "Green",
+  Black: "Black",
+  Purple: "Purple",
+  White: "White",
+};
+
+export function canonColor(s: string): string | null {
+  return COLOR_CANON[s.trim()] ?? null;
+}
 
 export function normalize(s: string | undefined): string {
   return (s ?? "").replace(/\s+/g, " ").trim();
@@ -128,7 +181,14 @@ export function parseCardBlock(
   const code = normalize($el.find(".cardNo").first().text());
   if (!code) return null;
 
-  const name = normalize($el.find(".cardTitle").first().text());
+  // A Dual card's second half sits in `.dualCardCol` INSIDE this same block,
+  // and it re-uses the same class names (.cardTitle, .cardInfoBox,
+  // .cardInfoBoxSmall). Every main-side lookup below therefore has to exclude
+  // that subtree, or a Dual card would silently pick up Option-side values.
+  const notDual = (_i: number, e: AnyNode) => $(e).closest(".dualCardCol").length === 0;
+  const $dual = $el.find(".dualCardCol").first();
+
+  const name = normalize($el.find(".cardTitle").filter(notDual).first().text());
   const rarity = normalize($el.find(".cardRarity").first().text());
   let card_type = normalize($el.find(".cardType").first().text());
   // Normalize "Digimon/Option" (dual-mode cards) to existing convention "Dual"
@@ -141,7 +201,7 @@ export function parseCardBlock(
   // Color: ONLY from the "Color" dl. Note other cells (Digivolve Cost) also use
   // cardColor_<name> spans, so we must scope to the dl whose <dt> is "Color".
   const colors: string[] = [];
-  $el.find("dl.cardInfoBox").each((_i, dl) => {
+  $el.find("dl.cardInfoBox").filter(notDual).each((_i, dl) => {
     const dt = $(dl).find(".cardInfoTit").first();
     if (normalize(dt.text()) !== L.color) return;
     $(dl)
@@ -161,6 +221,7 @@ export function parseCardBlock(
     let result: string | null = null;
     $el
       .find("dl.cardInfoBox .cardInfoTit, dl.cardInfoBoxSmall .cardInfoTitSmall")
+      .filter(notDual)
       .each((_i, e) => {
         if (normalize($(e).text()) === label) {
           const $dd = $(e).siblings("dd").first().clone();
@@ -198,6 +259,40 @@ export function parseCardBlock(
 
   const set_names = ndOrNull(dd(L.notes) ?? "");
 
+  // ---- Dual card: the Option half in `.dualCardCol` -------------------------
+  // Without this the second half vanished entirely from the JP text, and the
+  // English row got it filed under `inherited_effect` by digimoncard.io — the
+  // same block landing in a different (wrong) place in each language.
+  let dual_name: string | null = null;
+  let dual_color: string | null = null;
+  let dual_cost: number | null = null;
+  let dual_effect: string | null = null;
+  let dual_rule: string | null = null;
+  if ($dual.length > 0) {
+    dual_name = ndOrNull($dual.find(".cardTitle").first().text());
+    const dcolors: string[] = [];
+    $dual.find("dl.cardInfoBox").each((_i, dl) => {
+      if (normalize($(dl).find(".cardInfoTit").first().text()) !== L.dualColor)
+        return;
+      $(dl)
+        .find("dd span[class^='cardColor_']")
+        .each((_j, s) => {
+          const c = canonColor(normalize($(s).text()));
+          if (c && !dcolors.includes(c)) dcolors.push(c);
+        });
+      return false;
+    });
+    dual_color = dcolors.length > 0 ? dcolors.join("") : null;
+    $dual.find("dl.cardInfoBox").each((_i, dl) => {
+      if (normalize($(dl).find(".cardInfoTit").first().text()) !== L.dualCost)
+        return;
+      dual_cost = toInt(normalize($(dl).find("dd").first().text()));
+      return false;
+    });
+    dual_effect = effectByLabel($, $el, L.dualEffect, true);
+    dual_rule = effectByLabel($, $el, L.dualRule, true);
+  }
+
   // Image
   let img = $el.find(".cardImg img").attr("src") ?? "";
   if (img.startsWith("../")) {
@@ -230,16 +325,31 @@ export function parseCardBlock(
     source_effect,
     set_names,
     image_url: img,
+    dual_name,
+    dual_color,
+    dual_cost,
+    dual_effect,
+    dual_rule,
   };
 }
 
+/**
+ * Read one labelled effect block.
+ *
+ * `dual` picks which half of a Dual card to read from: the default (false)
+ * skips the `.dualCardCol` subtree, `true` reads only inside it. Dual and
+ * main labels happen to differ today ([効果] vs [デュアル効果]), but relying
+ * on that would break the moment the site reuses a label.
+ */
 export function effectByLabel(
   $: cheerio.CheerioAPI,
   $el: cheerio.Cheerio<AnyNode>,
   label: string,
+  dual = false,
 ): string | null {
   let out: string | null = null;
   $el.find("dl.cardInfoBoxSmall").each((_i, dl) => {
+    if (($(dl).closest(".dualCardCol").length > 0) !== dual) return;
     const dt = $(dl).find(".cardInfoTitSmall").first();
     if (normalize(dt.text()) === label) {
       const dd = $(dl).find("dd.cardInfoData").first();

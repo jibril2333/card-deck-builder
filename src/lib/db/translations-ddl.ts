@@ -25,6 +25,11 @@ export const CARD_TRANSLATIONS_DDL = `
     effect_3    TEXT,                    -- digimon 进化源效果
     evo_cost    TEXT,                    -- 進化条件1 — colour/level/cost line
     evo_req     TEXT,                    -- [特殊進化] — DNA / DigiXros / Assembly
+    -- Dual cards (デジモン/オプション): the Option half printed on the same
+    -- card. Colour and cost are language-independent so they live on cards.
+    dual_name   TEXT,
+    dual_effect TEXT,                    -- [デュアル効果]
+    dual_rule   TEXT,                    -- [デュアルルール]
     image_url   TEXT,                    -- localized card art, if any
     updated_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (code, lang)
@@ -49,16 +54,22 @@ export type CardTranslation = {
   evo_cost: string | null;
   /** Localized special-digivolve block: DNA / DigiXros / Assembly / Link. */
   evo_req: string | null;
+  /** Dual cards: the Option half's name / text / rule, in this language. */
+  dual_name: string | null;
+  dual_effect: string | null;
+  dual_rule: string | null;
   image_url: string | null;
 };
 
 export const UPSERT_TRANSLATION_SQL = `
   INSERT INTO card_translations
     (code, lang, name, card_type, series, traits, form, attribute,
-     effect_main, effect_2, effect_3, evo_cost, evo_req, image_url, updated_at)
+     effect_main, effect_2, effect_3, evo_cost, evo_req,
+     dual_name, dual_effect, dual_rule, image_url, updated_at)
   VALUES
     (@code, @lang, @name, @card_type, @series, @traits, @form, @attribute,
-     @effect_main, @effect_2, @effect_3, @evo_cost, @evo_req, @image_url,
+     @effect_main, @effect_2, @effect_3, @evo_cost, @evo_req,
+     @dual_name, @dual_effect, @dual_rule, @image_url,
      CURRENT_TIMESTAMP)
   ON CONFLICT(code, lang) DO UPDATE SET
     name = excluded.name,
@@ -74,6 +85,11 @@ export const UPSERT_TRANSLATION_SQL = `
     -- must not blank out what the JP scrape already captured.
     evo_cost = COALESCE(excluded.evo_cost, evo_cost),
     evo_req  = COALESCE(excluded.evo_req, evo_req),
+    -- Same reasoning for the Dual half: whichever source can see it wins, and
+    -- a source that can't must leave it alone.
+    dual_name   = COALESCE(excluded.dual_name, dual_name),
+    dual_effect = COALESCE(excluded.dual_effect, dual_effect),
+    dual_rule   = COALESCE(excluded.dual_rule, dual_rule),
     image_url = excluded.image_url,
     updated_at = CURRENT_TIMESTAMP
 `;

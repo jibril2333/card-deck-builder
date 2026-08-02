@@ -23,6 +23,11 @@ import {
   CARD_TRANSLATIONS_DDL,
   UPSERT_TRANSLATION_SQL,
 } from "../src/lib/db/translations-ddl";
+import {
+  cleanEffect,
+  splitCnDual,
+  splitCnRequirements,
+} from "../src/lib/scraper/digimon-cn";
 
 // CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
 // keeps serving the real one (host writes to the bind-mounted DB corrupt the
@@ -53,22 +58,6 @@ type CnCard = {
 function clean(s: string | null | undefined): string | null {
   const v = (s ?? "").trim();
   return v && v !== "-" ? v : null;
-}
-
-/**
- * Effect-text cleaner. digimoncard.cn encodes line breaks as the literal token
- * "enter" (sometimes followed by a real newline, sometimes used alone as the
- * only separator). Normalize every "enter" to a newline and collapse the blank
- * lines that creates. Chinese card text never contains the English word, so
- * this is unambiguous.
- */
-function cleanEffect(s: string | null | undefined): string | null {
-  const v = (s ?? "").trim();
-  if (!v || v === "-") return null;
-  return v
-    .replace(/enter/g, "\n")
-    .replace(/[ \t]*\n[ \t]*(?:\n[ \t]*)*/g, "\n")
-    .trim();
 }
 
 async function fetchPage(pageNum: number): Promise<{
@@ -198,23 +187,34 @@ async function main() {
           set.add(img);
           imagesByModel.set(code, set);
         }
+        const { main, req } = splitCnRequirements(cleanEffect(c.effect));
+        const dual = splitCnDual(cleanEffect(c.envolutionEffect));
         upsert.run({
           code,
           lang: "zh",
           name,
-          card_type: clean(c.belongsType),
+          // The feed calls a Dual card a plain 数码宝贝; the official sites
+          // call it デジモン/オプション. Say so, or the card page gives no hint
+          // that there's a second face at all.
+          card_type: dual.dualEffect ? "数码宝贝/选项" : clean(c.belongsType),
           series: null,
           traits: clean(c.type),
           form: clean(c.form),
           attribute: clean(c.attribute),
-          effect_main: cleanEffect(c.effect),
+          effect_main: main,
           effect_2: cleanEffect(c.safeEffect),
-          effect_3: cleanEffect(c.envolutionEffect),
-          // The CN feed has no separate requirement fields (it inlines them in
-          // the effect text). NULL here, and the upsert COALESCEs so a CN pass
-          // never blanks what the JP scrape captured.
+          effect_3: dual.inherited,
+          // The CN feed has no `进化条件` field of its own — `req` is what we
+          // just peeled off the top of the effect body. Still NULL for evo_cost,
+          // and the upsert COALESCEs so a CN pass never blanks the JP scrape.
           evo_cost: null,
-          evo_req: null,
+          evo_req: req,
+          dual_name: dual.dualName,
+          dual_effect: dual.dualEffect,
+          // CN runs the DUAL Rule (【技艺进化】…) into the same blob rather
+          // than labelling it, so there's nothing reliable to split off; the
+          // card page falls back to the JP/EN rule line.
+          dual_rule: null,
           image_url: clean(c.imageCover),
         });
         total++;

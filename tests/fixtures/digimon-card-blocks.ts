@@ -99,6 +99,77 @@ export const FIXTURE_DUAL = `
 </div>
 `;
 
+/**
+ * A REAL Dual card as the official sites render it (trimmed from
+ * world.digimoncard.com's BT25-057 block). The second face lives in
+ * `.dualCardCol` and re-uses every class name the main face uses — .cardTitle,
+ * .cardInfoBox, .cardInfoBoxSmall — so the parser has to scope each lookup to
+ * one half or the other. `DUAL Color` here is deliberately different from the
+ * Digimon half's colour, and the DUAL Cost differs from Cost, so a leak in
+ * either direction shows up as a wrong value rather than a coincidence.
+ */
+export const FIXTURE_DUAL_FULL = `
+<div class="popupCol" id="BT25-057">
+  <div class="cardTitleCol">
+    <p class="cardNo">BT25-057</p>
+    <p class="cardRarity">UR</p>
+    <p class="cardType">Digimon/Option</p>
+    <p class="cardLv">Lv.5</p>
+    <div class="cardTitle">Monarchlizamon</div>
+  </div>
+  <div class="cardImg"><img src="../images/cardlist/card/BT25-057.png?04" /></div>
+  <div class="cardInfoCol">
+    <dl class="cardInfoBox">
+      <dt class="cardInfoTit">Color</dt>
+      <dd><span class="cardColor_green">Green</span><span class="cardColor_black">Black</span></dd>
+    </dl>
+    <dl class="cardInfoBox">
+      <dt class="cardInfoTit">Cost</dt>
+      <dd class="cardInfoData">D</dd>
+    </dl>
+    <dl class="cardInfoBox">
+      <dt class="cardInfoTit">DP</dt>
+      <dd class="cardInfoData">8000</dd>
+    </dl>
+    <div class="cardInfoBox">
+      <div class="cardInfoTitMedium">Card Text 1</div>
+      <dl class="cardInfoBoxSmall">
+        <dt class="cardInfoTitSmall">[Special Digivolution Condition]</dt>
+        <dd class="cardInfoData">[Digivolve] Lv.4 w/[Glowing Dawn] trait: Cost 3</dd>
+      </dl>
+      <dl class="cardInfoBoxSmall">
+        <dt class="cardInfoTitSmall">[Effect]</dt>
+        <dd class="cardInfoData">[When Digivolving] Digimon-half effect.</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="dualCardCol">
+    <div class="cardTitleCol"><div class="cardTitle">Final Judgment</div></div>
+    <div class="cardInfoCol">
+      <dl class="cardInfoBox">
+        <dt class="cardInfoTit">DUAL Color</dt>
+        <dd class="cardInfoData cardColor"><span class="cardColor_red">Red</span><span class="cardColor_yellow">Yellow</span></dd>
+      </dl>
+      <dl class="cardInfoBox">
+        <dt class="cardInfoTit">DUAL Cost</dt>
+        <dd class="cardInfoData">4</dd>
+      </dl>
+      <div class="cardInfoBox">
+        <div class="cardInfoTitMedium">Card Text 2</div>
+        <dl class="cardInfoBoxSmall">
+          <dt class="cardInfoTitSmall">[DUAL Effect]</dt>
+          <dd class="cardInfoData">&lt;Use Req. ([Glowing Dawn] trait)&gt;<br>[Main] Option-half effect.</dd>
+        </dl>
+        <dl class="cardInfoBoxSmall">
+          <dt class="cardInfoTitSmall">[DUAL Rule]</dt>
+          <dd class="cardInfoData">&lt;Arts Digivolve&gt;</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+`;
+
 /** Lower-cased "Digi-egg" type (some promos) — should normalize to "Digi-Egg". */
 export const FIXTURE_DIGI_EGG = `
 <div class="popupCol" id="ST1-01">

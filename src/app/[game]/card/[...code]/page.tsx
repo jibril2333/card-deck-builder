@@ -9,7 +9,7 @@ import { BackLink } from "@/components/back-link";
 import { CardImageGallery } from "@/components/card-image-gallery";
 import { CardPriceInput } from "@/components/card-price-input";
 import { EffectText } from "@/components/effect-text";
-import { EvolutionCost } from "@/components/evolution-cost";
+import { EvolutionCost, parseEvolutionCost } from "@/components/evolution-cost";
 import { CardRulings } from "@/components/card-rulings";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
@@ -61,6 +61,11 @@ export default async function CardPage({
           // missing DNA/DigiXros requirement.
           evolution_cost: t.evo_cost ?? card.evolution_cost,
           evolution_requirements: t.evo_req ?? card.evolution_requirements,
+          // Dual cards: the Option half. Colour and cost aren't translated —
+          // they only exist on `cards`.
+          dual_name: t.dual_name ?? card.dual_name,
+          dual_effect: t.dual_effect ?? card.dual_effect,
+          dual_rule: t.dual_rule ?? card.dual_rule,
         }
       : card;
     const decks = me
@@ -219,6 +224,58 @@ function EffectBlock({
       <div className="text-sm bg-[var(--color-muted)] rounded-md p-3 border border-[var(--color-border)]">
         <EffectText text={text} keywords={keywords} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The Option half of a Dual card (デジモン/オプション).
+ *
+ * A Dual card is two cards printed on one, and everything else on this page
+ * describes only the Digimon half. Framed as its own panel so it reads as a
+ * second card rather than more effect text — which is exactly how the three
+ * sources used to mangle it: English filed it under 进化元效果, Japanese threw
+ * it away, Chinese kept it but labelled it wrong.
+ */
+function DualFace({
+  card,
+  keywords,
+}: {
+  card: digimon.DigimonCard;
+  keywords?: string[];
+}) {
+  if (!card.dual_effect && !card.dual_name) return null;
+  const colors = card.dual_color
+    ? (parseEvolutionCost(card.dual_color)?.colors ?? [])
+    : [];
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--color-muted)] text-[var(--color-muted-fg)]">
+          选项面
+        </span>
+        {card.dual_name ? (
+          <span className="text-sm font-semibold">{card.dual_name}</span>
+        ) : null}
+        {colors.map((c) => (
+          <span
+            key={c}
+            className="inline-flex items-center gap-1.5 pl-1.5 pr-2 h-6 rounded-md text-xs font-medium border border-[var(--color-border)]"
+          >
+            <span
+              aria-hidden
+              className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ background: colorHex(c) }}
+            />
+            {c}
+          </span>
+        ))}
+        {card.dual_cost !== null && card.dual_cost !== undefined ? (
+          <Badge>使用费用 {card.dual_cost}</Badge>
+        ) : null}
+      </div>
+      <EffectBlock label="选项效果" text={card.dual_effect} keywords={keywords} />
+      <EffectBlock label="双力规则" text={card.dual_rule} keywords={keywords} />
     </div>
   );
 }
@@ -420,6 +477,8 @@ function DigimonDetail({
         <EffectBlock label="安全区效果" text={card.security_effect} keywords={keywords} />
         <EffectBlock label="进化继承效果" text={card.inherited_effect} keywords={keywords} />
         <EffectBlock label="源池效果" text={card.source_effect} keywords={keywords} />
+
+        <DualFace card={card} keywords={keywords} />
 
         <SetList sets={splitSetNames(card.set_names)} />
 

@@ -110,6 +110,17 @@ fi
 
 export CDB_DATA_DIR="$WORK_DIR"
 
+# The scrapers open the copy directly with better-sqlite3 — they never go
+# through the app, which is what normally applies migrations. Migrate the copy
+# first so a schema change can't land in the same release as a refresh and kill
+# it with "no such column".
+log "migrating work copy"
+write_status "running" "migrating"
+if ! npx tsx scripts/migrate.ts >>"$LOG_FILE" 2>&1; then
+  log "migration of the work copy FAILED (see $LOG_FILE)"
+  FAILED_STAGE="migrate"; exit 1
+fi
+
 run() { # stage-name, command…
   local name="$1"; shift
   log "--- $name ---"
@@ -126,7 +137,13 @@ TSX="npx tsx"
 for stage in "${STAGES[@]}"; do
   case "$stage" in
     cards)   run cards        $TSX scripts/sync-cards.ts || exit 1 ;;
-    text)    run text-zh      $TSX scripts/scrape-digimon-cn.ts || exit 1
+    text)    # Official EN first: digimoncard.io (the `cards` stage) is a
+             # community mirror and gets structure wrong — most visibly it has
+             # no notion of a Dual card's second face and dumps it into
+             # inherited_effect. The official site is authoritative and repairs
+             # that, so it must run after `cards`, not before.
+             run text-en      $TSX scripts/scrape-digimon-metadata.ts || exit 1
+             run text-zh      $TSX scripts/scrape-digimon-cn.ts || exit 1
              run text-ja      $TSX scripts/scrape-digimon-jp.ts || exit 1 ;;
     art)     run alt-arts     $TSX scripts/scrape-digimon-alt-arts.ts || exit 1 ;;
     keywords)
