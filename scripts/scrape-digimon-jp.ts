@@ -59,24 +59,6 @@ async function main() {
                       dual_cost  = COALESCE(@dual_cost, dual_cost)
       WHERE code = @code`,
   );
-  // Which text blocks a card HAS is a fact about the card, not about the
-  // language, so the JP site can settle it for the English row too. This is
-  // what covers JP-only sets (BT26 &c.): world.digimoncard.com has never heard
-  // of them, so the official EN pass can't clean up after digimoncard.io,
-  // which files a Dual card's Option side under `inherited_effect` — where the
-  // card page shows it as 进化元效果.
-  //
-  // MOVE rather than delete: io's text is the Option side, just mis-slotted
-  // (and lossy — it drops the ≪≫ keyword markers), so relocating it beats
-  // throwing away the only English text these cards have. Guarded on
-  // `dual_effect IS NULL` so it never overwrites the official site's version.
-  const relocateDualFromInherited = db.prepare(
-    `UPDATE cards
-        SET dual_effect = inherited_effect, inherited_effect = NULL
-      WHERE code = @code
-        AND dual_effect IS NULL
-        AND inherited_effect IS NOT NULL AND inherited_effect <> ''`,
-  );
 
   const prefixes = only
     ? [only]
@@ -129,9 +111,6 @@ async function main() {
             dual_color: c.dual_color,
             dual_cost: c.dual_cost,
           });
-          // Only when the official JP page shows no [進化元効果] at all — if
-          // the card really has one, whatever sits in that column is genuine.
-          if (!c.inherited_effect) relocateDualFromInherited.run({ code: c.code });
         }
         n++;
       }

@@ -767,6 +767,35 @@ const MIGRATIONS: Migration[] = [
       ]);
     },
   },
+  {
+    id: 26,
+    name: "Move mis-slotted Option text off inherited_effect on Dual cards",
+    up: (db) => {
+      // Migration 25 gave Dual cards somewhere to put their Option half, and
+      // the scrapers now route it there. This backfills the rows that were
+      // written BEFORE that — where digimoncard.io's Option text is still
+      // sitting in inherited_effect and would show as 进化元效果.
+      //
+      // Same rule as the ON CONFLICT clause in UPSERT_CARD_SQL, not a list of
+      // card codes: dual_name is written only by the official scrapers, so
+      // NULL means nothing authoritative has ever parsed this card and
+      // anything in inherited_effect came from our own mis-slotting. Cards the
+      // official sites have already published are left alone — their
+      // inherited_effect is a real verdict.
+      //
+      // Only bites where the official sites don't (yet) carry the set: as of
+      // the 2026-08 BT26 and LM-09 leaks, 9 of 18 Dual cards.
+      db.exec(`
+        UPDATE cards
+           SET dual_effect = inherited_effect,
+               inherited_effect = NULL
+         WHERE card_type = 'Dual'
+           AND dual_name IS NULL
+           AND (dual_effect IS NULL OR dual_effect = '')
+           AND inherited_effect IS NOT NULL AND inherited_effect <> ''
+      `);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(
