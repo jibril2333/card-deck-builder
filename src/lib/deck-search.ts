@@ -265,11 +265,13 @@ export function computeDeckSearchTargets(
       if (!ok) return false;
     }
     if (c.types.length) {
-      // A "Dual" card counts as both a Digimon and a Tamer.
+      // "Dual" is our normalization of デジモン/オプション — the only slashed
+      // type the official list has. So a Dual card answers a search for a
+      // Digimon or for an Option, never for a Tamer.
       const ok = c.types.some(
         (t) =>
           d.type === t ||
-          (d.type === "Dual" && (t === "Digimon" || t === "Tamer")),
+          (d.type === "Dual" && (t === "Digimon" || t === "Option")),
       );
       if (!ok) return false;
     }

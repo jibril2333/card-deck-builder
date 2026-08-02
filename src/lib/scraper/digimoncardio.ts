@@ -94,6 +94,8 @@ export type CardRow = {
   security_effect: string;
   inherited_effect: string;
   source_effect: string;
+  /** Dual cards only: the Option half. Empty on everything else. */
+  dual_effect: string;
   set_names: string;
   image_url: string;
 };
@@ -104,8 +106,17 @@ export function toCardRow(c: ApiCard): CardRow {
   // The API's `source_effect` is the second effect block, which means the
   // INHERITED effect on Digimon-ish cards but the SECURITY effect on
   // Option/Tamer cards — route it to the right column by card type.
+  //
+  // Dual (デジモン/オプション) is a third case: the second block is the whole
+  // OPTION HALF of the card, not an inherited effect. It reads as one too
+  // ("Use Requirement: …", "add 1 to this card's use cost") — filing it under
+  // inherited_effect made the card page label it 进化元效果 on all 18 Dual
+  // cards. This API has no field for a second card face, so `dual_effect` is
+  // the closest true home; the official sites, which DO split the face out
+  // properly, overwrite it with better text once they publish the set.
   const secondBlock = c.source_effect ?? "";
   const isOptionOrTamer = type === "Option" || type === "Tamer";
+  const isDual = type === "Dual";
   // "[Digivolve] Lv.X w/[…]: Cost N" lives in alt_effect (xros_req mirrors it).
   const evoLine = (c.alt_effect || c.xros_req || "").trim();
   // Compose the "Yellow 3 from Lv.4"-style cost line when the structured
@@ -135,7 +146,8 @@ export function toCardRow(c: ApiCard): CardRow {
     evolution_requirements: evoLine,
     main_effect: c.main_effect ?? "",
     security_effect: isOptionOrTamer ? secondBlock : "",
-    inherited_effect: isOptionOrTamer ? "" : secondBlock,
+    inherited_effect: isOptionOrTamer || isDual ? "" : secondBlock,
+    dual_effect: isDual ? secondBlock : "",
     source_effect: "", // legacy column — always empty, matches official scraper
     set_names: Array.isArray(c.set_name)
       ? c.set_name.join("; ")
@@ -151,13 +163,13 @@ export const UPSERT_CARD_SQL = `
     play_cost, dp, attribute, form, stage, digi_types,
     evolution_cost, evolution_requirements,
     main_effect, security_effect, inherited_effect, source_effect,
-    set_names, image_url
+    set_names, image_url, dual_effect
   ) VALUES (
     @code, @code, @name, @rarity, @card_type, @level, @color, @color2,
     @play_cost, @dp, @attribute, @form, @stage, @digi_types,
     @evolution_cost, @evolution_requirements,
     @main_effect, @security_effect, @inherited_effect, @source_effect,
-    @set_names, @image_url
+    @set_names, @image_url, @dual_effect
   )
   -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase what
   -- another found. The official site has no Link block; this feed has no
@@ -174,7 +186,17 @@ export const UPSERT_CARD_SQL = `
     evolution_requirements = COALESCE(NULLIF(excluded.evolution_requirements, ''), evolution_requirements),
     main_effect = COALESCE(NULLIF(excluded.main_effect, ''), main_effect),
     security_effect = COALESCE(NULLIF(excluded.security_effect, ''), security_effect),
-    inherited_effect = COALESCE(NULLIF(excluded.inherited_effect, ''), inherited_effect),
+    -- On a Dual card this feed used to write the Option half here, and the
+    -- COALESCE guard then made that wrong value permanent. dual_name is set
+    -- only by the official scrapers, so NULL means nothing authoritative has
+    -- ever parsed this card and whatever sits in inherited_effect is our own
+    -- mis-slotting — clear it. Once an official pass has spoken, its verdict
+    -- on the inherited slot stands and this leaves it alone.
+    inherited_effect = CASE
+      WHEN excluded.card_type = 'Dual' AND dual_name IS NULL THEN NULL
+      ELSE COALESCE(NULLIF(excluded.inherited_effect, ''), inherited_effect)
+    END,
+    dual_effect = COALESCE(NULLIF(excluded.dual_effect, ''), dual_effect),
     source_effect = COALESCE(NULLIF(excluded.source_effect, ''), source_effect),
     set_names = COALESCE(NULLIF(excluded.set_names, ''), set_names), image_url = excluded.image_url`;
 
