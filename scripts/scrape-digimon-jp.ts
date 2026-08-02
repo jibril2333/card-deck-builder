@@ -13,7 +13,11 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
-import { parseAll, JA_LABELS } from "../src/lib/scraper/digimon";
+import {
+  parseAll,
+  JA_LABELS,
+  lastUnknownLabels,
+} from "../src/lib/scraper/digimon";
 import {
   checkScrapeSanity,
   formatSanityReport,
@@ -49,6 +53,16 @@ async function postSearch(query: string): Promise<string> {
   return await r.text();
 }
 
+/** Report block labels the parser doesn't know — see lastUnknownLabels. */
+function warnUnknownLabels(tag: string) {
+  for (const [label, codes] of lastUnknownLabels) {
+    console.warn(
+      `[${tag}] UNKNOWN text block "${label}" on ${codes.join(", ")} — ` +
+        `nothing maps to it, so its text is being dropped. Add it to LabelMap.`,
+    );
+  }
+}
+
 async function main() {
   const only = process.argv
     .find((a) => a.startsWith("--only="))
@@ -60,7 +74,8 @@ async function main() {
   const upsert = db.prepare(UPSERT_TRANSLATION_SQL);
   const fillDual = db.prepare(
     `UPDATE cards SET dual_color = COALESCE(@dual_color, dual_color),
-                      dual_cost  = COALESCE(@dual_cost, dual_cost)
+                      dual_cost  = COALESCE(@dual_cost, dual_cost),
+                      link_dp    = COALESCE(@link_dp, link_dp)
       WHERE code = @code`,
   );
 
@@ -122,16 +137,22 @@ async function main() {
           dual_name: c.dual_name,
           dual_effect: c.dual_effect,
           dual_rule: c.dual_rule,
+          link_requirement: c.link_requirement,
+          link_effect: c.link_effect,
+          special_rule: c.special_rule,
           image_url: c.image_url || null,
         });
         // The Option half's colour and cost aren't language-specific, so they
         // live on `cards`. The JP site is the ONLY source that sees JP-only
         // sets (BT26 &c.), so it has to fill them in there too.
-        if (c.dual_effect) {
+        // Values that aren't language-specific but that only the JP site sees
+        // for JP-only sets, so they have to reach `cards` from here too.
+        if (c.dual_effect || c.link_dp !== null) {
           fillDual.run({
             code: c.code,
             dual_color: c.dual_color,
             dual_cost: c.dual_cost,
+            link_dp: c.link_dp,
           });
         }
         n++;
@@ -150,6 +171,7 @@ async function main() {
       // short bare prefixes like "BT1" but matches "BT1-" fine, and the
       // hyphen keeps BT1 from also matching BT10/BT11….
       cards = parseAll(await postSearch(`${prefix}-`), JA_LABELS);
+      warnUnknownLabels(`jp ${prefix}`);
     } catch (e) {
       console.error(`[jp] ${prefix}: fetch/parse failed`, e);
       continue;

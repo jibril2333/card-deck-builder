@@ -66,6 +66,11 @@ export default async function CardPage({
           dual_name: t.dual_name ?? card.dual_name,
           dual_effect: t.dual_effect ?? card.dual_effect,
           dual_rule: t.dual_rule ?? card.dual_rule,
+          // Link cards: the plugged-in half. link_dp is a number and lives
+          // only on `cards` — nothing to translate.
+          link_requirement: t.link_requirement ?? card.link_requirement,
+          link_effect: t.link_effect ?? card.link_effect,
+          special_rule: t.special_rule ?? card.special_rule,
         }
       : card;
     const decks = me
@@ -280,6 +285,48 @@ function DualFace({
   );
 }
 
+/**
+ * The "plugged in" half of a Link card (リンク).
+ *
+ * A Link card is played sideways underneath another Digimon and contributes
+ * these three things to it. That is a different relationship from an inherited
+ * effect (what a card grants the Digimon stacked ON TOP of it), which is
+ * exactly the distinction every source lost: the JP scrape dropped all three
+ * blocks, and both English sources folded them into 进化元效果.
+ */
+function LinkFace({
+  card,
+  keywords,
+}: {
+  card: digimon.DigimonCard;
+  keywords?: string[];
+}) {
+  if (!card.link_requirement && !card.link_effect && card.link_dp === null)
+    return null;
+  return (
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--color-muted)] text-[var(--color-muted-fg)]">
+          链接
+        </span>
+        {card.link_dp !== null && card.link_dp !== undefined ? (
+          <Badge>DP +{card.link_dp}</Badge>
+        ) : null}
+      </div>
+      <EffectBlock
+        label="链接条件"
+        text={card.link_requirement}
+        keywords={keywords}
+      />
+      <EffectBlock
+        label="链接中效果"
+        text={card.link_effect}
+        keywords={keywords}
+      />
+    </div>
+  );
+}
+
 function DigimonDetail({
   card,
   subName,
@@ -479,6 +526,10 @@ function DigimonDetail({
         <EffectBlock label="源池效果" text={card.source_effect} keywords={keywords} />
 
         <DualFace card={card} keywords={keywords} />
+
+        <LinkFace card={card} keywords={keywords} />
+
+        <EffectBlock label="特别规则" text={card.special_rule} keywords={keywords} />
 
         <SetList sets={splitSetNames(card.set_names)} />
 

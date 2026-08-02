@@ -87,6 +87,59 @@ const CN_DUAL_HEAD_RE = /^选项[：:]\s*(.+)$/;
  */
 const CN_DUAL_RULE_RE = /^[【《≪＜]\s*(?:技艺进化)\s*[】》≫＞]/;
 
+/**
+ * Split a Link card's blocks out of the CN inherited-effect field.
+ *
+ * Third variation on the same theme. The official JP site labels a Link card's
+ * three lower-text blocks ([リンク条件] / [リンクDP] / [リンク中効果]); the CN
+ * feed appends all of them to `envolutionEffect`, so what a Link card does
+ * while plugged into another Digimon showed up as its 进化元效果 — a genuinely
+ * different game concept.
+ *
+ * The shape is fixed and self-identifying: the condition line opens with the
+ * 〈链接〉 keyword, the DP line is a bare 【DP±N】, and whatever follows is the
+ * effect. Returns nulls when the text isn't a Link block, so ordinary
+ * inherited effects pass straight through.
+ */
+const CN_LINK_HEAD_RE = /^[〈《＜<]\s*链接\s*[〉》＞>]/;
+const CN_LINK_DP_RE = /^【\s*DP\s*([+\-＋－]\s*\d+)\s*】$/i;
+
+export function splitCnLink(inherited: string | null): {
+  inherited: string | null;
+  linkRequirement: string | null;
+  linkDp: number | null;
+  linkEffect: string | null;
+} {
+  const none = {
+    inherited,
+    linkRequirement: null,
+    linkDp: null,
+    linkEffect: null,
+  };
+  if (!inherited) return { ...none, inherited: null };
+  const lines = inherited.split("\n");
+  if (!CN_LINK_HEAD_RE.test(lines[0].trim())) return none;
+
+  const linkRequirement = lines[0].trim();
+  const rest = lines.slice(1);
+  let linkDp: number | null = null;
+  const effectLines: string[] = [];
+  for (const line of rest) {
+    const m = line.trim().match(CN_LINK_DP_RE);
+    if (m && linkDp === null) {
+      linkDp = parseInt(m[1].replace(/[＋]/g, "+").replace(/[－]/g, "-").replace(/\s+/g, ""), 10);
+      continue;
+    }
+    effectLines.push(line);
+  }
+  return {
+    inherited: null,
+    linkRequirement,
+    linkDp,
+    linkEffect: effectLines.join("\n").trim() || null,
+  };
+}
+
 export function splitCnDual(inherited: string | null): {
   inherited: string | null;
   dualName: string | null;

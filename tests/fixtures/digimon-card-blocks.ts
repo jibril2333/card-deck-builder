@@ -170,6 +170,80 @@ export const FIXTURE_DUAL_FULL = `
 </div>
 `;
 
+/**
+ * A Link card as the EN site renders it (trimmed from BT21-009). The EN site
+ * gets this wrong in two independent ways on the same card — it labels the
+ * Link DP block [Special Rule], and it has no Link Condition / Link Effect
+ * blocks at all, concatenating both into [Inherited Effect]. The JP site
+ * labels all three properly, so this fixture pins the repair.
+ */
+export const FIXTURE_LINK_EN = `
+<div class="popupCol" id="BT21-009">
+  <p class="cardNo">BT21-009</p>
+  <p class="cardTitle">Gatchmon</p>
+  <p class="cardRarity">R</p>
+  <p class="cardType">Digimon</p>
+  <p class="cardLv">Lv.3</p>
+  <div class="cardImg"><img src="../images/cardlist/card/BT21-009.png" /></div>
+  <dl class="cardInfoBox">
+    <dt class="cardInfoTit">Color</dt>
+    <dd><span class="cardColor_red">Red</span></dd>
+  </dl>
+  <dl class="cardInfoBox">
+    <dt class="cardInfoTit">Digivolve Cost 1</dt>
+    <dd class="cardInfoData">Red 0 from Lv.2</dd>
+  </dl>
+  <dl class="cardInfoBox">
+    <dt class="cardInfoTit">Digivolve Cost 2</dt>
+    <dd class="cardInfoData">Red 2 from TAMER</dd>
+  </dl>
+  <dl class="cardInfoBoxSmall">
+    <dt class="cardInfoTitSmall">[Effect]</dt>
+    <dd class="cardInfoData">[Your Turn] Main-half effect.</dd>
+  </dl>
+  <dl class="cardInfoBoxSmall">
+    <dt class="cardInfoTitSmall">[Special Rule]</dt>
+    <dd class="cardInfoData">+2000 DP</dd>
+  </dl>
+  <dl class="cardInfoBoxSmall">
+    <dt class="cardInfoTitSmall">[Inherited Effect]</dt>
+    <dd class="cardInfoData">＜Link＞ [Appmon] trait: Cost 1 (Plug this card in sideways.)<br>＜Raid＞ (Change the attack target.)</dd>
+  </dl>
+</div>
+`;
+
+/** The same card on the JP site, which labels every block correctly. */
+export const FIXTURE_LINK_JA = `
+<div class="popupCol" id="BT21-009">
+  <p class="cardNo">BT21-009</p>
+  <p class="cardTitle">ガッチモン</p>
+  <p class="cardRarity">R</p>
+  <p class="cardType">デジモン</p>
+  <p class="cardLv">Lv.3</p>
+  <div class="cardImg"><img src="../images/cardlist/card/BT21-009.png" /></div>
+  <dl class="cardInfoBox">
+    <dt class="cardInfoTit">色</dt>
+    <dd><span class="cardColor_red">赤</span></dd>
+  </dl>
+  <dl class="cardInfoBoxSmall">
+    <dt class="cardInfoTitSmall">[効果]</dt>
+    <dd class="cardInfoData">【自分のターン】上段の効果。</dd>
+  </dl>
+  <dl class="cardInfoBoxSmall">
+    <dt class="cardInfoTitSmall">[リンクDP]</dt>
+    <dd class="cardInfoData">DP+2000</dd>
+  </dl>
+  <dl class="cardInfoBoxSmall">
+    <dt class="cardInfoTitSmall">[リンク条件]</dt>
+    <dd class="cardInfoData">〈リンク〉特徴「アプモン」:コスト1（横向きで差し込む）</dd>
+  </dl>
+  <dl class="cardInfoBoxSmall">
+    <dt class="cardInfoTitSmall">[リンク中効果]</dt>
+    <dd class="cardInfoData">≪突進≫（アタックの対象を変更できる）</dd>
+  </dl>
+</div>
+`;
+
 /** Lower-cased "Digi-egg" type (some promos) — should normalize to "Digi-Egg". */
 export const FIXTURE_DIGI_EGG = `
 <div class="popupCol" id="ST1-01">

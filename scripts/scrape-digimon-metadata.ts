@@ -28,6 +28,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import {
   parseAll,
+  lastUnknownLabels,
   type ScrapedCard,
 } from "../src/lib/scraper/digimon";
 import {
@@ -59,6 +60,16 @@ async function postSearch(query: string): Promise<string> {
   });
   if (!r.ok) throw new Error(`POST ${query} failed: ${r.status}`);
   return await r.text();
+}
+
+/** Report block labels the parser doesn't know — see lastUnknownLabels. */
+function warnUnknownLabels(tag: string) {
+  for (const [label, codes] of lastUnknownLabels) {
+    console.warn(
+      `[${tag}] UNKNOWN text block "${label}" on ${codes.join(", ")} — ` +
+        `nothing maps to it, so its text is being dropped. Add it to LabelMap.`,
+    );
+  }
 }
 
 async function main() {
@@ -118,21 +129,22 @@ async function main() {
        evolution_cost, evolution_requirements,
        main_effect, security_effect, inherited_effect, source_effect,
        set_names, image_url,
-       dual_name, dual_color, dual_cost, dual_effect, dual_rule
+       dual_name, dual_color, dual_cost, dual_effect, dual_rule,
+       link_dp, link_requirement, link_effect, special_rule
      ) VALUES (
        @code, @code, @name, @rarity, @card_type, @level, @color, @color2,
        @play_cost, @dp, @attribute, @form, @stage, @digi_types,
        @evolution_cost, @evolution_requirements,
        @main_effect, @security_effect, @inherited_effect, @source_effect,
        @set_names, @image_url,
-       @dual_name, @dual_color, @dual_cost, @dual_effect, @dual_rule
+       @dual_name, @dual_color, @dual_cost, @dual_effect, @dual_rule,
+       @link_dp, @link_requirement, @link_effect, @special_rule
      )
      -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase
-     -- what another source found. The official site carries no Link block, so
-     -- a plain assignment wiped 20 cards' Link requirements on every run.
-     -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase what
-  -- another source found (the official site has no Link block, digimoncard.io
-  -- has no [Special Play Condition]).
+     -- what another source found — digimoncard.io has no [Special Play
+     -- Condition], this site has no Link block for JP-only sets. A plain
+     -- assignment let whichever ran last blank the other's rows, which cost 20
+     -- cards their Link requirements on every single run.
   ON CONFLICT(id) DO UPDATE SET
        name = excluded.name,
        rarity = excluded.rarity,
@@ -158,7 +170,11 @@ async function main() {
        dual_color  = COALESCE(NULLIF(excluded.dual_color, ''), dual_color),
        dual_cost   = COALESCE(excluded.dual_cost, dual_cost),
        dual_effect = COALESCE(NULLIF(excluded.dual_effect, ''), dual_effect),
-       dual_rule   = COALESCE(NULLIF(excluded.dual_rule, ''), dual_rule)`,
+       dual_rule   = COALESCE(NULLIF(excluded.dual_rule, ''), dual_rule),
+       link_dp          = COALESCE(excluded.link_dp, link_dp),
+       link_requirement = COALESCE(NULLIF(excluded.link_requirement, ''), link_requirement),
+       link_effect      = COALESCE(NULLIF(excluded.link_effect, ''), link_effect),
+       special_rule     = COALESCE(NULLIF(excluded.special_rule, ''), special_rule)`,
   );
   // Dual cards are the one case where the COALESCE guard actively preserves a
   // WRONG value: digimoncard.io has no concept of a second card face, so it
@@ -169,7 +185,7 @@ async function main() {
   // future refresh.
   const clearBogusInherited = db.prepare(
     `UPDATE cards SET inherited_effect = NULLIF(@inherited_effect, '')
-      WHERE code = @code AND dual_effect IS NOT NULL`,
+      WHERE code = @code AND (dual_effect IS NOT NULL OR link_requirement IS NOT NULL)`,
   );
   // Track which codes already exist so we can report inserts vs updates accurately.
   const existingCodes = new Set(
@@ -183,7 +199,7 @@ async function main() {
     for (const r of rows) {
       const wasExisting = existingCodes.has(r.code);
       upsert.run(r as unknown as Record<string, unknown>);
-      if (r.dual_effect) {
+      if (r.dual_effect || r.link_requirement) {
         clearBogusInherited.run({
           code: r.code,
           inherited_effect: r.inherited_effect ?? "",
@@ -207,6 +223,7 @@ async function main() {
       // Search with a trailing hyphen so prefixes like "BT1" don't also match BT10..BT19
       const html = await postSearch(`${pfx}-`);
       let cards = parseAll(html);
+      warnUnknownLabels(`en ${pfx}`);
       cards = cards.filter((c) => c.code.startsWith(pfx + "-"));
       if (needCodes) cards = cards.filter((c) => needCodes!.has(c.code));
 

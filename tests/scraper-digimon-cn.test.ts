@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cleanEffect,
   splitCnDual,
+  splitCnLink,
   splitCnRequirements,
 } from "@/lib/scraper/digimon-cn";
 
@@ -113,5 +114,34 @@ describe("splitCnDual", () => {
       dualEffect: null,
       dualRule: null,
     });
+  });
+});
+
+describe("splitCnLink", () => {
+  it("lifts a Link card's three blocks out of the inherited-effect field", () => {
+    const r = splitCnLink(
+      "〈链接〉特征“应用兽”：费用1（从手牌/战斗区中，将此卡牌以横向状态插入战斗区中指定的数码宝贝中）\n" +
+        "【DP+2000】\n" +
+        "《突进》（当此数码宝贝进行攻击时，可以将攻击对象变更为对方1只DP最高且处于活跃状态的数码宝贝）",
+    );
+    expect(r.inherited).toBeNull();
+    expect(r.linkRequirement).toContain("〈链接〉");
+    // Numeric, so the page reads the same whichever site filled it in — JP
+    // prints "DP+2000", EN prints "+2000 DP", CN prints "【DP+2000】".
+    expect(r.linkDp).toBe(2000);
+    expect(r.linkEffect).toBe(
+      "《突进》（当此数码宝贝进行攻击时，可以将攻击对象变更为对方1只DP最高且处于活跃状态的数码宝贝）",
+    );
+  });
+
+  it("leaves a genuine inherited effect alone", () => {
+    const inherited = "【双方的回合】此数码宝贝获得进化源中的所有效果。";
+    expect(splitCnLink(inherited)).toEqual({
+      inherited,
+      linkRequirement: null,
+      linkDp: null,
+      linkEffect: null,
+    });
+    expect(splitCnLink(null).inherited).toBeNull();
   });
 });

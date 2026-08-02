@@ -30,6 +30,11 @@ export const CARD_TRANSLATIONS_DDL = `
     dual_name   TEXT,
     dual_effect TEXT,                    -- [デュアル効果]
     dual_rule   TEXT,                    -- [デュアルルール]
+    -- Link cards: what this card contributes while plugged into another
+    -- Digimon. link_dp is numeric and lives on cards (see migration 27).
+    link_requirement TEXT,               -- [リンク条件]
+    link_effect      TEXT,               -- [リンク中効果]
+    special_rule     TEXT,               -- [特別ルール]
     image_url   TEXT,                    -- localized card art, if any
     updated_at  TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (code, lang)
@@ -58,6 +63,10 @@ export type CardTranslation = {
   dual_name: string | null;
   dual_effect: string | null;
   dual_rule: string | null;
+  /** Link cards: the plugged-in half, in this language. */
+  link_requirement: string | null;
+  link_effect: string | null;
+  special_rule: string | null;
   image_url: string | null;
 };
 
@@ -65,11 +74,13 @@ export const UPSERT_TRANSLATION_SQL = `
   INSERT INTO card_translations
     (code, lang, name, card_type, series, traits, form, attribute,
      effect_main, effect_2, effect_3, evo_cost, evo_req,
-     dual_name, dual_effect, dual_rule, image_url, updated_at)
+     dual_name, dual_effect, dual_rule,
+     link_requirement, link_effect, special_rule, image_url, updated_at)
   VALUES
     (@code, @lang, @name, @card_type, @series, @traits, @form, @attribute,
      @effect_main, @effect_2, @effect_3, @evo_cost, @evo_req,
-     @dual_name, @dual_effect, @dual_rule, @image_url,
+     @dual_name, @dual_effect, @dual_rule,
+     @link_requirement, @link_effect, @special_rule, @image_url,
      CURRENT_TIMESTAMP)
   ON CONFLICT(code, lang) DO UPDATE SET
     name = excluded.name,
@@ -90,6 +101,9 @@ export const UPSERT_TRANSLATION_SQL = `
     dual_name   = COALESCE(excluded.dual_name, dual_name),
     dual_effect = COALESCE(excluded.dual_effect, dual_effect),
     dual_rule   = COALESCE(excluded.dual_rule, dual_rule),
+    link_requirement = COALESCE(excluded.link_requirement, link_requirement),
+    link_effect      = COALESCE(excluded.link_effect, link_effect),
+    special_rule     = COALESCE(excluded.special_rule, special_rule),
     image_url = excluded.image_url,
     updated_at = CURRENT_TIMESTAMP
 `;

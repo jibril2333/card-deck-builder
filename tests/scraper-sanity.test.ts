@@ -30,6 +30,10 @@ function card(overrides: Partial<ScrapedCard> = {}): ScrapedCard {
     dual_cost: null,
     dual_effect: null,
     dual_rule: null,
+    link_dp: null,
+    link_requirement: null,
+    link_effect: null,
+    special_rule: null,
     ...overrides,
   };
 }

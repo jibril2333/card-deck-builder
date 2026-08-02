@@ -41,6 +41,15 @@ export type DigimonCard = {
   dual_cost: number | null;
   dual_effect: string | null;
   dual_rule: string | null;
+  /** ---- Link cards -------------------------------------------------------
+   *  What this card contributes while plugged sideways into another Digimon.
+   *  `link_dp` is a number so the page reads the same in every language — the
+   *  two official sites print it as "DP+2000" and "+2000 DP". */
+  link_dp: number | null;
+  link_requirement: string | null;
+  link_effect: string | null;
+  /** [特別ルール] — card-specific rules text (Overflow &c.). */
+  special_rule: string | null;
 };
 
 export type DigimonDeck = {

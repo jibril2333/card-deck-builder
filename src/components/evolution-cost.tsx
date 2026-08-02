@@ -46,7 +46,20 @@ export function parseEvolutionCost(
 }
 
 export function EvolutionCost({ value }: { value: string }) {
-  const parsed = parseEvolutionCost(value);
+  // A card can print TWO alternative digivolve lines ("Red 2 from Lv.3" and
+  // "Red 2 from a Tamer"); the scraper newline-joins them. Render one row each
+  // — merging them would read as a single, wrong requirement.
+  const lines = value.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        {lines.map((l, i) => (
+          <EvolutionCost key={i} value={l} />
+        ))}
+      </div>
+    );
+  }
+  const parsed = parseEvolutionCost(lines[0] ?? value);
   if (!parsed) return <span className="text-sm font-medium">{value}</span>;
   return (
     <div className="flex flex-wrap gap-1.5">

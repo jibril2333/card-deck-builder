@@ -48,6 +48,16 @@ export type ScrapedCard = {
   dual_effect: string | null;
   /** [デュアルルール] — how the two halves interact (≪アーツ進化≫ &c.). */
   dual_rule: string | null;
+  /** ---- Link cards (リンク) ------------------------------------------------
+   *  A Link card plugs sideways into another Digimon; these describe what it
+   *  contributes while plugged in. Stored as a NUMBER because the two official
+   *  sites print the same value differently ("DP+2000" vs "+2000 DP") and the
+   *  page should not read differently per language over a formatting quirk. */
+  link_dp: number | null;
+  link_requirement: string | null;
+  link_effect: string | null;
+  /** [特別ルール] — card-specific rules text, e.g. ≪オーバーフロー《-4》≫. */
+  special_rule: string | null;
 };
 
 /**
@@ -62,6 +72,8 @@ export type LabelMap = {
   attribute: string;
   type: string;
   evoCost: string;
+  /** 進化条件2 — a second, alternative digivolve line (20 cards have one). */
+  evoCost2: string;
   /** 【特殊進化】 — DNA digivolve / ジョグレス and friends. */
   evoCondition: string;
   /** 【特殊登場】 — Assembly / DigiXros and other alternative PLAY costs.
@@ -78,6 +90,15 @@ export type LabelMap = {
   dualCost: string;
   dualEffect: string;
   dualRule: string;
+  /** ---- Link cards ---- the 下段テキスト / "Card Text 2" section. A Link
+   *  card plugs sideways into another Digimon, and these three blocks are
+   *  what it contributes while plugged in. */
+  linkDp: string;
+  linkRequirement: string;
+  linkEffect: string;
+  /** [特別ルール] — card-specific rules text (Overflow &c.). The EN site also
+   *  (mis)uses this label for a Link card's DP line; see parseCardBlock. */
+  specialRule: string;
   /** Absolute prefix for relative image srcs. */
   imageBase: string;
 };
@@ -89,6 +110,7 @@ export const EN_LABELS: LabelMap = {
   attribute: "Attribute",
   type: "Type",
   evoCost: "Digivolve Cost 1",
+  evoCost2: "Digivolve Cost 2",
   evoCondition: "[Special Digivolution Condition]",
   specialPlay: "[Special Play Condition]",
   effect: "[Effect]",
@@ -100,6 +122,10 @@ export const EN_LABELS: LabelMap = {
   dualCost: "DUAL Cost",
   dualEffect: "[DUAL Effect]",
   dualRule: "[DUAL Rule]",
+  linkDp: "[Link DP]",
+  linkRequirement: "[Link Condition]",
+  linkEffect: "[Link Effect]",
+  specialRule: "[Special Rule]",
   imageBase: "https://world.digimoncard.com",
 };
 
@@ -110,6 +136,7 @@ export const JA_LABELS: LabelMap = {
   attribute: "属性",
   type: "タイプ",
   evoCost: "進化条件1",
+  evoCost2: "進化条件2",
   evoCondition: "[特殊進化]",
   specialPlay: "[特殊登場]",
   effect: "[効果]",
@@ -121,6 +148,10 @@ export const JA_LABELS: LabelMap = {
   dualCost: "デュアル使用コスト",
   dualEffect: "[デュアル効果]",
   dualRule: "[デュアルルール]",
+  linkDp: "[リンクDP]",
+  linkRequirement: "[リンク条件]",
+  linkEffect: "[リンク中効果]",
+  specialRule: "[特別ルール]",
   imageBase: "https://digimoncard.com",
 };
 
@@ -170,6 +201,49 @@ export function levelFromText(s: string | null): number | null {
   if (!s) return null;
   const m = s.match(/Lv\.?\s*(\d+)/i);
   return m ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * Every effect-block label the parser knows how to file.
+ *
+ * This exists so an UNKNOWN one can be reported. Three times now a mechanic
+ * has shipped in a new block — [特殊登場], [デュアル効果], [リンク条件] — and
+ * each time the parser silently ignored it and the text simply wasn't on the
+ * site, with nothing to indicate anything was missing. `unknownBlockLabels`
+ * turns that into a warning on the very first scrape after Bandai adds one.
+ */
+export function knownBlockLabels(L: LabelMap): Set<string> {
+  return new Set([
+    L.evoCondition,
+    L.specialPlay,
+    L.effect,
+    L.security,
+    L.inherited,
+    L.source,
+    L.dualEffect,
+    L.dualRule,
+    L.linkDp,
+    L.linkRequirement,
+    L.linkEffect,
+    L.specialRule,
+  ]);
+}
+
+/** Labels present in this block that `knownBlockLabels` doesn't cover. */
+export function unknownBlockLabels(
+  $: cheerio.CheerioAPI,
+  block: AnyNode,
+  L: LabelMap = EN_LABELS,
+): string[] {
+  const known = knownBlockLabels(L);
+  const found = new Set<string>();
+  $(block)
+    .find("dl.cardInfoBoxSmall .cardInfoTitSmall")
+    .each((_i, e) => {
+      const label = normalize($(e).text());
+      if (label && !known.has(label)) found.add(label);
+    });
+  return [...found];
 }
 
 export function parseCardBlock(
@@ -240,7 +314,14 @@ export function parseCardBlock(
   const stage = form;
   const attribute = ndOrNull(dd(L.attribute) ?? "");
   const digi_types = ndOrNull(dd(L.type) ?? "");
-  const evolution_cost = ndOrNull(dd(L.evoCost) ?? "");
+  // Some cards offer a second, alternative digivolve line ("Red from a Tamer"
+  // alongside "Red from Lv.2"). Only the first was ever read, so 20 cards were
+  // missing half their digivolve options. Newline-joined; the renderer splits.
+  const evolution_cost =
+    [dd(L.evoCost), dd(L.evoCost2)]
+      .map((v) => normalize(v ?? ""))
+      .filter((v) => v !== "")
+      .join("\n") || null;
   // Both blocks describe "how else this card can hit the field", so they share
   // one field. Kept in page order (digivolve first) and newline-joined.
   const evolution_requirements =
@@ -253,11 +334,46 @@ export function parseCardBlock(
 
   const main_effect = effectByLabel($, $el, L.effect);
   const security_effect = effectByLabel($, $el, L.security);
-  const inherited_effect = effectByLabel($, $el, L.inherited);
+  let inherited_effect = effectByLabel($, $el, L.inherited);
   // Source/Pool effects vary by translation; capture if present
   const source_effect = effectByLabel($, $el, L.source);
 
   const set_names = ndOrNull(dd(L.notes) ?? "");
+
+  // ---- Link card: the 下段テキスト / "Card Text 2" blocks --------------------
+  // The JP site labels all three properly. The EN site does not, and gets it
+  // wrong in two separate ways on the same card, so both need repairing here
+  // rather than at 13 call sites:
+  //   · it labels the Link DP block [Special Rule]
+  //   · it has no Link Condition / Link Effect blocks at all and instead
+  //     concatenates both into [Inherited Effect] — the very slot that means
+  //     "what this card gives the Digimon it's underneath", which is a
+  //     different thing from what a Link card gives the Digimon it's plugged
+  //     into. 12 of 13 BT21 Link cards look like this.
+  let link_dp = toInt(effectByLabel($, $el, L.linkDp));
+  let link_requirement = effectByLabel($, $el, L.linkRequirement);
+  let link_effect = effectByLabel($, $el, L.linkEffect);
+  let special_rule = effectByLabel($, $el, L.specialRule);
+
+  // The Link condition always opens with the ＜Link＞ / 〈リンク〉 keyword, so a
+  // block starting with it is a Link block wherever the site filed it.
+  const LINK_HEAD_RE = /^[＜<〈《≪]\s*(?:Link|リンク|链接|鏈接)\s*[＞>〉》≫]/;
+  if (!link_requirement && inherited_effect && LINK_HEAD_RE.test(inherited_effect)) {
+    const [first, ...rest] = inherited_effect.split("\n");
+    link_requirement = first.trim();
+    link_effect = link_effect ?? (rest.join("\n").trim() || null);
+    inherited_effect = null;
+  }
+  // Only reinterpret [Special Rule] once we know this really is a Link card
+  // and the DP block is otherwise missing — BT21-051's [特別ルール] is a
+  // genuine rules line (≪オーバーフロー《-4》≫) and must stay put.
+  if (link_dp === null && link_requirement && special_rule) {
+    const dp = toInt(special_rule);
+    if (dp !== null && /dp/i.test(special_rule)) {
+      link_dp = dp;
+      special_rule = null;
+    }
+  }
 
   // ---- Dual card: the Option half in `.dualCardCol` -------------------------
   // Without this the second half vanished entirely from the JP text, and the
@@ -330,6 +446,10 @@ export function parseCardBlock(
     dual_cost,
     dual_effect,
     dual_rule,
+    link_dp,
+    link_requirement,
+    link_effect,
+    special_rule,
   };
 }
 
@@ -425,12 +545,30 @@ export function parseRulingsAll(html: string): ScrapedRuling[] {
   return out;
 }
 
+/**
+ * Block labels seen in the last `parseAll` that no field maps to.
+ *
+ * Module-level rather than a return value so adding this didn't change
+ * `parseAll`'s signature for its five callers; the scrapers read it right
+ * after their own parseAll call.
+ */
+export let lastUnknownLabels: Map<string, string[]> = new Map();
+
 export function parseAll(html: string, labels: LabelMap = EN_LABELS): ScrapedCard[] {
   const $ = cheerio.load(html);
   const byCode = new Map<string, ScrapedCard>();
+  lastUnknownLabels = new Map();
   $(".popupCol").each((_i, el) => {
     const c = parseCardBlock($, el, labels);
     if (!c) return;
+    const unknown = unknownBlockLabels($, el, labels);
+    if (unknown.length > 0) {
+      for (const u of unknown) {
+        const codes = lastUnknownLabels.get(u) ?? [];
+        if (codes.length < 5) codes.push(c.code);
+        lastUnknownLabels.set(u, codes);
+      }
+    }
     const isBase = !/_P\d+\.png$/i.test(c.image_url);
     const existing = byCode.get(c.code);
     if (!existing) {

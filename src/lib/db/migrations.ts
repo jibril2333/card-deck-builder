@@ -796,6 +796,51 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: 27,
+    name: "Link cards: link DP / condition / effect, plus [特別ルール]",
+    up: (db) => {
+      // Third instance of the same shape as Dual (migration 25): a mechanic
+      // printed in the card's LOWER text section that nothing modelled, so
+      // every source improvised differently —
+      //   JA official  labels all three blocks properly; we had no label map
+      //                entry, so all three were dropped
+      //   EN official  labels the DP block [Special Rule], has no Link
+      //                Condition / Link Effect blocks at all, and concatenates
+      //                both into [Inherited Effect] instead
+      //   ZH           the whole lot appended to envolutionEffect
+      //
+      // link_dp is an INTEGER on purpose: the two official sites print the same
+      // value as "DP+2000" and "+2000 DP", and the page should not read
+      // differently per language over a formatting quirk. Colour/cost on Dual
+      // are on `cards` for the same reason.
+      const addAll = (table: string, cols: [string, string][]) => {
+        const have = new Set(
+          (
+            db
+              .prepare(`SELECT name FROM pragma_table_info('${table}')`)
+              .all() as { name: string }[]
+          ).map((c) => c.name),
+        );
+        for (const [name, type] of cols) {
+          if (!have.has(name)) {
+            db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
+          }
+        }
+      };
+      addAll("cards", [
+        ["link_dp", "INTEGER"],
+        ["link_requirement", "TEXT"],
+        ["link_effect", "TEXT"],
+        ["special_rule", "TEXT"],
+      ]);
+      addAll("card_translations", [
+        ["link_requirement", "TEXT"],
+        ["link_effect", "TEXT"],
+        ["special_rule", "TEXT"],
+      ]);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

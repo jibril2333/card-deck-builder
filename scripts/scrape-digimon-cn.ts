@@ -26,6 +26,7 @@ import {
 import {
   cleanEffect,
   splitCnDual,
+  splitCnLink,
   splitCnRequirements,
 } from "../src/lib/scraper/digimon-cn";
 
@@ -163,6 +164,11 @@ async function main() {
   db.pragma("journal_mode = WAL");
   db.exec(CARD_TRANSLATIONS_DDL);
   const upsert = db.prepare(UPSERT_TRANSLATION_SQL);
+  // Language-independent, so it belongs on `cards`. The CN feed is often the
+  // earliest source to carry a JP-only set, so let it fill this in too.
+  const fillLinkDp = db.prepare(
+    `UPDATE cards SET link_dp = COALESCE(@link_dp, link_dp) WHERE code = @code`,
+  );
 
   // Parallel-art printings come back as EXTRA rows with the same `model` but a
   // different `imageCover`. The text is identical (last-write-wins is fine for
@@ -188,7 +194,9 @@ async function main() {
           imagesByModel.set(code, set);
         }
         const { main, req } = splitCnRequirements(cleanEffect(c.effect));
+        // A card is Dual or Link, never both, and both hide in the same field.
         const dual = splitCnDual(cleanEffect(c.envolutionEffect));
+        const link = splitCnLink(dual.inherited);
         upsert.run({
           code,
           lang: "zh",
@@ -203,7 +211,7 @@ async function main() {
           attribute: clean(c.attribute),
           effect_main: main,
           effect_2: cleanEffect(c.safeEffect),
-          effect_3: dual.inherited,
+          effect_3: link.inherited,
           // The CN feed has no `进化条件` field of its own — `req` is what we
           // just peeled off the top of the effect body. Still NULL for evo_cost,
           // and the upsert COALESCEs so a CN pass never blanks the JP scrape.
@@ -212,8 +220,13 @@ async function main() {
           dual_name: dual.dualName,
           dual_effect: dual.dualEffect,
           dual_rule: dual.dualRule,
+          link_requirement: link.linkRequirement,
+          link_effect: link.linkEffect,
+          // [特別ルール] has no counterpart in the CN feed at all.
+          special_rule: null,
           image_url: clean(c.imageCover),
         });
+        if (link.linkDp !== null) fillLinkDp.run({ code, link_dp: link.linkDp });
         total++;
       }
     });

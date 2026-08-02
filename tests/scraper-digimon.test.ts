@@ -3,6 +3,7 @@ import * as cheerio from "cheerio";
 import {
   parseAll,
   parseCardBlock,
+  JA_LABELS,
   levelFromText,
   toInt,
   normalize,
@@ -14,6 +15,8 @@ import {
   FIXTURE_DIGIMON_BASE,
   FIXTURE_DUAL,
   FIXTURE_DUAL_FULL,
+  FIXTURE_LINK_EN,
+  FIXTURE_LINK_JA,
   FIXTURE_FULL_PAGE,
 } from "./fixtures/digimon-card-blocks";
 
@@ -164,5 +167,53 @@ describe("parseAll", () => {
   it("returns empty array for blank HTML", () => {
     expect(parseAll("")).toEqual([]);
     expect(parseAll("<html><body></body></html>")).toEqual([]);
+  });
+});
+
+describe("Link cards", () => {
+  const parseOne = (html: string, L?: never) => {
+    const $ = cheerio.load(html);
+    return parseCardBlock($, $(".popupCol").get(0)!, L);
+  };
+
+  it("repairs the EN site's two separate mislabellings", () => {
+    const c = parseOne(FIXTURE_LINK_EN);
+    expect(c!.link_dp).toBe(2000);
+    expect(c!.link_requirement).toBe(
+      "＜Link＞ [Appmon] trait: Cost 1 (Plug this card in sideways.)",
+    );
+    expect(c!.link_effect).toBe("＜Raid＞ (Change the attack target.)");
+    // Both were folded into [Inherited Effect]; what a Link card gives the
+    // Digimon it plugs INTO is not what it gives the one stacked on top of it.
+    expect(c!.inherited_effect).toBeNull();
+    // [Special Rule] was really the Link DP block, so it shouldn't linger.
+    expect(c!.special_rule).toBeNull();
+    // Both digivolve lines, not just the first.
+    expect(c!.evolution_cost).toBe("Red 0 from Lv.2\nRed 2 from TAMER");
+  });
+
+  it("reads the JP site's properly-labelled blocks to the same values", () => {
+    const c = parseOne(FIXTURE_LINK_JA, JA_LABELS as never);
+    expect(c!.link_dp).toBe(2000);
+    expect(c!.link_requirement).toContain("〈リンク〉");
+    expect(c!.link_effect).toContain("≪突進≫");
+    expect(c!.inherited_effect).toBeNull();
+  });
+
+  it("keeps a genuine [特別ルール] out of the Link DP slot", () => {
+    // BT21-051's is ≪オーバーフロー《-4》≫ — a real rules line, and the card
+    // has no Link blocks at all, so nothing may reinterpret it.
+    const c = parseOne(
+      FIXTURE_LINK_JA.replace(
+        /<dl class="cardInfoBoxSmall">\s*<dt class="cardInfoTitSmall">\[リンク(DP|条件|中効果)\][\s\S]*?<\/dl>/g,
+        "",
+      ).replace(
+        "</div>",
+        `<dl class="cardInfoBoxSmall"><dt class="cardInfoTitSmall">[特別ルール]</dt><dd class="cardInfoData">≪オーバーフロー《-4》≫</dd></dl></div>`,
+      ),
+      JA_LABELS as never,
+    );
+    expect(c!.special_rule).toBe("≪オーバーフロー《-4》≫");
+    expect(c!.link_dp).toBeNull();
   });
 });

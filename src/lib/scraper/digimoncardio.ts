@@ -96,6 +96,9 @@ export type CardRow = {
   source_effect: string;
   /** Dual cards only: the Option half. Empty on everything else. */
   dual_effect: string;
+  /** Link cards only: what the card does while plugged in. */
+  link_requirement: string;
+  link_effect: string;
   set_names: string;
   image_url: string;
 };
@@ -117,6 +120,14 @@ export function toCardRow(c: ApiCard): CardRow {
   const secondBlock = c.source_effect ?? "";
   const isOptionOrTamer = type === "Option" || type === "Tamer";
   const isDual = type === "Dual";
+  // Link cards hit the same wall from the other side: the second block is what
+  // the card does while PLUGGED INTO another Digimon, which is a different
+  // thing from what it grants the Digimon it sits under. It announces itself —
+  // the condition line always opens with the Link keyword — so it can be
+  // recognized without a card list. First line is the condition, rest the
+  // effect, exactly as the official JP site splits them.
+  const isLink = /^[＜<〈《≪]\s*Link\s*[＞>〉》≫]/.test(secondBlock.trim());
+  const linkLines = secondBlock.replace(/\r\n/g, "\n").split("\n");
   // "[Digivolve] Lv.X w/[…]: Cost N" lives in alt_effect (xros_req mirrors it).
   const evoLine = (c.alt_effect || c.xros_req || "").trim();
   // Compose the "Yellow 3 from Lv.4"-style cost line when the structured
@@ -146,8 +157,11 @@ export function toCardRow(c: ApiCard): CardRow {
     evolution_requirements: evoLine,
     main_effect: c.main_effect ?? "",
     security_effect: isOptionOrTamer ? secondBlock : "",
-    inherited_effect: isOptionOrTamer || isDual ? "" : secondBlock,
+    inherited_effect:
+      isOptionOrTamer || isDual || isLink ? "" : secondBlock,
     dual_effect: isDual ? secondBlock : "",
+    link_requirement: isLink ? linkLines[0].trim() : "",
+    link_effect: isLink ? linkLines.slice(1).join("\n").trim() : "",
     source_effect: "", // legacy column — always empty, matches official scraper
     set_names: Array.isArray(c.set_name)
       ? c.set_name.join("; ")
@@ -163,13 +177,13 @@ export const UPSERT_CARD_SQL = `
     play_cost, dp, attribute, form, stage, digi_types,
     evolution_cost, evolution_requirements,
     main_effect, security_effect, inherited_effect, source_effect,
-    set_names, image_url, dual_effect
+    set_names, image_url, dual_effect, link_requirement, link_effect
   ) VALUES (
     @code, @code, @name, @rarity, @card_type, @level, @color, @color2,
     @play_cost, @dp, @attribute, @form, @stage, @digi_types,
     @evolution_cost, @evolution_requirements,
     @main_effect, @security_effect, @inherited_effect, @source_effect,
-    @set_names, @image_url, @dual_effect
+    @set_names, @image_url, @dual_effect, @link_requirement, @link_effect
   )
   -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase what
   -- another found. The official site has no Link block; this feed has no
@@ -194,9 +208,12 @@ export const UPSERT_CARD_SQL = `
     -- on the inherited slot stands and this leaves it alone.
     inherited_effect = CASE
       WHEN excluded.card_type = 'Dual' AND dual_name IS NULL THEN NULL
+      WHEN excluded.link_requirement <> '' THEN NULL
       ELSE COALESCE(NULLIF(excluded.inherited_effect, ''), inherited_effect)
     END,
     dual_effect = COALESCE(NULLIF(excluded.dual_effect, ''), dual_effect),
+    link_requirement = COALESCE(NULLIF(excluded.link_requirement, ''), link_requirement),
+    link_effect      = COALESCE(NULLIF(excluded.link_effect, ''), link_effect),
     source_effect = COALESCE(NULLIF(excluded.source_effect, ''), source_effect),
     set_names = COALESCE(NULLIF(excluded.set_names, ''), set_names), image_url = excluded.image_url`;
 
