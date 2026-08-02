@@ -15,6 +15,10 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import { parseAll, JA_LABELS } from "../src/lib/scraper/digimon";
 import {
+  checkScrapeSanity,
+  formatSanityReport,
+} from "../src/lib/scraper/sanity";
+import {
   CARD_TRANSLATIONS_DDL,
   UPSERT_TRANSLATION_SQL,
 } from "../src/lib/db/translations-ddl";
@@ -73,6 +77,24 @@ async function main() {
 
   console.log(`[jp] ${prefixes.length} set prefixes: ${prefixes.join(" ")}`);
 
+  /**
+   * Same gate the EN scraper has run all along — this side never did, which is
+   * why the missing [デュアル効果] label went unnoticed for months: the JP
+   * scrape happily wrote Dual cards with no Option half and reported success.
+   * A per-code sweep legitimately hands us one card at a time, so only refuse
+   * on a real batch; a single bad row would trip the ratio thresholds.
+   */
+  function sanityOk(cards: ReturnType<typeof parseAll>, label: string): boolean {
+    if (cards.length < 5) return true;
+    const report = checkScrapeSanity(cards);
+    if (report.issues.length > 0) console.warn(formatSanityReport(report));
+    if (!report.ok) {
+      console.error(`[jp] ${label}: SANITY FAILED — refusing to write`);
+      return false;
+    }
+    return true;
+  }
+
   function upsertCards(cards: ReturnType<typeof parseAll>): number {
     let n = 0;
     const tx = db.transaction(() => {
@@ -120,6 +142,7 @@ async function main() {
   }
 
   let total = 0;
+  let failed = 0;
   for (const prefix of prefixes) {
     let cards;
     try {
@@ -132,6 +155,10 @@ async function main() {
       continue;
     }
     const exact = cards.filter((c) => c.code.startsWith(`${prefix}-`));
+    if (!sanityOk(exact, prefix)) {
+      failed++;
+      continue;
+    }
     total += upsertCards(exact);
     console.log(`[jp] ${prefix}: ${exact.length} cards`);
     await new Promise((r) => setTimeout(r, SET_DELAY_MS));
@@ -182,6 +209,12 @@ async function main() {
     `[jp] done. upserted ${total}; coverage ${have.n}/${all.n} cards in DB`,
   );
   db.close();
+  // Exit non-zero so refresh-cards.sh aborts instead of swapping in a DB that
+  // is missing whatever the failing sets were supposed to contain.
+  if (failed > 0) {
+    console.error(`[jp] ${failed} set(s) failed the sanity gate`);
+    process.exit(1);
+  }
 }
 
 main().catch((e) => {

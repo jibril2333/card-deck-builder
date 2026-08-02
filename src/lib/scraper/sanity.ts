@@ -15,12 +15,22 @@
 
 import type { ScrapedCard } from "./digimon";
 
+// The same parser runs against the JP site with a JA label map, and leaves
+// `card_type` / `color` in the page's own language ("Dual" is the one value it
+// normalizes, because it's derived from the slash rather than copied). Listing
+// both vocabularies is what lets the JP scraper use this gate at all — with
+// English only it warned on ~100 of every 104 cards, which is indistinguishable
+// from real breakage and trains you to ignore the report.
 const EXPECTED_TYPES = new Set([
   "Digimon",
   "Digi-Egg",
   "Tamer",
   "Option",
   "Dual",
+  "デジモン",
+  "デジタマ",
+  "テイマー",
+  "オプション",
 ]);
 
 const EXPECTED_COLORS = new Set([
@@ -31,6 +41,13 @@ const EXPECTED_COLORS = new Set([
   "Black",
   "Purple",
   "White",
+  "赤",
+  "青",
+  "黄",
+  "緑",
+  "黒",
+  "紫",
+  "白",
 ]);
 
 export type SanityIssue = {
@@ -152,7 +169,9 @@ export function checkScrapeSanity(cards: ScrapedCard[]): SanityReport {
   }
 
   const digimonMissingLevel = cards.filter(
-    (c) => c.card_type === "Digimon" && c.level == null,
+    (c) =>
+      (c.card_type === "Digimon" || c.card_type === "デジモン") &&
+      c.level == null,
   );
   if (digimonMissingLevel.length > 0) {
     issues.push({
