@@ -164,6 +164,27 @@ export function checkScrapeSanity(cards: ScrapedCard[]): SanityReport {
     });
   }
 
+  // A Dual card that parsed with no Option half means the labels moved. This
+  // is the exact failure that hid for months: the parser had no entry for
+  // [デュアル効果], so every Japanese Dual card came back looking like an
+  // ordinary Digimon and nothing anywhere said otherwise. `card_type` is read
+  // from a different element than the effect blocks, so the two disagreeing is
+  // a reliable signal that one of them drifted.
+  const dualMissingFace = cards.filter(
+    (c) => c.card_type === "Dual" && !c.dual_effect,
+  );
+  if (dualMissingFace.length > 0) {
+    issues.push({
+      severity: "error",
+      message:
+        `${dualMissingFace.length} Dual card(s) parsed with no Option half — ` +
+        `the [DUAL Effect] / [デュアル効果] label likely changed (samples: ${dualMissingFace
+          .slice(0, 3)
+          .map((c) => c.code)
+          .join(", ")})`,
+    });
+  }
+
   if (total >= 2) {
     const distinctNames = new Set(cards.map((c) => c.name));
     if (distinctNames.size === 1) {

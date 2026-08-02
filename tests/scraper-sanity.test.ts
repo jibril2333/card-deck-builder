@@ -140,12 +140,27 @@ describe("checkScrapeSanity", () => {
       card({ code: "BT1-001", card_type: "Tamer", level: null }),
       card({ code: "BT1-002", card_type: "Option", level: null }),
       card({ code: "BT1-003", card_type: "Digi-Egg", level: 2 }),
-      card({ code: "BT1-004", card_type: "Dual" }),
+      // A Dual card must carry its Option half — see the next test.
+      card({ code: "BT1-004", card_type: "Dual", dual_effect: "[Main] …" }),
     ];
     const r = checkScrapeSanity(cards);
     expect(r.ok).toBe(true);
     expect(
       r.issues.find((i) => i.message.includes("unrecognized")),
     ).toBeUndefined();
+  });
+
+  it("errors when a Dual card parses with no Option half", () => {
+    // The failure that hid for months: with no label entry for [デュアル効果],
+    // every Japanese Dual card came back looking like an ordinary Digimon and
+    // nothing said otherwise. card_type is read from a different element than
+    // the effect blocks, so the two disagreeing means one of them drifted.
+    const r = checkScrapeSanity([
+      card({ code: "BT25-057", card_type: "Dual", dual_effect: null }),
+    ]);
+    expect(r.ok).toBe(false);
+    expect(
+      r.issues.find((i) => i.message.includes("no Option half")),
+    ).toBeTruthy();
   });
 });

@@ -70,18 +70,32 @@ describe("splitCnRequirements", () => {
 });
 
 describe("splitCnDual", () => {
-  it("lifts the Option half out of the inherited-effect field", () => {
+  it("lifts the Option half out of the inherited-effect field, rule and all", () => {
     const r = splitCnDual(
       "选项：最终审判\n" +
         "《使用条件《特征“光辉黎明”》》（我方存在指定的卡牌也可以无视颜色条件）\n" +
-        "【主要】直到回合结束为止，我方的1只数码宝贝获得《速攻》效果。",
+        "【主要】直到回合结束为止，我方的1只数码宝贝获得《速攻》效果。\n" +
+        "【技艺进化】（使用后，可以将我方的卡牌不支付费用进化成此卡牌以代替丢弃）",
     );
     expect(r.inherited).toBeNull();
     expect(r.dualName).toBe("最终审判");
+    // The DUAL Rule is a trailing line in CN but its own labelled block on the
+    // official sites — split it so all three languages render the same shape.
     expect(r.dualEffect).toBe(
       "《使用条件《特征“光辉黎明”》》（我方存在指定的卡牌也可以无视颜色条件）\n" +
         "【主要】直到回合结束为止，我方的1只数码宝贝获得《速攻》效果。",
     );
+    expect(r.dualRule).toBe(
+      "【技艺进化】（使用后，可以将我方的卡牌不支付费用进化成此卡牌以代替丢弃）",
+    );
+  });
+
+  it("keeps an unrecognized trailing line in the effect rather than losing it", () => {
+    const r = splitCnDual(
+      "选项：某卡\n【主要】做事。\n【未来的新规则】（尚未见过的规则）",
+    );
+    expect(r.dualEffect).toBe("【主要】做事。\n【未来的新规则】（尚未见过的规则）");
+    expect(r.dualRule).toBeNull();
   });
 
   it("leaves a genuine inherited effect untouched", () => {
@@ -91,11 +105,13 @@ describe("splitCnDual", () => {
       inherited,
       dualName: null,
       dualEffect: null,
+      dualRule: null,
     });
     expect(splitCnDual(null)).toEqual({
       inherited: null,
       dualName: null,
       dualEffect: null,
+      dualRule: null,
     });
   });
 });

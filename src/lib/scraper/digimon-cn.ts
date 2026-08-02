@@ -71,18 +71,43 @@ export function splitCnRequirements(effect: string | null): {
  */
 const CN_DUAL_HEAD_RE = /^选项[：:]\s*(.+)$/;
 
+/**
+ * DUAL Rule markers, as CN writes them.
+ *
+ * The official sites label this block ([デュアルルール] / [DUAL Rule]); CN
+ * appends it to the effect text as a trailing line instead. It describes how
+ * the two faces interact, not what the Option does, so it belongs in its own
+ * field like it does in the other two languages.
+ *
+ * The mechanic currently has exactly one member — 技艺进化 / アーツ進化 /
+ * Arts Digivolve — in all three languages. Written as a list, and matched
+ * regardless of which bracket style CN uses, so a new rule is one entry rather
+ * than a rewrite. An unrecognized trailing line simply stays in the effect
+ * text: worse layout, never lost text.
+ */
+const CN_DUAL_RULE_RE = /^[【《≪＜]\s*(?:技艺进化)\s*[】》≫＞]/;
+
 export function splitCnDual(inherited: string | null): {
   inherited: string | null;
   dualName: string | null;
   dualEffect: string | null;
+  dualRule: string | null;
 } {
-  if (!inherited) return { inherited: null, dualName: null, dualEffect: null };
+  if (!inherited)
+    return { inherited: null, dualName: null, dualEffect: null, dualRule: null };
   const lines = inherited.split("\n");
   const m = lines[0].trim().match(CN_DUAL_HEAD_RE);
-  if (!m) return { inherited, dualName: null, dualEffect: null };
+  if (!m)
+    return { inherited, dualName: null, dualEffect: null, dualRule: null };
+
+  const body = lines.slice(1);
+  // Take trailing rule lines off the end, keeping their original order.
+  let end = body.length;
+  while (end > 0 && CN_DUAL_RULE_RE.test(body[end - 1].trim())) end--;
   return {
     inherited: null,
     dualName: m[1].trim() || null,
-    dualEffect: lines.slice(1).join("\n").trim() || null,
+    dualEffect: body.slice(0, end).join("\n").trim() || null,
+    dualRule: body.slice(end).join("\n").trim() || null,
   };
 }

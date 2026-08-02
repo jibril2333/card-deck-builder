@@ -211,10 +211,7 @@ async function main() {
           evo_req: req,
           dual_name: dual.dualName,
           dual_effect: dual.dualEffect,
-          // CN runs the DUAL Rule (【技艺进化】…) into the same blob rather
-          // than labelling it, so there's nothing reliable to split off; the
-          // card page falls back to the JP/EN rule line.
-          dual_rule: null,
+          dual_rule: dual.dualRule,
           image_url: clean(c.imageCover),
         });
         total++;
