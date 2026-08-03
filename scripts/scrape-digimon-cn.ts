@@ -25,6 +25,7 @@ import {
 } from "../src/lib/db/translations-ddl";
 import {
   cleanEffect,
+  cnEvolutionCost,
   splitCnDual,
   splitCnLink,
   splitCnRequirements,
@@ -53,6 +54,7 @@ type CnCard = {
   effect: string | null; // main effect
   safeEffect: string | null; // security effect
   envolutionEffect: string | null; // inherited effect
+  envolutionConsumeOne: string | null; // digivolve cost, "绿Lv.4起4；黑Lv.4起4"
   imageCover: string | null;
 };
 
@@ -212,10 +214,10 @@ async function main() {
           effect_main: main,
           effect_2: cleanEffect(c.safeEffect),
           effect_3: link.inherited,
-          // The CN feed has no `进化条件` field of its own — `req` is what we
-          // just peeled off the top of the effect body. Still NULL for evo_cost,
-          // and the upsert COALESCEs so a CN pass never blanks the JP scrape.
-          evo_cost: null,
+          // `req` is what we peeled off the top of the effect body; the cost
+          // line has its own field and was simply never read, so Chinese
+          // readers got the ENGLISH digivolve cost via the display fallback.
+          evo_cost: cnEvolutionCost(c.envolutionConsumeOne),
           evo_req: req,
           dual_name: dual.dualName,
           dual_effect: dual.dualEffect,

@@ -164,3 +164,28 @@ export function splitCnDual(inherited: string | null): {
     dualRule: body.slice(end).join("\n").trim() || null,
   };
 }
+
+/**
+ * The CN digivolve-cost line, reshaped to match the other two languages.
+ *
+ * The feed gives "绿Lv.4起4；黑Lv.4起4" — alternatives separated by a full-width
+ * semicolon. The official sites split the same thing across 進化条件1 and
+ * 進化条件2, which the parser newline-joins, so newline-joining here puts all
+ * three languages in one shape and EvolutionCost renders a row per alternative.
+ *
+ * The text itself stays verbatim Chinese: parseEvolutionCost only recognizes
+ * English colour names and falls through to printing the string as-is, which is
+ * the right outcome — a Chinese reader was previously shown the ENGLISH cost
+ * line, because this field was hardcoded to null and the page fell back.
+ */
+export function cnEvolutionCost(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").trim();
+  if (!v || v === "-") return null;
+  return (
+    v
+      .split(/[；;]/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .join("\n") || null
+  );
+}

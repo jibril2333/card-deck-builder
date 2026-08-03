@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanEffect,
+  cnEvolutionCost,
   splitCnDual,
   splitCnLink,
   splitCnRequirements,
@@ -143,5 +144,20 @@ describe("splitCnLink", () => {
       linkEffect: null,
     });
     expect(splitCnLink(null).inherited).toBeNull();
+  });
+});
+
+describe("cnEvolutionCost", () => {
+  it("splits the full-width-semicolon alternatives onto their own lines", () => {
+    // Matches how the official sites split 進化条件1 / 進化条件2, so
+    // EvolutionCost renders one row per alternative in every language.
+    expect(cnEvolutionCost("绿Lv.4起4；黑Lv.4起4")).toBe("绿Lv.4起4\n黑Lv.4起4");
+    expect(cnEvolutionCost("红Lv.2起0")).toBe("红Lv.2起0");
+  });
+
+  it("treats blank and '-' as absent", () => {
+    expect(cnEvolutionCost("-")).toBeNull();
+    expect(cnEvolutionCost("")).toBeNull();
+    expect(cnEvolutionCost(null)).toBeNull();
   });
 });
