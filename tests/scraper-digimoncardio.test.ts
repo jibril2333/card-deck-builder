@@ -82,6 +82,35 @@ describe("toCardRow rejects things that aren't card text", () => {
     expect(r.inherited_effect).toBe("");
   });
 
+  it("routes a leaked label in the SECOND field too", () => {
+    // EX10-012 and three siblings kept their genuine security effect here,
+    // labelled and in the inherited slot, so the page showed it as 进化元效果.
+    // world.digimoncard.com omits the block entirely, so nothing else was ever
+    // going to correct it.
+    const r = toCardRow(
+      api({
+        type: "Digimon",
+        main_effect: "{Hand} [Main] Do the main thing.",
+        source_effect: "Security Effect [Security] Do the security thing.",
+      }),
+    );
+    expect(r.main_effect).toBe("{Hand} [Main] Do the main thing.");
+    expect(r.security_effect).toBe("[Security] Do the security thing.");
+    expect(r.inherited_effect).toBe("");
+  });
+
+  it("drops a 'Card Effect(s)' copy of the main effect", () => {
+    const r = toCardRow(
+      api({
+        type: "Digimon",
+        main_effect: "[On Play] Official wording.",
+        source_effect: "Card Effect(s) [On Play] Stale mirror wording.",
+      }),
+    );
+    expect(r.main_effect).toBe("[On Play] Official wording.");
+    expect(r.inherited_effect).toBe("");
+  });
+
   it("routes a leaked block label to the block it names", () => {
     // When a card has only an inherited effect, io writes it into main_effect
     // with its own label still attached and leaves source_effect empty.

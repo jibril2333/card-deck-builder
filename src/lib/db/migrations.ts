@@ -915,6 +915,53 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: 29,
+    name: "Route the leaked labels sitting in the inherited slot",
+    up: (db) => {
+      // Migration 28 handled leaked labels in main_effect. They turn up in the
+      // inherited slot too, and there the mis-slotting hides a real block:
+      //
+      //   4 cards  "Security Effect [Security] …" — the genuine security
+      //            effect, shown as 进化元效果 with security_effect empty.
+      //            EX10-012/020/035/057; world.digimoncard.com omits the block
+      //            entirely, so only digimoncard.io has the English text and
+      //            nothing was ever going to correct it.
+      //   4 cards  "Card Effect(s) …" — a stale copy of the main effect, which
+      //            the official site already supplies in better words (it has
+      //            [Sistermon Ciel] where io has [Sistermon Noir]).
+      //
+      // The label names the block, so route by it: move the security ones,
+      // drop the duplicates.
+      db.exec(`
+        UPDATE cards
+           SET security_effect = COALESCE(NULLIF(security_effect, ''),
+                                          TRIM(SUBSTR(inherited_effect, 17))),
+               inherited_effect = NULL
+         WHERE inherited_effect LIKE 'Security Effect %'
+      `);
+      db.exec(`
+        UPDATE cards
+           SET main_effect = COALESCE(NULLIF(main_effect, ''),
+                                      TRIM(SUBSTR(inherited_effect, 16))),
+               inherited_effect = NULL
+         WHERE inherited_effect LIKE 'Card Effect(s) %'
+      `);
+
+      // A security effect only does anything while the card is being checked
+      // in security, and the game marks that timing explicitly — 809 of the
+      // 810 stored ones carry [Security] / 【セキュリティ】. The one that
+      // doesn't (P-146) is digimoncard.io's copy of the inherited effect,
+      // which the official site already gave us in its own wording.
+      db.exec(`
+        UPDATE cards SET security_effect = NULL
+         WHERE security_effect IS NOT NULL AND security_effect <> ''
+           AND security_effect NOT LIKE '%[Security]%'
+           AND security_effect NOT LIKE '%【セキュリティ%'
+           AND inherited_effect IS NOT NULL AND inherited_effect <> ''
+      `);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

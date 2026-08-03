@@ -109,8 +109,26 @@ export type CardRow = {
  * cards were displaying the literal string "|applinkdp =" as their 进化元效果.
  */
 const WIKI_MARKUP_RE = /^\s*\|[a-z_]+\s*=\s*$|\{\{/i;
-/** io prefixes a block with its own label when it has nowhere else to put it. */
-const LEAKED_LABEL_RE = /^\s*(Inherited Effect|Security Effect)\s+/;
+/**
+ * io prefixes a block with its own label when it has nowhere else to put it,
+ * and it does this in BOTH text fields. The label names the block the text
+ * belongs to, which is all we need to route it.
+ */
+const LEAKED_LABEL_RE = /^\s*(Inherited Effect|Security Effect|Card Effect\(s\))\s+/;
+
+type Slot = "main" | "security" | "inherited";
+const LABEL_SLOT: Record<string, Slot> = {
+  "Card Effect(s)": "main",
+  "Security Effect": "security",
+  "Inherited Effect": "inherited",
+};
+
+/** Strip a leaked label, returning the text and the slot the label names. */
+function splitLeakedLabel(text: string): { slot: Slot | null; body: string } {
+  const m = text.match(LEAKED_LABEL_RE);
+  if (!m) return { slot: null, body: text };
+  return { slot: LABEL_SLOT[m[1]], body: text.slice(m[0].length).trim() };
+}
 
 function usableText(s: string | null | undefined): string {
   const v = (s ?? "").trim();
@@ -148,16 +166,16 @@ export function toCardRow(c: ApiCard): CardRow {
   // Turn] …" — and leaves source_effect empty. 28 cards, all promos, were
   // showing that as their main effect while the inherited slot sat empty. The
   // label names the block it belongs in, so route by it and drop the prefix.
-  let mainText = usableText(c.main_effect);
-  let leakedInherited = "";
-  let leakedSecurity = "";
-  const leaked = mainText.match(LEAKED_LABEL_RE);
-  if (leaked) {
-    const body = mainText.slice(leaked[0].length).trim();
-    if (leaked[1] === "Inherited Effect") leakedInherited = body;
-    else leakedSecurity = body;
-    mainText = "";
+  const leakedMain = splitLeakedLabel(usableText(c.main_effect));
+  const leakedSecond = splitLeakedLabel(secondBlock);
+  const bySlot: Record<Slot, string> = { main: "", security: "", inherited: "" };
+  for (const p of [leakedMain, leakedSecond]) {
+    if (p.slot && !bySlot[p.slot]) bySlot[p.slot] = p.body;
   }
+  const mainText = leakedMain.slot ? bySlot.main : leakedMain.body;
+  // A labelled second block goes where its label says; only an UNlabelled one
+  // falls through to being routed by card type.
+  const unlabelledSecond = leakedSecond.slot ? "" : secondBlock;
   // "[Digivolve] Lv.X w/[…]: Cost N" lives in alt_effect (xros_req mirrors it).
   const evoLine = (c.alt_effect || c.xros_req || "").trim();
   // Compose the "Yellow 3 from Lv.4"-style cost line when the structured
@@ -186,11 +204,11 @@ export function toCardRow(c: ApiCard): CardRow {
     evolution_cost: evoCost,
     evolution_requirements: evoLine,
     main_effect: mainText,
-    security_effect: isOptionOrTamer ? secondBlock : leakedSecurity,
+    security_effect:
+      bySlot.security || (isOptionOrTamer ? unlabelledSecond : ""),
     inherited_effect:
-      isOptionOrTamer || isDual || isLink
-        ? leakedInherited
-        : secondBlock || leakedInherited,
+      bySlot.inherited ||
+      (isOptionOrTamer || isDual || isLink ? "" : unlabelledSecond),
     dual_effect: isDual ? secondBlock : "",
     link_requirement: isLink ? linkLines[0].trim() : "",
     link_effect: isLink ? linkLines.slice(1).join("\n").trim() : "",

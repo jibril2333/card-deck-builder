@@ -190,6 +190,13 @@ async function main() {
   // Verified against the official pages: all 10 Option-type Link cards
   // (BT24-091, BT25-100, ST22-09 …) have [Effect] / [Link DP] / [Link Condition]
   // / [Link Effect] and NO [Security Effect] block at all.
+  //
+  // Deliberately scoped to Dual/Link cards. I tried making this site
+  // authoritative for all three text blocks on every card and measured the
+  // result: it deletes the English security effect of EX10-012/020/035/057,
+  // which world.digimoncard.com omits entirely while digimoncard.com prints a
+  // [セキュリティ効果] for it. The EN site is not complete enough to treat its
+  // silence as a fact.
   const clearMisfiledBlocks = db.prepare(
     `UPDATE cards
         SET inherited_effect = NULLIF(@inherited_effect, ''),
