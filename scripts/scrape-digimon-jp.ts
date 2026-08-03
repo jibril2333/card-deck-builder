@@ -142,11 +142,9 @@ async function main() {
           special_rule: c.special_rule,
           image_url: c.image_url || null,
         });
-        // The Option half's colour and cost aren't language-specific, so they
-        // live on `cards`. The JP site is the ONLY source that sees JP-only
-        // sets (BT26 &c.), so it has to fill them in there too.
-        // Values that aren't language-specific but that only the JP site sees
-        // for JP-only sets, so they have to reach `cards` from here too.
+        // A Dual card's colour/cost and a Link card's DP aren't
+        // language-specific, so they live on `cards` — but for JP-only sets
+        // this is the only site that can see them, so they reach `cards` here.
         if (c.dual_effect || c.link_dp !== null) {
           fillDual.run({
             code: c.code,
@@ -164,6 +162,13 @@ async function main() {
 
   let total = 0;
   let failed = 0;
+  // Prefixes whose bulk search came back empty. The JP site returns NOTHING
+  // for `P-` (243 promo cards), so the prefix pass has never once refreshed a
+  // promo card — and the sweep below only visited codes with no ja row at all,
+  // which promos all have. Their Japanese text was frozen at whatever the very
+  // first scrape captured, which is why P-190 still showed its Link blocks as
+  // 進化元効果 after every other Link card had been fixed.
+  const emptyPrefixes: string[] = [];
   for (const prefix of prefixes) {
     let cards;
     try {
@@ -181,23 +186,41 @@ async function main() {
       failed++;
       continue;
     }
+    if (exact.length === 0) emptyPrefixes.push(prefix);
     total += upsertCards(exact);
     console.log(`[jp] ${prefix}: ${exact.length} cards`);
     await new Promise((r) => setTimeout(r, SET_DELAY_MS));
   }
+  if (emptyPrefixes.length > 0) {
+    console.log(
+      `[jp] bulk search returned nothing for: ${emptyPrefixes.join(" ")} — ` +
+        `sweeping those per code`,
+    );
+  }
 
-  // Per-code sweep for whatever the prefix searches missed (very short
-  // prefixes like P- return noisy/empty results; some sets paginate).
+  // Per-code sweep. Two kinds of code land here:
+  //   · anything with no ja row yet (some sets paginate past the bulk result)
+  //   · EVERY code of a prefix whose bulk search returned nothing — those
+  //     rows exist but nothing has ever refreshed them, so "already has a
+  //     translation" is exactly the wrong reason to skip them.
+  const emptyLike = emptyPrefixes.map((p) => `${p}-%`);
+  const emptyClause = emptyLike.length
+    ? `OR ${emptyLike.map((_, i) => `c.code LIKE @e${i}`).join(" OR ")}`
+    : "";
   const missing = (
     db
       .prepare(
         `SELECT code FROM cards c
-         WHERE NOT EXISTS (SELECT 1 FROM card_translations t
-                           WHERE t.code = c.code AND t.lang = 'ja')
+         WHERE (NOT EXISTS (SELECT 1 FROM card_translations t
+                            WHERE t.code = c.code AND t.lang = 'ja')
+                ${emptyClause})
          ${only ? "AND c.code LIKE @p" : ""}
          ORDER BY code`,
       )
-      .all(only ? { p: `${only}-%` } : {}) as { code: string }[]
+      .all({
+        ...(only ? { p: `${only}-%` } : {}),
+        ...Object.fromEntries(emptyLike.map((v, i) => [`e${i}`, v])),
+      }) as { code: string }[]
   ).map((r) => r.code);
   if (missing.length > 0) {
     console.log(`[jp] per-code sweep for ${missing.length} missing codes…`);

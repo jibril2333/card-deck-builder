@@ -358,10 +358,18 @@ export function parseCardBlock(
   // The Link condition always opens with the ＜Link＞ / 〈リンク〉 keyword, so a
   // block starting with it is a Link block wherever the site filed it.
   const LINK_HEAD_RE = /^[＜<〈《≪]\s*(?:Link|リンク|链接|鏈接)\s*[＞>〉》≫]/;
-  if (!link_requirement && inherited_effect && LINK_HEAD_RE.test(inherited_effect)) {
-    const [first, ...rest] = inherited_effect.split("\n");
-    link_requirement = first.trim();
-    link_effect = link_effect ?? (rest.join("\n").trim() || null);
+  if (inherited_effect && LINK_HEAD_RE.test(inherited_effect)) {
+    // Only adopt the text when the proper blocks are absent — but clear the
+    // slot either way. An inherited effect can never begin with the Link
+    // keyword, so this block is a Link block wherever the site filed it.
+    // (P-190's EN page prints BOTH the real [Link Condition] block AND a
+    // duplicate under [Inherited Effect]; a guard on link_requirement alone
+    // left the duplicate showing as 进化元效果.)
+    if (!link_requirement) {
+      const [first, ...rest] = inherited_effect.split("\n");
+      link_requirement = first.trim();
+      link_effect = link_effect ?? (rest.join("\n").trim() || null);
+    }
     inherited_effect = null;
   }
   // Only reinterpret [Special Rule] once we know this really is a Link card
