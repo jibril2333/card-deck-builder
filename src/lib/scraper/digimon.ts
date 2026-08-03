@@ -564,7 +564,7 @@ export let lastUnknownLabels: Map<string, string[]> = new Map();
 
 export function parseAll(html: string, labels: LabelMap = EN_LABELS): ScrapedCard[] {
   const $ = cheerio.load(html);
-  const byCode = new Map<string, ScrapedCard>();
+  const byCode = new Map<string, ScrapedCard[]>();
   lastUnknownLabels = new Map();
   $(".popupCol").each((_i, el) => {
     const c = parseCardBlock($, el, labels);
@@ -577,14 +577,82 @@ export function parseAll(html: string, labels: LabelMap = EN_LABELS): ScrapedCar
         lastUnknownLabels.set(u, codes);
       }
     }
-    const isBase = !/_P\d+\.png$/i.test(c.image_url);
-    const existing = byCode.get(c.code);
-    if (!existing) {
-      byCode.set(c.code, c);
-    } else if (isBase && /_P\d+\.png$/i.test(existing.image_url)) {
-      // Replace alt-art entry with the base one
-      byCode.set(c.code, c);
-    }
+    byCode.set(c.code, [...(byCode.get(c.code) ?? []), c]);
   });
-  return [...byCode.values()];
+  return [...byCode.values()].map(mergePrintings);
+}
+
+/**
+ * Text fields that describe the CARD, so every printing of it must agree.
+ * Excluded on purpose: rarity, image_url and card_type, which legitimately
+ * differ between a base print and its parallels.
+ */
+const MERGEABLE_FIELDS = [
+  "main_effect",
+  "security_effect",
+  "inherited_effect",
+  "source_effect",
+  "evolution_cost",
+  "evolution_requirements",
+  "digi_types",
+  "attribute",
+  "form",
+  "stage",
+  "set_names",
+  "dual_name",
+  "dual_color",
+  "dual_effect",
+  "dual_rule",
+  "link_requirement",
+  "link_effect",
+  "special_rule",
+] as const satisfies readonly (keyof ScrapedCard)[];
+
+const MERGEABLE_NUMBERS = [
+  "dual_cost",
+  "link_dp",
+] as const satisfies readonly (keyof ScrapedCard)[];
+
+/**
+ * Collapse every printing of one card into a single row.
+ *
+ * The base print wins on identity (rarity, image), but any field it leaves
+ * EMPTY is filled from a parallel. This is not tidiness — the official site
+ * genuinely contradicts itself between printings of the same card. P-148 and
+ * P-149 label their one text block [Security Effect] on the base print and
+ * [Inherited Effect] on both parallels; taking the base print wholesale meant
+ * a Digi-Egg with a security effect and an empty inherited slot, which is not
+ * a thing that can exist.
+ */
+export function mergePrintings(printings: ScrapedCard[]): ScrapedCard {
+  const base =
+    printings.find((c) => !/_P\d+\.png$/i.test(c.image_url)) ?? printings[0];
+  if (printings.length === 1) return fixDigiEggSecurity(base);
+  const merged: ScrapedCard = { ...base };
+  for (const f of MERGEABLE_FIELDS) {
+    if (merged[f] != null && merged[f] !== "") continue;
+    const found = printings.find((c) => c[f] != null && c[f] !== "");
+    if (found) (merged[f] as string | null) = found[f] as string | null;
+  }
+  for (const f of MERGEABLE_NUMBERS) {
+    if (merged[f] != null) continue;
+    const found = printings.find((c) => c[f] != null);
+    if (found) (merged[f] as number | null) = found[f] as number | null;
+  }
+  return fixDigiEggSecurity(merged);
+}
+
+/**
+ * A Digi-Egg cannot have a security effect: it lives in the egg deck and never
+ * enters the security stack. So when the site prints one — which it does, on
+ * the base printings of P-148 and P-149 — it is the inherited effect wearing
+ * the wrong label, and an inherited effect is the only kind a Digi-Egg has.
+ */
+function fixDigiEggSecurity(c: ScrapedCard): ScrapedCard {
+  if (c.card_type !== "Digi-Egg" || !c.security_effect) return c;
+  return {
+    ...c,
+    inherited_effect: c.inherited_effect || c.security_effect,
+    security_effect: null,
+  };
 }

@@ -103,6 +103,20 @@ export type CardRow = {
   image_url: string;
 };
 
+/**
+ * digimoncard.io's text is wiki-derived, and two kinds of scaffolding leak
+ * through into it. Neither is ever card text, and both are user-visible: 42
+ * cards were displaying the literal string "|applinkdp =" as their 进化元效果.
+ */
+const WIKI_MARKUP_RE = /^\s*\|[a-z_]+\s*=\s*$|\{\{/i;
+/** io prefixes a block with its own label when it has nowhere else to put it. */
+const LEAKED_LABEL_RE = /^\s*(Inherited Effect|Security Effect)\s+/;
+
+function usableText(s: string | null | undefined): string {
+  const v = (s ?? "").trim();
+  return WIKI_MARKUP_RE.test(v) ? "" : v;
+}
+
 /** Map one API row onto our `cards` columns. */
 export function toCardRow(c: ApiCard): CardRow {
   const type = c.type ?? "";
@@ -117,7 +131,7 @@ export function toCardRow(c: ApiCard): CardRow {
   // cards. This API has no field for a second card face, so `dual_effect` is
   // the closest true home; the official sites, which DO split the face out
   // properly, overwrite it with better text once they publish the set.
-  const secondBlock = c.source_effect ?? "";
+  const secondBlock = usableText(c.source_effect);
   const isOptionOrTamer = type === "Option" || type === "Tamer";
   const isDual = type === "Dual";
   // Link cards hit the same wall from the other side: the second block is what
@@ -128,6 +142,22 @@ export function toCardRow(c: ApiCard): CardRow {
   // effect, exactly as the official JP site splits them.
   const isLink = /^[＜<〈《≪]\s*Link\s*[＞>〉》≫]/.test(secondBlock.trim());
   const linkLines = secondBlock.replace(/\r\n/g, "\n").split("\n");
+
+  // When a card has ONLY an inherited (or security) effect, io writes it into
+  // main_effect with its own label still attached — "Inherited Effect [Your
+  // Turn] …" — and leaves source_effect empty. 28 cards, all promos, were
+  // showing that as their main effect while the inherited slot sat empty. The
+  // label names the block it belongs in, so route by it and drop the prefix.
+  let mainText = usableText(c.main_effect);
+  let leakedInherited = "";
+  let leakedSecurity = "";
+  const leaked = mainText.match(LEAKED_LABEL_RE);
+  if (leaked) {
+    const body = mainText.slice(leaked[0].length).trim();
+    if (leaked[1] === "Inherited Effect") leakedInherited = body;
+    else leakedSecurity = body;
+    mainText = "";
+  }
   // "[Digivolve] Lv.X w/[…]: Cost N" lives in alt_effect (xros_req mirrors it).
   const evoLine = (c.alt_effect || c.xros_req || "").trim();
   // Compose the "Yellow 3 from Lv.4"-style cost line when the structured
@@ -155,10 +185,12 @@ export function toCardRow(c: ApiCard): CardRow {
       .join(" / "),
     evolution_cost: evoCost,
     evolution_requirements: evoLine,
-    main_effect: c.main_effect ?? "",
-    security_effect: isOptionOrTamer ? secondBlock : "",
+    main_effect: mainText,
+    security_effect: isOptionOrTamer ? secondBlock : leakedSecurity,
     inherited_effect:
-      isOptionOrTamer || isDual || isLink ? "" : secondBlock,
+      isOptionOrTamer || isDual || isLink
+        ? leakedInherited
+        : secondBlock || leakedInherited,
     dual_effect: isDual ? secondBlock : "",
     link_requirement: isLink ? linkLines[0].trim() : "",
     link_effect: isLink ? linkLines.slice(1).join("\n").trim() : "",

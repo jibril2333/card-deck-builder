@@ -73,3 +73,26 @@ describe("toCardRow routes the second effect block by card type", () => {
     expect(r.security_effect).toBe("");
   });
 });
+
+describe("toCardRow rejects things that aren't card text", () => {
+  it("drops raw wiki template markup", () => {
+    // digimoncard.io is wiki-derived; 42 cards were displaying the literal
+    // string "|applinkdp =" as their inherited effect.
+    const r = toCardRow(api({ type: "Digimon", source_effect: "|applinkdp =" }));
+    expect(r.inherited_effect).toBe("");
+  });
+
+  it("routes a leaked block label to the block it names", () => {
+    // When a card has only an inherited effect, io writes it into main_effect
+    // with its own label still attached and leaves source_effect empty.
+    const r = toCardRow(
+      api({
+        type: "Digimon",
+        main_effect: "Inherited Effect [Your Turn] This Digimon gets +1000 DP.",
+        source_effect: "",
+      }),
+    );
+    expect(r.main_effect).toBe("");
+    expect(r.inherited_effect).toBe("[Your Turn] This Digimon gets +1000 DP.");
+  });
+});

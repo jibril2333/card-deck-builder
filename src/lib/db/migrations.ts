@@ -841,6 +841,80 @@ const MIGRATIONS: Migration[] = [
       ]);
     },
   },
+  {
+    id: 28,
+    name: "Clear text that isn't card text (wiki markup, leaked labels, impossible slots)",
+    up: (db) => {
+      // Found by auditing every card against the rules of the game rather than
+      // by spot-checking. Each rule below states what makes the value provably
+      // not card text; none of them is a list of card codes.
+      //
+      // All four survived because of the same trap: the COALESCE guard in the
+      // upserts exists so a source that CAN'T see a block never erases what
+      // another found — but when the bad value comes from digimoncard.io and
+      // the official site's corresponding block is legitimately EMPTY, the
+      // guard preserves the bad value forever.
+
+      // 1. digimoncard.io is wiki-derived and leaks raw template syntax. 42
+      //    cards were literally displaying "|applinkdp =" as their 进化元效果.
+      for (const col of ["main_effect", "security_effect", "inherited_effect"]) {
+        db.exec(`
+          UPDATE cards SET ${col} = NULL
+           WHERE ${col} IS NOT NULL
+             AND (TRIM(${col}) GLOB '|*=' OR ${col} LIKE '%{{%')
+        `);
+      }
+
+      // 2. A Digi-Egg cannot have a security effect — it lives in the egg deck
+      //    and never enters the security stack. The official site nonetheless
+      //    labels P-148's and P-149's one text block [Security Effect] on the
+      //    BASE printing and [Inherited Effect] on both parallels; preferring
+      //    the base print picked the impossible one.
+      db.exec(`
+        UPDATE cards
+           SET inherited_effect = COALESCE(NULLIF(inherited_effect, ''), security_effect),
+               security_effect = NULL
+         WHERE card_type = 'Digi-Egg'
+           AND security_effect IS NOT NULL AND security_effect <> ''
+      `);
+
+      // 3. The same text in both slots is one real value and one copy that
+      //    digimoncard.io filed by card type. The official site names the
+      //    block explicitly, and it named it the inherited effect.
+      db.exec(`
+        UPDATE cards SET security_effect = NULL
+         WHERE security_effect IS NOT NULL AND security_effect <> ''
+           AND security_effect = inherited_effect
+      `);
+      // 4. When a card has only an inherited effect, digimoncard.io writes it
+      //    into main_effect with its own label still attached. 28 promo cards
+      //    showed "Inherited Effect [Your Turn] …" as their main effect while
+      //    the inherited slot sat empty. The label names its rightful home.
+      //
+      //    Runs LAST, and only fills a slot that is still empty: where the
+      //    official site also has the text, its wording wins. P-149 reads
+      //    "is multicolored" officially and "has 2 or more colors" on
+      //    digimoncard.io — same rule, and the official phrasing is the one
+      //    the printed card carries.
+      for (const [label, col] of [
+        ["Inherited Effect ", "inherited_effect"],
+        ["Security Effect ", "security_effect"],
+      ] as const) {
+        db.prepare(
+          `UPDATE cards
+              SET ${col} = COALESCE(NULLIF(${col}, ''),
+                                    TRIM(SUBSTR(main_effect, ?))),
+                  main_effect = NULL
+            WHERE main_effect LIKE ?`,
+        ).run(label.length + 1, `${label}%`);
+      }
+
+      db.exec(`
+        UPDATE card_translations SET effect_2 = NULL
+         WHERE effect_2 IS NOT NULL AND effect_2 <> '' AND effect_2 = effect_3
+      `);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

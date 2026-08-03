@@ -3,6 +3,7 @@ import * as cheerio from "cheerio";
 import {
   parseAll,
   parseCardBlock,
+  mergePrintings,
   JA_LABELS,
   levelFromText,
   toInt,
@@ -215,5 +216,39 @@ describe("Link cards", () => {
     );
     expect(c!.special_rule).toBe("≪オーバーフロー《-4》≫");
     expect(c!.link_dp).toBeNull();
+  });
+});
+
+describe("mergePrintings", () => {
+  const base = (o: Partial<ReturnType<typeof parseCardBlock>> = {}) => {
+    const $ = cheerio.load(FIXTURE_DIGIMON_BASE);
+    return { ...parseCardBlock($, $(".popupCol").get(0)!)!, ...o };
+  };
+
+  it("fills a field the base printing left empty from a parallel", () => {
+    // The official site contradicts itself between printings of one card, so
+    // taking the base print wholesale can drop text that a parallel has.
+    const merged = mergePrintings([
+      base({ image_url: "x/BT25-001.png", security_effect: null }),
+      base({ image_url: "x/BT25-001_P1.png", security_effect: "[Security] Do a thing." }),
+    ]);
+    expect(merged.security_effect).toBe("[Security] Do a thing.");
+    // …without giving up the base printing's identity.
+    expect(merged.image_url).toBe("x/BT25-001.png");
+  });
+
+  it("moves a Digi-Egg's impossible security effect to the inherited slot", () => {
+    // A Digi-Egg lives in the egg deck and never enters the security stack, so
+    // a [Security Effect] on one is the inherited effect wearing a wrong label
+    // — which is exactly what P-148's and P-149's base printings carry.
+    const merged = mergePrintings([
+      base({
+        card_type: "Digi-Egg",
+        security_effect: "[When Attacking] ＜Draw 1＞.",
+        inherited_effect: null,
+      }),
+    ]);
+    expect(merged.security_effect).toBeNull();
+    expect(merged.inherited_effect).toBe("[When Attacking] ＜Draw 1＞.");
   });
 });
