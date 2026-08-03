@@ -176,15 +176,24 @@ async function main() {
        link_effect      = COALESCE(NULLIF(excluded.link_effect, ''), link_effect),
        special_rule     = COALESCE(NULLIF(excluded.special_rule, ''), special_rule)`,
   );
-  // Dual cards are the one case where the COALESCE guard actively preserves a
-  // WRONG value: digimoncard.io has no concept of a second card face, so it
-  // dumps the whole Option side into `inherited_effect` — where the card page
-  // renders it as 进化元效果. The official site knows better, so once it has
-  // told us the Option text, its verdict on the inherited slot is final
-  // (usually "there isn't one"). Without this the bad text would survive every
-  // future refresh.
-  const clearBogusInherited = db.prepare(
-    `UPDATE cards SET inherited_effect = NULLIF(@inherited_effect, '')
+  // Dual and Link cards are where the COALESCE guard actively preserves a WRONG
+  // value. digimoncard.io has no concept of a second card face, and routes its
+  // single "second block" by card type, so the text lands in whichever slot that
+  // type implies:
+  //   Digimon Dual/Link → inherited_effect, shown as 进化元效果
+  //   Option  Link      → security_effect,  shown as 安全区效果
+  // Both are wrong, and the guard — which exists so a source that CAN'T see a
+  // block never erases it — then makes them permanent. The official site labels
+  // every one of these blocks explicitly, so once it has given us the Dual/Link
+  // text its verdict on the other two slots is final, including "empty".
+  //
+  // Verified against the official pages: all 10 Option-type Link cards
+  // (BT24-091, BT25-100, ST22-09 …) have [Effect] / [Link DP] / [Link Condition]
+  // / [Link Effect] and NO [Security Effect] block at all.
+  const clearMisfiledBlocks = db.prepare(
+    `UPDATE cards
+        SET inherited_effect = NULLIF(@inherited_effect, ''),
+            security_effect  = NULLIF(@security_effect, '')
       WHERE code = @code AND (dual_effect IS NOT NULL OR link_requirement IS NOT NULL)`,
   );
   // Track which codes already exist so we can report inserts vs updates accurately.
@@ -200,9 +209,10 @@ async function main() {
       const wasExisting = existingCodes.has(r.code);
       upsert.run(r as unknown as Record<string, unknown>);
       if (r.dual_effect || r.link_requirement) {
-        clearBogusInherited.run({
+        clearMisfiledBlocks.run({
           code: r.code,
           inherited_effect: r.inherited_effect ?? "",
+          security_effect: r.security_effect ?? "",
         });
       }
       if (wasExisting) updated++;
