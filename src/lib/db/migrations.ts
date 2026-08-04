@@ -981,6 +981,49 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: 31,
+    name: "Split the Link condition back out of the digivolve requirement",
+    up: (db) => {
+      // Four BT26 cards carry two different things concatenated in
+      // evolution_requirements: a real "[Digivolve] Lv.2 w/[Appmon] trait:
+      // Cost 0" line, then a "Link Requirements [Link] …" block. A Link
+      // condition is how the card plugs into another Digimon, not how anything
+      // digivolves into it, so the second half was rendering under 进化条件.
+      //
+      // Only these four are left because the JP scrape now settles the field
+      // for every card that site carries, and BT26 isn't published there yet.
+      // digimoncard.io's current alt_effect is clean, so this is a stale value
+      // from an earlier run that the COALESCE guard has been preserving.
+      //
+      // Anchored on the label, which names what follows it — no card list.
+      const rows = db
+        .prepare(
+          `SELECT code, evolution_requirements AS req, link_requirement AS link
+             FROM cards
+            WHERE evolution_requirements LIKE '%Link Requirement%'`,
+        )
+        .all() as { code: string; req: string; link: string | null }[];
+      const upd = db.prepare(
+        `UPDATE cards SET evolution_requirements = @req, link_requirement = @link
+          WHERE code = @code`,
+      );
+      for (const r of rows) {
+        const text = r.req.replace(/\r\n/g, "\n");
+        const at = text.search(/^Link Requirements?\s/m);
+        if (at < 0) continue;
+        const tail = text
+          .slice(at)
+          .replace(/^Link Requirements?\s+/, "")
+          .trim();
+        upd.run({
+          code: r.code,
+          req: text.slice(0, at).trim() || null,
+          link: r.link && r.link !== "" ? r.link : tail || null,
+        });
+      }
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

@@ -100,7 +100,15 @@ async function main() {
               ELSE digi_types END,
             attribute = CASE WHEN @has_attr THEN attribute ELSE NULL END,
             dp        = CASE WHEN @has_dp THEN dp ELSE NULL END,
-            play_cost = CASE WHEN @has_cost THEN play_cost ELSE NULL END
+            play_cost = CASE WHEN @has_cost THEN play_cost ELSE NULL END,
+            -- Same rule for the digivolve cells. world.digimoncard.com prints
+            -- a "Digivolve Cost 1" on the Tamers BT20-088 and BT21-081 that the
+            -- printed cards simply do not have — the scans show a plain Tamer,
+            -- play cost and effects, no digivolve box — and a truncated "2 from"
+            -- on the Option P-156. digimoncard.com has neither.
+            evolution_cost = CASE WHEN @has_evocost THEN evolution_cost ELSE NULL END,
+            evolution_requirements =
+              CASE WHEN @has_evoreq THEN evolution_requirements ELSE NULL END
       WHERE code = @code`,
   );
   const fillDual = db.prepare(
@@ -179,6 +187,8 @@ async function main() {
           has_attr: c.attribute ? 1 : 0,
           has_dp: c.dp !== null ? 1 : 0,
           has_cost: c.play_cost !== null ? 1 : 0,
+          has_evocost: c.evolution_cost ? 1 : 0,
+          has_evoreq: c.evolution_requirements ? 1 : 0,
         });
         // A Dual card's colour/cost and a Link card's DP aren't
         // language-specific, so they live on `cards` — but for JP-only sets

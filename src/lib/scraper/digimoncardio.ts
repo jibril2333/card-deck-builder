@@ -178,7 +178,19 @@ export function toCardRow(c: ApiCard): CardRow {
   // falls through to being routed by card type.
   const unlabelledSecond = leakedSecond.slot ? "" : secondBlock;
   // "[Digivolve] Lv.X w/[…]: Cost N" lives in alt_effect (xros_req mirrors it).
-  const evoLine = (c.alt_effect || c.xros_req || "").trim();
+  // It has also been seen carrying a Link condition appended after the
+  // digivolve line, which then rendered as part of 进化条件 — a Link condition
+  // is how the card plugs into another Digimon, not how anything digivolves.
+  // The label announces itself, so split rather than guess.
+  const rawEvoLine = (c.alt_effect || c.xros_req || "")
+    .replace(/\r\n/g, "\n")
+    .trim();
+  const linkTail = rawEvoLine.search(/^Link Requirements?\s/m);
+  const evoLine = linkTail >= 0 ? rawEvoLine.slice(0, linkTail).trim() : rawEvoLine;
+  const linkFromEvo =
+    linkTail >= 0
+      ? rawEvoLine.slice(linkTail).replace(/^Link Requirements?\s+/, "").trim()
+      : "";
   // Compose the "Yellow 3 from Lv.4"-style cost line when the structured
   // pieces are present (they often aren't for newer JP/CN sets).
   const evoCost = c.evolution_color
@@ -218,7 +230,7 @@ export function toCardRow(c: ApiCard): CardRow {
       bySlot.inherited ||
       (isOptionOrTamer || isDual || isLink ? "" : unlabelledSecond),
     dual_effect: isDual ? secondBlock : "",
-    link_requirement: isLink ? linkLines[0].trim() : "",
+    link_requirement: isLink ? linkLines[0].trim() : linkFromEvo,
     link_effect: isLink ? linkLines.slice(1).join("\n").trim() : "",
     source_effect: "", // legacy column — always empty, matches official scraper
     set_names: Array.isArray(c.set_name)

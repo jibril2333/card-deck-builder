@@ -143,3 +143,31 @@ describe("toCardRow respects each card type's own field set", () => {
     expect(r.dual_cost).toBeNull();
   });
 });
+
+describe("toCardRow separates a Link condition from the digivolve line", () => {
+  it("splits the two apart when alt_effect carries both", () => {
+    // A Link condition is how the card plugs into another Digimon, not how
+    // anything digivolves into it, so it must not end up under 进化条件.
+    const r = toCardRow(
+      api({
+        type: "Digimon",
+        alt_effect:
+          "[Digivolve] Lv.2 w/[Appmon] trait: Cost 0\r\nLink Requirements [Link] [Appmon] trait: Cost 3\r\n(Plug this card in sideways.)",
+      }),
+    );
+    expect(r.evolution_requirements).toBe(
+      "[Digivolve] Lv.2 w/[Appmon] trait: Cost 0",
+    );
+    expect(r.link_requirement).toBe(
+      "[Link] [Appmon] trait: Cost 3\n(Plug this card in sideways.)",
+    );
+  });
+
+  it("leaves an ordinary digivolve line untouched", () => {
+    const r = toCardRow(
+      api({ type: "Digimon", alt_effect: "[Digivolve] Lv.4 w/[X] trait: Cost 3" }),
+    );
+    expect(r.evolution_requirements).toBe("[Digivolve] Lv.4 w/[X] trait: Cost 3");
+    expect(r.link_requirement).toBe("");
+  });
+});
