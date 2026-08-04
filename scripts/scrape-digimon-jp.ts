@@ -72,6 +72,37 @@ async function main() {
   db.pragma("journal_mode = WAL");
   db.exec(CARD_TRANSLATIONS_DDL);
   const upsert = db.prepare(UPSERT_TRANSLATION_SQL);
+  // Which fields a card HAS is a fact about the printed card, not about the
+  // language — and the JP site is the one that gets it right. Across 520 cards
+  // it prints 形態/属性 only on Digimon and Digi-Eggs, never on Tamers or
+  // Options, and it puts a trait under タイプ where world.digimoncard.com
+  // sometimes files the same value under "Attribute" (BT9-104's X抗体). Layer
+  // digimoncard.io on top, which copies the type into `form` for Tamers, and
+  // one printed field ends up rendered twice under two different labels — the
+  // Option BT9-104 showed both "属性 X Antibody" and "特征 X抗体".
+  //
+  // So: for a card this site returned, its field set decides which of ours may
+  // be populated. A card it doesn't carry is never touched — we'd have no
+  // authority for it.
+  //
+  // NOT a per-type rule. Digi-Eggs normally have neither cost nor DP, but
+  // BT22-007 genuinely costs 20 and EX2-007 genuinely has 15000 DP; a rule
+  // keyed on card type would have deleted both.
+  const alignFields = db.prepare(
+    `UPDATE cards
+        SET form      = CASE WHEN @has_form THEN form ELSE NULL END,
+            stage     = CASE WHEN @has_form THEN stage ELSE NULL END,
+            -- An attribute the JP site doesn't have is really the type, so
+            -- move it rather than drop the only English wording we have.
+            digi_types = CASE
+              WHEN @has_attr THEN digi_types
+              WHEN digi_types IS NULL OR digi_types = '' THEN attribute
+              ELSE digi_types END,
+            attribute = CASE WHEN @has_attr THEN attribute ELSE NULL END,
+            dp        = CASE WHEN @has_dp THEN dp ELSE NULL END,
+            play_cost = CASE WHEN @has_cost THEN play_cost ELSE NULL END
+      WHERE code = @code`,
+  );
   const fillDual = db.prepare(
     `UPDATE cards SET dual_color = COALESCE(@dual_color, dual_color),
                       dual_cost  = COALESCE(@dual_cost, dual_cost),
@@ -141,6 +172,13 @@ async function main() {
           link_effect: c.link_effect,
           special_rule: c.special_rule,
           image_url: c.image_url || null,
+        });
+        alignFields.run({
+          code: c.code,
+          has_form: c.form ? 1 : 0,
+          has_attr: c.attribute ? 1 : 0,
+          has_dp: c.dp !== null ? 1 : 0,
+          has_cost: c.play_cost !== null ? 1 : 0,
         });
         // A Dual card's colour/cost and a Link card's DP aren't
         // language-specific, so they live on `cards` — but for JP-only sets
