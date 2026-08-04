@@ -372,6 +372,10 @@ function DigimonDetail({
           defaultVariant={defaultVariant}
           cardLang={cardLang}
         />
+        {/* Everything in this panel is conditional, so the panel has to be
+            too — an anonymous reader looking at a card with no market listings
+            and no price got an empty bordered box. */}
+        {!readonly || marketListings.length > 0 || price != null ? (
         <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
           <MarketListingsBlock listings={marketListings} />
           {readonly ? (
@@ -400,6 +404,7 @@ function DigimonDetail({
             </>
           )}
         </div>
+        ) : null}
       </div>
 
       <div className="space-y-5">
@@ -589,6 +594,10 @@ function UADetail({
           variants={variants}
           defaultVariant={defaultVariant}
         />
+        {/* Everything in this panel is conditional, so the panel has to be
+            too — an anonymous reader looking at a card with no market listings
+            and no price got an empty bordered box. */}
+        {!readonly || marketListings.length > 0 || price != null ? (
         <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
           <MarketListingsBlock listings={marketListings} />
           {readonly ? (
@@ -617,6 +626,7 @@ function UADetail({
             </>
           )}
         </div>
+        ) : null}
       </div>
 
       <div className="space-y-5">
