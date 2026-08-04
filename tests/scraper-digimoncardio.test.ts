@@ -125,3 +125,21 @@ describe("toCardRow rejects things that aren't card text", () => {
     expect(r.inherited_effect).toBe("[Your Turn] This Digimon gets +1000 DP.");
   });
 });
+
+describe("toCardRow respects each card type's own field set", () => {
+  it("files a Dual card's cost as the Option-side use cost, not a play cost", () => {
+    // The official sites print a Dual card's cost cell as the letter "D" — it
+    // cannot be played, only digivolved into. The number this API returns
+    // there is the DUAL cost; it matched the official value on all 9 Dual
+    // cards both sources carry.
+    const r = toCardRow(api({ type: "Dual", play_cost: 4 }));
+    expect(r.play_cost).toBeNull();
+    expect(r.dual_cost).toBe(4);
+  });
+
+  it("leaves an ordinary card's play cost alone", () => {
+    const r = toCardRow(api({ type: "Digimon", play_cost: 3 }));
+    expect(r.play_cost).toBe(3);
+    expect(r.dual_cost).toBeNull();
+  });
+});

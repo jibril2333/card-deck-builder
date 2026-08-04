@@ -96,6 +96,7 @@ export type CardRow = {
   source_effect: string;
   /** Dual cards only: the Option half. Empty on everything else. */
   dual_effect: string;
+  dual_cost: number | null;
   /** Link cards only: what the card does while plugged in. */
   link_requirement: string;
   link_effect: string;
@@ -193,7 +194,14 @@ export function toCardRow(c: ApiCard): CardRow {
     level: c.level ?? null,
     color: c.color ?? "",
     color2: c.color2 ?? "",
-    play_cost: c.play_cost ?? null,
+    // A Dual card has no play cost — the official sites print the cost cell as
+    // the letter "D", because the card can only be digivolved into or Arts
+    // Digivolved. The number this API returns there is the OPTION side's use
+    // cost: it matches the official DUAL Cost on all 9 Dual cards both sources
+    // carry, 0 mismatches. Left in play_cost it renders as "Play Cost 4" on a
+    // card that cannot be played at all.
+    play_cost: isDual ? null : (c.play_cost ?? null),
+    dual_cost: isDual ? (c.play_cost ?? null) : null,
     dp: c.dp ?? null,
     attribute: c.attribute ?? "",
     form: c.form ?? "",
@@ -227,13 +235,13 @@ export const UPSERT_CARD_SQL = `
     play_cost, dp, attribute, form, stage, digi_types,
     evolution_cost, evolution_requirements,
     main_effect, security_effect, inherited_effect, source_effect,
-    set_names, image_url, dual_effect, link_requirement, link_effect
+    set_names, image_url, dual_effect, dual_cost, link_requirement, link_effect
   ) VALUES (
     @code, @code, @name, @rarity, @card_type, @level, @color, @color2,
     @play_cost, @dp, @attribute, @form, @stage, @digi_types,
     @evolution_cost, @evolution_requirements,
     @main_effect, @security_effect, @inherited_effect, @source_effect,
-    @set_names, @image_url, @dual_effect, @link_requirement, @link_effect
+    @set_names, @image_url, @dual_effect, @dual_cost, @link_requirement, @link_effect
   )
   -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase what
   -- another found. The official site has no Link block; this feed has no
@@ -262,6 +270,7 @@ export const UPSERT_CARD_SQL = `
       ELSE COALESCE(NULLIF(excluded.inherited_effect, ''), inherited_effect)
     END,
     dual_effect = COALESCE(NULLIF(excluded.dual_effect, ''), dual_effect),
+    dual_cost   = COALESCE(dual_cost, excluded.dual_cost),
     link_requirement = COALESCE(NULLIF(excluded.link_requirement, ''), link_requirement),
     link_effect      = COALESCE(NULLIF(excluded.link_effect, ''), link_effect),
     source_effect = COALESCE(NULLIF(excluded.source_effect, ''), source_effect),

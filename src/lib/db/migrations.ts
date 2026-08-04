@@ -962,6 +962,25 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: 30,
+    name: "A Dual card's play cost is really its Option-side use cost",
+    up: (db) => {
+      // The official sites print a Dual card's cost cell as the letter "D" —
+      // the card cannot be played, only digivolved into or Arts Digivolved. The
+      // number digimoncard.io returns in play_cost is the OPTION side's use
+      // cost instead: it equals the official DUAL Cost on all 9 Dual cards both
+      // sources carry, with 0 mismatches. Six BT26 and three LM cards, which
+      // neither official site has published, were therefore rendering "Play
+      // Cost 4" on a card that has no play cost at all.
+      db.exec(`
+        UPDATE cards
+           SET dual_cost = COALESCE(dual_cost, play_cost),
+               play_cost = NULL
+         WHERE card_type = 'Dual' AND play_cost IS NOT NULL
+      `);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(
