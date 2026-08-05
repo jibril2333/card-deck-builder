@@ -96,6 +96,15 @@ const SPECIAL = new Set([
 export const BARE_REQUIREMENT_RE =
   /(?:アセンブリ|デジクロス|数码合体|组装|应用合体|Assembly|DigiXros)\s*[-－–]\s*[0-9０-９]+\s*[:：]/g;
 
+/**
+ * 〈…〉 (U+3008) is NOT the ＜…＞ (U+FF1C) the EN text uses, and it was missing
+ * from the tokenizer entirely — 498 tags went unstyled. It carries two things:
+ * the Link condition, which English writes as the orange ＜Link＞, and a rules
+ * note, which English writes as a plain "(Rule)" with no chip at all. Listing
+ * the rules markers keeps the languages showing the same thing.
+ */
+const RULES_NOTE = new Set(["ルール", "规则", "規則", "Rule"]);
+
 export type TagKind = "timing" | "limiter" | "keyword" | "special" | "name";
 
 /**
@@ -112,7 +121,8 @@ export function classifyTag(bracket: string, inner: string): TagKind {
     case "《":
     case "≪":
     case "＜":
-      return "keyword";
+    case "〈":
+      return RULES_NOTE.has(body) ? "name" : "keyword";
     case "「":
     case "“":
       return "name";

@@ -55,3 +55,29 @@ describe("classifyTag", () => {
     expect(hit("カードがあり、相手のデジモンが")).toBe(false);
   });
 });
+
+describe("bugs found by looking at rendered cards", () => {
+  it("reads the JP limiter written without に", () => {
+    // The JP text uses both spellings — [ターンに1回] 1357 times and
+    // [ターン1回] 148 — and the 148 were falling through to italic.
+    const lim = /^(?:ターンに?\s*\d+\s*回|(?:每)?回合\s*\d+\s*次|\d+\s*Per Turn)$/i;
+    expect(lim.test("ターンに1回")).toBe(true);
+    expect(lim.test("ターン1回")).toBe(true);
+    expect(lim.test("每回合1次")).toBe(true);
+  });
+
+  it("treats 〈…〉 as its own bracket, not the fullwidth ＜…＞", () => {
+    // U+3008 is a different character from U+FF1C; it was absent from the
+    // tokenizer, leaving 498 tags unstyled. 〈リンク〉 is the JP/CN spelling of
+    // what English writes as the orange ＜Link＞.
+    expect(classifyTag("〈", "リンク")).toBe("keyword");
+    expect(classifyTag("〈", "链接")).toBe("keyword");
+  });
+
+  it("leaves a rules note unchipped, as English does", () => {
+    // English writes this as a plain "(Rule)" with no chip, so a coloured
+    // Japanese chip would be the two languages disagreeing again.
+    expect(classifyTag("〈", "ルール")).toBe("name");
+    expect(classifyTag("〈", "规则")).toBe("name");
+  });
+});

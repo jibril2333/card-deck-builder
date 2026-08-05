@@ -46,6 +46,9 @@ const TOKEN_RE = new RegExp(
       "《(?:[^《》]|《[^》]*》)*》",
       "≪[^≫]*≫",
       "＜[^＞]*＞",
+      // U+3008/3009, a different character from the ＜＞ above and used by the
+      // JP/CN text for the Link condition and for rules notes.
+      "〈[^〉]*〉",
       "「[^」]*」",
       "“[^”]*”",
       BARE_REQUIREMENT_RE.source,
@@ -58,8 +61,11 @@ const TOKEN_RE = new RegExp(
  * "Once per turn"-style limiters that the vocabulary can't catch because they
  * carry a number — ［ターンに2回］ — rather than being a fixed phrase.
  */
+// The JP text writes this BOTH ways — [ターンに1回] 1357 times and [ターン1回]
+// 148 times — so the に has to be optional or those 148 fall through to being
+// rendered as a name.
 const LIMITER_RE =
-  /^(?:ターンに\s*\d+\s*回|回合\s*\d+\s*次|每回合\s*\d+\s*次|\d+\s*Per Turn)$/i;
+  /^(?:ターンに?\s*\d+\s*回|(?:每)?回合\s*\d+\s*次|\d+\s*Per Turn)$/i;
 
 /**
  * A requirement line the CN source wrapped in its own 【】 — captures the
@@ -84,7 +90,7 @@ const CHIP =
 
 const PAIRS: Record<string, string> = {
   "【": "】", "〔": "〕", "[": "]", "［": "］", "{": "}",
-  "《": "》", "≪": "≫", "＜": "＞", "「": "」", "“": "”",
+  "《": "》", "≪": "≫", "＜": "＞", "〈": "〉", "「": "」", "“": "”",
 };
 
 type Kind = keyof typeof CHIP_STYLE | "name";
