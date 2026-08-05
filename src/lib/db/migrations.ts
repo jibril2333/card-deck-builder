@@ -1024,6 +1024,40 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 32,
+    name: "Overflow is a special rule, and source_effect is a dead column",
+    up: (db) => {
+      // Both found by `scripts/audit-cards.ts` reconciling all 4292 stored
+      // cards against both official sites — neither site carries either value.
+
+      // 66 ACE cards had their Overflow rule under 进化元效果. Overflow says
+      // what happens when the ACE leaves the field; it is printed in the
+      // [Special Rule] block and is never an inherited effect. 61 of the 66
+      // already had the official wording in `special_rule`, so this was the
+      // same rule shown twice, once in the wrong place.
+      db.exec(`
+        UPDATE cards
+           SET special_rule = COALESCE(NULLIF(special_rule, ''), inherited_effect),
+               inherited_effect = NULL
+         WHERE inherited_effect IS NOT NULL
+           AND TRIM(inherited_effect) LIKE 'Ace Overflow%'
+      `);
+      db.exec(`
+        UPDATE cards
+           SET special_rule = COALESCE(NULLIF(special_rule, ''), inherited_effect),
+               inherited_effect = NULL
+         WHERE inherited_effect IS NOT NULL
+           AND TRIM(inherited_effect) LIKE 'Overflow%'
+      `);
+
+      // `source_effect` is a legacy column: the official parser has a label for
+      // it but no card has ever used one. The only six non-empty values are
+      // LM-057…062, each a labelled copy of the security effect those cards
+      // already have in the right column.
+      db.exec(`UPDATE cards SET source_effect = NULL WHERE source_effect IS NOT NULL`);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

@@ -100,6 +100,8 @@ export type CardRow = {
   /** Link cards only: what the card does while plugged in. */
   link_requirement: string;
   link_effect: string;
+  /** [Special Rule] — Overflow and friends. */
+  special_rule: string;
   set_names: string;
   image_url: string;
 };
@@ -116,6 +118,14 @@ const WIKI_MARKUP_RE = /^\s*\|[a-z_]+\s*=\s*$|\{\{/i;
  * belongs to, which is all we need to route it.
  */
 const LEAKED_LABEL_RE = /^\s*(Inherited Effect|Security Effect|Card Effect\(s\))\s+/;
+
+/**
+ * Overflow is a card-level RULE, printed in the [Special Rule] block — it says
+ * what happens when the ACE leaves the field, and is never an inherited
+ * effect. This API has no such field, so it hands it over as the second block
+ * and it was landing under 进化元效果 on 66 ACE cards.
+ */
+const OVERFLOW_RE = /^\s*(?:Ace\s+)?[＜<]?Overflow\b/i;
 
 type Slot = "main" | "security" | "inherited";
 const LABEL_SLOT: Record<string, Slot> = {
@@ -160,6 +170,7 @@ export function toCardRow(c: ApiCard): CardRow {
   // recognized without a card list. First line is the condition, rest the
   // effect, exactly as the official JP site splits them.
   const isLink = /^[＜<〈《≪]\s*Link\s*[＞>〉》≫]/.test(secondBlock.trim());
+  const isOverflow = OVERFLOW_RE.test(secondBlock);
   const linkLines = secondBlock.replace(/\r\n/g, "\n").split("\n");
 
   // When a card has ONLY an inherited (or security) effect, io writes it into
@@ -228,7 +239,8 @@ export function toCardRow(c: ApiCard): CardRow {
       bySlot.security || (isOptionOrTamer ? unlabelledSecond : ""),
     inherited_effect:
       bySlot.inherited ||
-      (isOptionOrTamer || isDual || isLink ? "" : unlabelledSecond),
+      (isOptionOrTamer || isDual || isLink || isOverflow ? "" : unlabelledSecond),
+    special_rule: isOverflow ? secondBlock : "",
     dual_effect: isDual ? secondBlock : "",
     link_requirement: isLink ? linkLines[0].trim() : linkFromEvo,
     link_effect: isLink ? linkLines.slice(1).join("\n").trim() : "",
@@ -247,13 +259,15 @@ export const UPSERT_CARD_SQL = `
     play_cost, dp, attribute, form, stage, digi_types,
     evolution_cost, evolution_requirements,
     main_effect, security_effect, inherited_effect, source_effect,
-    set_names, image_url, dual_effect, dual_cost, link_requirement, link_effect
+    set_names, image_url, dual_effect, dual_cost, link_requirement, link_effect,
+    special_rule
   ) VALUES (
     @code, @code, @name, @rarity, @card_type, @level, @color, @color2,
     @play_cost, @dp, @attribute, @form, @stage, @digi_types,
     @evolution_cost, @evolution_requirements,
     @main_effect, @security_effect, @inherited_effect, @source_effect,
-    @set_names, @image_url, @dual_effect, @dual_cost, @link_requirement, @link_effect
+    @set_names, @image_url, @dual_effect, @dual_cost, @link_requirement, @link_effect,
+    @special_rule
   )
   -- COALESCE(NULLIF(...)): a source that can't SEE a block must not erase what
   -- another found. The official site has no Link block; this feed has no
@@ -285,6 +299,7 @@ export const UPSERT_CARD_SQL = `
     dual_cost   = COALESCE(dual_cost, excluded.dual_cost),
     link_requirement = COALESCE(NULLIF(excluded.link_requirement, ''), link_requirement),
     link_effect      = COALESCE(NULLIF(excluded.link_effect, ''), link_effect),
+    special_rule     = COALESCE(NULLIF(special_rule, ''), NULLIF(excluded.special_rule, '')),
     source_effect = COALESCE(NULLIF(excluded.source_effect, ''), source_effect),
     set_names = COALESCE(NULLIF(excluded.set_names, ''), set_names), image_url = excluded.image_url`;
 

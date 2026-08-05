@@ -171,3 +171,27 @@ describe("toCardRow separates a Link condition from the digivolve line", () => {
     expect(r.link_requirement).toBe("");
   });
 });
+
+describe("toCardRow files an ACE card's Overflow as a special rule", () => {
+  it("keeps Overflow out of the inherited slot", () => {
+    // Overflow says what happens when the ACE leaves the field. It's printed
+    // in the [Special Rule] block and is never an inherited effect; this API
+    // has no such field, so it arrives as the second block.
+    const r = toCardRow(
+      api({
+        type: "Digimon",
+        source_effect: "Ace Overflow ＜-4＞ (As this card moves from the field…)",
+      }),
+    );
+    expect(r.inherited_effect).toBe("");
+    expect(r.special_rule).toContain("Overflow");
+  });
+
+  it("still routes an ordinary second block to the inherited slot", () => {
+    const r = toCardRow(
+      api({ type: "Digimon", source_effect: "[Your Turn] +1000 DP." }),
+    );
+    expect(r.inherited_effect).toBe("[Your Turn] +1000 DP.");
+    expect(r.special_rule).toBe("");
+  });
+});
