@@ -141,6 +141,76 @@ Data-only changes still don't need a git push (the container reads the mounted
 DB live once it's the only writer) — they just need the container **stopped**
 during the write.
 
+## Card data: the shape is NOT uniform
+
+Two things about this data broke repeatedly until they were written down, and
+both look like carelessness but are structural.
+
+**1. Card types have different field sets.** Surveyed against the official JP
+site across 520 cards:
+
+| type | prints |
+|---|---|
+| Digimon | colour, cost, DP, digivolve cost (some a 2nd), form, attribute, traits |
+| Digi-Egg | colour, form, traits — no cost, no DP (attribute only on Appmon) |
+| Tamer | colour, cost — no form, no attribute, no DP, no level |
+| Option | colour, cost — same, traits on about half |
+| Dual | the Digimon set, plus the Option half; its cost cell reads "D", not a number |
+
+`src/lib/cards/digimon-fields.ts` states this as `CARD_TYPE_FIELDS`, and the
+card page renders from it. It drives ORDER and GROUPING only — never
+suppression. Digi-Eggs have no cost, yet BT22-007 really costs 20 and EX2-007
+really has 15000 DP; `visibleFields` appends any off-model field that holds a
+value so real data can't be hidden, and `scripts/audit-cards.ts` reports it.
+
+**2. Some fields are language-specific and some aren't.** Effect text, form,
+attribute and traits differ per language; levels, costs, DP and the canonical
+colour run do not. `FIELD_SOURCE` says which is which, once, and
+`buildCardView` is derived from it. Don't hand-write `translation.x ?? card.y`
+chains — that is exactly how BT9-104 came to show its Japanese trait next to
+its English attribute.
+
+Layout must key off `canonical_type`, never the displayed `card_type` (which
+may be デジモン or 数码宝贝).
+
+### The sources disagree, and each is wrong differently
+
+- **digimoncard.com (JP)** — the most reliable, and the authority on WHICH
+  FIELDS a card has. `scripts/scrape-digimon-jp.ts` clears fields this site
+  doesn't print for a card it returned. Cards it doesn't carry are untouched.
+- **world.digimoncard.com (EN)** — authoritative for English wording, but not
+  complete and not always right: it omits EX10-012's security effect entirely,
+  prints a digivolve cost on Tamers that have none, and labels the same trait
+  "Attribute" where JP calls it a Type. Do NOT treat its silence as fact — I
+  tried making it authoritative for all text blocks and it deleted four cards'
+  real English text.
+- **digimoncard.io** — a wiki-derived mirror, the only source for sets neither
+  official site has published. It has ONE "second effect block" and routes it
+  by card type, so the same text lands in whichever slot that implies; it leaks
+  wiki markup and its own block labels into card text; and it puts a Dual
+  card's Option-side cost in `play_cost`.
+- **dtcgweb-api.digimoncard.cn** — Chinese text. Has no field for
+  digivolve/DigiXros conditions, Dual halves or Link blocks, and inlines all of
+  them into the effect bodies; `src/lib/scraper/digimon-cn.ts` splits them back
+  out.
+
+`COALESCE(NULLIF(excluded.x, ''), x)` in the upserts exists so a source that
+CAN'T see a block never erases what another found. Be aware of the flip side:
+when the bad value comes from the mirror and the official block is legitimately
+empty, that guard makes the bad value permanent. Several rounds of bugs were
+exactly this.
+
+### Checking the data
+
+```
+npx tsx scripts/audit-cards.ts              # every set, both official sites
+npx tsx scripts/audit-cards.ts --only=BT25
+```
+
+Read-only. Three-way (us / EN / JA), because two-way can't tell a bug from a
+decision. Run it after a refresh — it is the only thing that can answer "is
+anything else wrong?" with a number instead of a guess.
+
 ### Manual Docker operations (rarely needed — CI does this automatically)
 
 - Rebuild + redeploy by hand: `docker compose build && docker compose up -d`
