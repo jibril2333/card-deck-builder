@@ -85,13 +85,6 @@ export default async function CardPage({
     }
     // Cardrush per-illustrator market prices (each distinct printing).
     const listings = digimon.getExternalListings(card.id);
-    // Bracket-less keywords need the official vocabulary to be recognised.
-    // Fall back to the JA list for EN readers: it is the fuller of the two
-    // (the EN site hasn't published newer keywords like Assembly yet).
-    const keywords = [
-      ...digimon.listKeywords(cardLang === "zh" ? "ja" : cardLang),
-      ...(cardLang === "en" ? [] : digimon.listKeywords("en")),
-    ];
     return (
       <DetailShell game={game}>
         <DigimonDetail
@@ -104,7 +97,6 @@ export default async function CardPage({
           price={digimon.getCardPrice(meId, card.id)}
           marketListings={listings}
           rulings={digimon.getCardRulings(card.code)}
-          keywords={keywords}
           readonly={!me}
         />
       </DetailShell>
@@ -195,11 +187,9 @@ function Stat({
 function EffectBlock({
   label,
   text,
-  keywords,
 }: {
   label: string;
   text: string | null | undefined;
-  keywords?: string[];
 }) {
   if (!text) return null;
   return (
@@ -208,7 +198,7 @@ function EffectBlock({
         {label}
       </div>
       <div className="text-sm bg-[var(--color-muted)] rounded-md p-3 border border-[var(--color-border)]">
-        <EffectText text={text} keywords={keywords} />
+        <EffectText text={text} />
       </div>
     </div>
   );
@@ -308,11 +298,9 @@ function IdentityBlock({ card, fields }: { card: CardView; fields: FieldKey[] })
 function DigivolveBlock({
   card,
   fields,
-  keywords,
 }: {
   card: CardView;
   fields: FieldKey[];
-  keywords?: string[];
 }) {
   const has = (f: FieldKey) => fields.includes(f);
   if (!has("evolution_cost") && !has("evolution_requirements")) return null;
@@ -336,8 +324,7 @@ function DigivolveBlock({
           <EffectText
             text={card.evolution_requirements!}
             className="text-sm"
-            keywords={keywords}
-          />
+            />
         </div>
       ) : null}
     </div>
@@ -355,10 +342,8 @@ function DigivolveBlock({
  */
 function DualFace({
   card,
-  keywords,
 }: {
   card: CardView;
-  keywords?: string[];
 }) {
   if (!card.dual_effect && !card.dual_name) return null;
   const colors = card.dual_color
@@ -390,8 +375,8 @@ function DualFace({
           <Badge>使用费用 {card.dual_cost}</Badge>
         ) : null}
       </div>
-      <EffectBlock label="选项效果" text={card.dual_effect} keywords={keywords} />
-      <EffectBlock label="双力规则" text={card.dual_rule} keywords={keywords} />
+      <EffectBlock label="选项效果" text={card.dual_effect} />
+      <EffectBlock label="双力规则" text={card.dual_rule} />
     </div>
   );
 }
@@ -407,10 +392,8 @@ function DualFace({
  */
 function LinkFace({
   card,
-  keywords,
 }: {
   card: CardView;
-  keywords?: string[];
 }) {
   if (!card.link_requirement && !card.link_effect && card.link_dp === null)
     return null;
@@ -427,12 +410,12 @@ function LinkFace({
       <EffectBlock
         label="链接条件"
         text={card.link_requirement}
-        keywords={keywords}
+       
       />
       <EffectBlock
         label="链接中效果"
         text={card.link_effect}
-        keywords={keywords}
+       
       />
     </div>
   );
@@ -448,7 +431,6 @@ function DigimonDetail({
   price,
   marketListings,
   rulings,
-  keywords,
   readonly,
 }: {
   card: CardView;
@@ -469,8 +451,6 @@ function DigimonDetail({
   cardLang: string;
   price: number | null;
   marketListings: digimon.ExternalListing[];
-  /** Official keyword vocabulary, for keywords printed without brackets. */
-  keywords: string[];
   /** Anon viewer: hide the editable price input + the AddToDeck widget. */
   readonly: boolean;
 }) {
@@ -559,24 +539,23 @@ function DigimonDetail({
             unexpectedly holds a value, which is kept rather than hidden. */}
         <StatRow card={card} fields={shown} />
         <IdentityBlock card={card} fields={shown} />
-        <DigivolveBlock card={card} fields={shown} keywords={keywords} />
+        <DigivolveBlock card={card} fields={shown} />
 
         {TEXT_BLOCKS.filter(([f]) => shown.includes(f)).map(([f, label]) => (
           <EffectBlock
             key={f}
             label={label}
             text={card[FIELD_SOURCE[f].base] as string | null}
-            keywords={keywords}
-          />
+            />
         ))}
 
-        <DualFace card={card} keywords={keywords} />
+        <DualFace card={card} />
 
-        <LinkFace card={card} keywords={keywords} />
+        <LinkFace card={card} />
 
         <SetList sets={splitSetNames(card.set_names)} />
 
-        <CardRulings rulings={rulings} keywords={keywords} />
+        <CardRulings rulings={rulings} />
 
         <div className="grid grid-cols-2 gap-3 text-xs text-[var(--color-muted-fg)] pt-3 border-t border-[var(--color-border)]">
           <Stat label="画师" value={card.artist} />

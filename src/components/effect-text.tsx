@@ -1,166 +1,147 @@
 /**
- * Renders Digimon effect text with its tokens as chips, the way community card
- * viewers (digicamoe et al.) present them. Three families, three treatments:
+ * Renders Digimon effect text with its tags as chips, coloured the way the
+ * printed card colours them.
  *
- Colours match the printed card, sampled from the official art:
+ *   TIMING   navy   — 【登場時】 [On Play]. When the effect happens.
+ *   LIMITER  red    — ［ターンに1回］ [Once Per Turn]. How often.
+ *   KEYWORD  orange — ≪ブロッカー≫ ＜Rush＞ 《阻挡者》. A named ability.
+ *   SPECIAL  teal   — 〔進化〕 [Digivolve] アセンブリ-6:. Another way onto the
+ *                     field; a different mechanic from a timing window.
+ *   NAME     italic — 「グレイモン」 [Greymon] [X Antibody]. A reference to
+ *                     another card or a trait, part of the sentence.
  *
- *   TIMING — 【登場時】 [On Play], plus the EN trait tags sharing that bracket.
- *     NAVY on the card.
+ * WHICH bracket a tag uses does not decide its family — see
+ * `@/lib/cards/effect-vocab`. English writes timings and trait references in
+ * the same square brackets, and Chinese wraps whole DigiXros requirement lines
+ * in 【】, so the families come from closed vocabularies and everything else in
+ * a bracket is a name. That also makes the languages agree: EN [Greymon] now
+ * renders like JA 「グレイモン」 instead of as a navy timing chip.
  *
- *   LIMITER — ［ターンに1回］ [Once Per Turn] ［1回合1次］. RED on the card, and
- *     visibly distinct from the navy timing tag it usually sits next to.
- *
- *   KEYWORD ABILITY — 《阻挡者》 ≪Sアタック+1≫ ＜Rush＞. ORANGE on the card.
- *
- *   SPECIAL PLAY / DIGIVOLVE — 〔ジョグレス〕 アセンブリ-6 デジクロス-2. TEAL on
- *     the card; a different mechanic from the keyword abilities above.
- *
- *   QUOTED NAME — 「スカモン」 “亚古兽”. References to another card or trait by
- *     name; emphasised rather than chipped, since they're part of the sentence
- *     and are often long.
- *
- * A few keywords are printed WITHOUT brackets — "アセンブリ-6:「ネガーモン」4枚",
- * "デジクロス-2", "数码合体-2" — so there is nothing structural to key off.
- * Pass `keywords` (the official vocabulary, scraped into `card_keywords`) and
- * those get the keyword chip too, trailing "-N" included.
- *
- * Everything else is plain text, and the source's line breaks survive via
- * `whitespace-pre-wrap` so multi-clause effects keep their structure.
- *
- * Purely presentational and deterministic. All three languages use the same
- * bracket families, so one pass covers EN / 中文 / 日本語.
+ * Line breaks survive via `whitespace-pre-wrap`. Purely presentational and
+ * deterministic; one pass covers EN / 中文 / 日本語.
  */
 
-// A single capturing split regex, so `String.split` hands back text and tokens
-// interleaved. The families don't nest in this data, so order doesn't matter.
-const TOKEN_RE =
-  /(【[^】]*】|〔[^〕]*〕|\[[^\]]+\]|［[^］]+］|\{[^}]+\}|《[^》]*》|≪[^≫]*≫|＜[^＞]*＞|「[^」]*」|“[^”]*”)/g;
-
-type Kind = "timing" | "limiter" | "keyword" | "special" | "name" | "text";
+import { classifyTag, BARE_REQUIREMENT_RE } from "@/lib/cards/effect-vocab";
 
 /**
- * "Once per turn"-style limiters, which the card prints red rather than navy.
- * EN shares the [] bracket with timings, so it has to be matched by phrase.
+ * One capturing split regex, so `String.split` hands back text and tags
+ * interleaved.
+ *
+ * 《》 allows ONE level of nesting, because the CN text nests it:
+ * 《使用条件《特征“光辉黎明”》》. Matching lazily to the first 》 chopped that in
+ * half and left a stray bracket loose in the sentence.
+ *
+ * The last alternative is the bracket-less requirement line — アセンブリ-6: and
+ * friends — which is a tag with no bracket to key off, so it's recognized by
+ * its shape here rather than by scanning the prose for vocabulary words.
+ */
+const TOKEN_RE = new RegExp(
+  "(" +
+    [
+      "【[^】]*】",
+      "〔[^〕]*〕",
+      "\\[[^\\]]+\\]",
+      "［[^］]+］",
+      "\\{[^}]+\\}",
+      "《(?:[^《》]|《[^》]*》)*》",
+      "≪[^≫]*≫",
+      "＜[^＞]*＞",
+      "「[^」]*」",
+      "“[^”]*”",
+      BARE_REQUIREMENT_RE.source,
+    ].join("|") +
+    ")",
+  "g",
+);
+
+/**
+ * "Once per turn"-style limiters that the vocabulary can't catch because they
+ * carry a number — ［ターンに2回］ — rather than being a fixed phrase.
  */
 const LIMITER_RE =
-  /ターンに\s*\d+\s*回|回合\s*\d+\s*次|Once Per (?:Turn|Match)|\d+\s*Per Turn/i;
+  /^(?:ターンに\s*\d+\s*回|回合\s*\d+\s*次|每回合\s*\d+\s*次|\d+\s*Per Turn)$/i;
 
-function kindOf(tok: string): Kind {
-  switch (tok[0]) {
-    case "【":
-      return "timing";
-    // 〔…〕 is the special-digivolve bracket — 〔進化〕〔ジョグレス〕 — a different
-    // mechanic (and colour) from a timing window.
-    case "〔":
-      return "special";
-    case "[":
-    // CN text uses the fullwidth bracket for the same tags — ［每回合1次］.
-    case "［":
-    // 126 cards spell the play-location tag with braces — {Hand}[Counter].
-    case "{":
-      return LIMITER_RE.test(tok) ? "limiter" : "timing";
-    case "《":
-    case "≪":
-    case "＜":
-      return "keyword";
-    case "「":
-    case "“": // opening curly double quote, used by the CN text
-      return "name";
-    default:
-      return LIMITER_RE.test(tok) ? "limiter" : "text";
-  }
-}
+/**
+ * A requirement line the CN source wrapped in its own 【】 — captures the
+ * marker and the remaining prose separately.
+ */
+const WRAPPED_REQUIREMENT_RE = new RegExp(
+  `^【(${BARE_REQUIREMENT_RE.source})([^】]*)】$`,
+);
 
 /** Card-accurate chip colours. Fixed values, not theme tokens: they encode
  *  what's printed on the card, so they must not drift with the site theme. */
-const CHIP_STYLE: Record<
-  "timing" | "limiter" | "keyword" | "special",
-  string
-> = {
+const CHIP_STYLE = {
   timing: "bg-[#1f3a93] text-white",
   limiter: "bg-[#d2232a] text-white",
   keyword: "bg-[#e8830c] text-white",
   special: "bg-[#158a7a] text-white",
-};
+} as const;
 
 const CHIP =
   "inline-block px-1.5 rounded align-[0.05em] text-[0.92em] font-medium " +
   "leading-[1.5] whitespace-nowrap";
 
-/**
- * Build a matcher for bare keywords. Longest-first so "セキュリティアタック+1"
- * wins over "セキュリティアタック", and an optional "-N"/"+N" tail is absorbed so
- * "アセンブリ-6" chips as one unit rather than leaving the number outside.
- */
-function bareKeywordRe(keywords: string[]): RegExp | null {
-  const usable = keywords
-    .map((k) => k.trim())
-    .filter((k) => k.length >= 2)
-    .sort((a, b) => b.length - a.length);
-  if (usable.length === 0) return null;
-  const esc = usable.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  // The alternation MUST be wrapped: `(a|b(?:tail)?)` would attach the tail to
-  // the last alternative only, so with the real 106-keyword list "アセンブリ-6"
-  // chipped as "アセンブリ" and left "-6" outside.
-  return new RegExp(`((?:${esc.join("|")})(?:[-+－＋]\\d+)?)`, "g");
+const PAIRS: Record<string, string> = {
+  "【": "】", "〔": "〕", "[": "]", "［": "］", "{": "}",
+  "《": "》", "≪": "≫", "＜": "＞", "「": "」", "“": "”",
+};
+
+type Kind = keyof typeof CHIP_STYLE | "name";
+
+function kindOf(tok: string): Kind {
+  const open = tok[0];
+  const close = PAIRS[open];
+  // No bracket at all → the bare requirement line, which is always special.
+  if (!close || !tok.endsWith(close)) return "special";
+  const inner = tok.slice(1, -1);
+  // A numbered limiter can't be a fixed vocabulary entry.
+  if (LIMITER_RE.test(inner.trim())) return "limiter";
+  return classifyTag(open, inner);
 }
 
 export function EffectText({
   text,
   className = "",
-  keywords,
 }: {
   text: string;
   className?: string;
-  /** Official keyword vocabulary, for the ones printed without brackets. */
-  keywords?: string[];
 }) {
-  const bareRe = keywords?.length ? bareKeywordRe(keywords) : null;
   const parts = text.split(TOKEN_RE);
   return (
     <span className={`whitespace-pre-wrap leading-relaxed ${className}`}>
       {parts.map((p, i) => {
         if (!p) return null;
-        const kind = kindOf(p);
-        switch (kind) {
-          case "timing":
-          case "limiter":
-          case "keyword":
-          case "special":
-            return (
-              <span key={i} className={`${CHIP} ${CHIP_STYLE[kind]}`}>
-                {p}
+        // split() with one capture group interleaves: even = text, odd = tag.
+        if (i % 2 === 0) return <span key={i}>{p}</span>;
+        // The CN source wraps a whole requirement LINE in 【】 —
+        // 【数码合体-2：“高吼兽”×“弩炮兽”…】 — but the card only boxes the
+        // marker; the rest is ordinary text. Chip the marker alone and drop
+        // the source's line brackets, which aren't on the card either.
+        const wrapped = p.match(WRAPPED_REQUIREMENT_RE);
+        if (wrapped) {
+          return (
+            <span key={i}>
+              <span className={`${CHIP} ${CHIP_STYLE.special}`}>
+                {wrapped[1]}
               </span>
-            );
-          case "name":
-            return (
-              <b key={i} className="font-semibold italic">
-                {p}
-              </b>
-            );
-          default:
-            // Plain run — still scan it for unbracketed keywords.
-            if (!bareRe) return <span key={i}>{p}</span>;
-            return (
-              <span key={i}>
-                {p.split(bareRe).map((frag, j) =>
-                  j % 2 === 1 ? (
-                    <span
-                      key={j}
-                      // Bare (bracket-less) keywords are the special play /
-                      // digivolve family — アセンブリ-6, デジクロス-2 — which the
-                      // card prints teal.
-                      className={`${CHIP} ${CHIP_STYLE.special}`}
-                    >
-                      {frag}
-                    </span>
-                  ) : (
-                    frag
-                  ),
-                )}
-              </span>
-            );
+              {wrapped[2]}
+            </span>
+          );
         }
+        const kind = kindOf(p);
+        if (kind === "name") {
+          return (
+            <b key={i} className="font-semibold italic">
+              {p}
+            </b>
+          );
+        }
+        return (
+          <span key={i} className={`${CHIP} ${CHIP_STYLE[kind]}`}>
+            {p}
+          </span>
+        );
       })}
     </span>
   );
