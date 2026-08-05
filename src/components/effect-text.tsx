@@ -5,7 +5,7 @@
  *   TIMING   navy   — 【登場時】 [On Play]. When the effect happens.
  *   LIMITER  red    — ［ターンに1回］ [Once Per Turn]. How often.
  *   KEYWORD  orange — ≪ブロッカー≫ ＜Rush＞ 《阻挡者》. A named ability.
- *   SPECIAL  teal   — 〔進化〕 [Digivolve] アセンブリ-6:. Another way onto the
+ *   SPECIAL  blue-violet — 〔進化〕 [Digivolve] アセンブリ-6:. Another way onto the
  *                     field; a different mechanic from a timing window.
  *   NAME     italic — 「グレイモン」 [Greymon] [X Antibody]. A reference to
  *                     another card or a trait, part of the sentence.
@@ -81,7 +81,13 @@ const CHIP_STYLE = {
   timing: "bg-[#1f3a93] text-white",
   limiter: "bg-[#d2232a] text-white",
   keyword: "bg-[#e8830c] text-white",
-  special: "bg-[#158a7a] text-white",
+  // Blue-violet, NOT teal. Sampled off the printed cards: the digivolve box
+  // reads #0e2459 on BT20-007 and #0d4356 on EX8-031 — a dark blue leaning
+  // violet, close to but distinguishable from the timing box's #09243b. Both
+  // measurements are near-black, so this is brightened by the same amount the
+  // timing navy already is (#09243b → #1f3a93). The earlier teal was a guess
+  // that no card actually carries.
+  special: "bg-[#3b3a9e] text-white",
 } as const;
 
 const CHIP =

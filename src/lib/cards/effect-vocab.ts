@@ -67,7 +67,7 @@ const LIMITER = new Set([
 
 /**
  * Alternative ways onto the field — a different mechanic from a timing window,
- * and TEAL on the card. English files these in the same square brackets as
+ * and a blue-VIOLET on the card, close to but not the same as the timing blue. English files these in the same square brackets as
  * timings ([Digivolve] alone is 1241 occurrences), which is why they need
  * naming rather than inferring from the bracket.
  */
