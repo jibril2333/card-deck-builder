@@ -11,6 +11,13 @@ import { CardPriceInput } from "@/components/card-price-input";
 import { EffectText } from "@/components/effect-text";
 import { EvolutionCost, parseEvolutionCost } from "@/components/evolution-cost";
 import { CardRulings } from "@/components/card-rulings";
+import {
+  buildCardView,
+  FIELD_SOURCE,
+  visibleFields,
+  type CardView,
+  type FieldKey,
+} from "@/lib/cards/digimon-fields";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import * as ua from "@/lib/db/unionarena";
@@ -41,38 +48,12 @@ export default async function CardPage({
     const cardLang = parseCardLang(
       (await cookies()).get(CARD_LANG_COOKIE)?.value,
     );
-    // Per-field overlay: anything the CN/JP source doesn't have falls back
-    // to the EN base text, so a partially-translated card still reads fine.
+    // Which field comes from which language is declared once, in
+    // FIELD_SOURCE — see src/lib/cards/digimon-fields.ts. Hand-writing the
+    // fallbacks here is how BT9-104 ended up showing its Japanese trait beside
+    // its English attribute.
     const t = digimon.getCardTranslation(card.code, cardLang);
-    const view: digimon.DigimonCard = t
-      ? {
-          ...card,
-          name: t.name ?? card.name,
-          card_type: t.card_type ?? card.card_type,
-          form: t.form ?? card.form,
-          stage: t.form ?? card.stage,
-          attribute: t.attribute ?? card.attribute,
-          digi_types: t.traits ?? card.digi_types,
-          main_effect: t.effect_main ?? card.main_effect,
-          security_effect: t.effect_2 ?? card.security_effect,
-          inherited_effect: t.effect_3 ?? card.inherited_effect,
-          // Localized digivolve blocks when the JP scrape captured them,
-          // otherwise the English ones — better a readable EN line than a
-          // missing DNA/DigiXros requirement.
-          evolution_cost: t.evo_cost ?? card.evolution_cost,
-          evolution_requirements: t.evo_req ?? card.evolution_requirements,
-          // Dual cards: the Option half. Colour and cost aren't translated —
-          // they only exist on `cards`.
-          dual_name: t.dual_name ?? card.dual_name,
-          dual_effect: t.dual_effect ?? card.dual_effect,
-          dual_rule: t.dual_rule ?? card.dual_rule,
-          // Link cards: the plugged-in half. link_dp is a number and lives
-          // only on `cards` — nothing to translate.
-          link_requirement: t.link_requirement ?? card.link_requirement,
-          link_effect: t.link_effect ?? card.link_effect,
-          special_rule: t.special_rule ?? card.special_rule,
-        }
-      : card;
+    const view = buildCardView(card, t);
     const decks = me
       ? digimon.listDecksWithCardQty(meId, card.id).map((d) => ({
           id: d.id,
@@ -233,6 +214,136 @@ function EffectBlock({
   );
 }
 
+/** Effect blocks, in print order, with the label the page shows for each. */
+const TEXT_BLOCKS: [FieldKey, string][] = [
+  ["main_effect", "主要效果"],
+  ["security_effect", "安全区效果"],
+  ["inherited_effect", "进化继承效果"],
+  ["source_effect", "源池效果"],
+  ["special_rule", "特别规则"],
+];
+
+const STAT_LABELS: Partial<Record<FieldKey, string>> = {
+  level: "Lv",
+  play_cost: "Play Cost",
+  dp: "DP",
+  dual_cost: "使用费用",
+};
+
+/**
+ * The numeric stats this card actually has.
+ *
+ * A flex row rather than a fixed three-column grid: a Tamer has only a play
+ * cost, and reserving two empty columns for the level and DP it will never
+ * have was the layout equivalent of the data bugs above.
+ */
+function StatRow({ card, fields }: { card: CardView; fields: FieldKey[] }) {
+  const stats = fields.filter((f) => f in STAT_LABELS);
+  if (stats.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-x-10 gap-y-3 p-3 rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)]">
+      {stats.map((f) => (
+        <Stat
+          key={f}
+          label={STAT_LABELS[f]!}
+          value={card[FIELD_SOURCE[f].base] as string | number | null}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** 形态 / 属性 / 特征 — the fields that say what KIND of card this is. */
+function IdentityBlock({ card, fields }: { card: CardView; fields: FieldKey[] }) {
+  const has = (f: FieldKey) => fields.includes(f);
+  if (!has("form") && !has("attribute") && !has("digi_types")) return null;
+  return (
+    <div className="rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)] p-3 space-y-2.5">
+      {has("form") || has("attribute") ? (
+        <div className="flex flex-wrap gap-x-8 gap-y-2">
+          {has("form") ? (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+                形态
+              </div>
+              <div className="text-sm font-medium">{card.form}</div>
+            </div>
+          ) : null}
+          {has("attribute") ? (
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+                属性
+              </div>
+              <div className="text-sm font-medium">{card.attribute}</div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {has("digi_types") ? (
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+            特征
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {card
+              .digi_types!.split("/")
+              .map((t) => t.trim())
+              .filter(Boolean)
+              .map((t) => (
+                <span
+                  key={t}
+                  className="px-2 py-0.5 rounded-md text-sm bg-[var(--color-bg)] border border-[var(--color-border)]"
+                >
+                  {t}
+                </span>
+              ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** How this card gets onto the field, when it isn't simply played. */
+function DigivolveBlock({
+  card,
+  fields,
+  keywords,
+}: {
+  card: CardView;
+  fields: FieldKey[];
+  keywords?: string[];
+}) {
+  const has = (f: FieldKey) => fields.includes(f);
+  if (!has("evolution_cost") && !has("evolution_requirements")) return null;
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+      {has("evolution_cost") ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+            进化消费
+          </span>
+          <EvolutionCost value={card.evolution_cost!} />
+        </div>
+      ) : null}
+      {has("evolution_requirements") ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
+            进化条件
+          </span>
+          {/* DigiXros / special-digivolve lines carry the same bracket tokens
+              as effect text, so chip them the same way. */}
+          <EffectText
+            text={card.evolution_requirements!}
+            className="text-sm"
+            keywords={keywords}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * The Option half of a Dual card (デジモン/オプション).
  *
@@ -246,7 +357,7 @@ function DualFace({
   card,
   keywords,
 }: {
-  card: digimon.DigimonCard;
+  card: CardView;
   keywords?: string[];
 }) {
   if (!card.dual_effect && !card.dual_name) return null;
@@ -298,7 +409,7 @@ function LinkFace({
   card,
   keywords,
 }: {
-  card: digimon.DigimonCard;
+  card: CardView;
   keywords?: string[];
 }) {
   if (!card.link_requirement && !card.link_effect && card.link_dp === null)
@@ -340,7 +451,7 @@ function DigimonDetail({
   keywords,
   readonly,
 }: {
-  card: digimon.DigimonCard;
+  card: CardView;
   /** Original EN name, shown small under a translated title. */
   subName?: string;
   rulings: import("@/lib/db/rulings-ddl").CardRuling[];
@@ -363,6 +474,7 @@ function DigimonDetail({
   /** Anon viewer: hide the editable price input + the AddToDeck widget. */
   readonly: boolean;
 }) {
+  const shown = visibleFields(card);
   return (
     <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
       <div className="space-y-3">
@@ -442,99 +554,25 @@ function DigimonDetail({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)]">
-          <Stat label="Lv" value={card.level} />
-          <Stat label="Play Cost" value={card.play_cost} />
-          <Stat label="DP" value={card.dp} />
-        </div>
+        {/* Everything below is driven by `visibleFields`, so a card only ever
+            shows the fields its own type prints — plus any field that
+            unexpectedly holds a value, which is kept rather than hidden. */}
+        <StatRow card={card} fields={shown} />
+        <IdentityBlock card={card} fields={shown} />
+        <DigivolveBlock card={card} fields={shown} keywords={keywords} />
 
-        {/* Type line — 形态 / 属性 / 特征 grouped + labeled. These define the
-            card's identity and used to be scattered as unlabeled badges. */}
-        {card.stage || card.form || card.attribute || card.digi_types ? (
-          <div className="rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)] p-3 space-y-2.5">
-            {card.stage || card.form || card.attribute ? (
-              <div className="flex flex-wrap gap-x-8 gap-y-2">
-                {card.stage || card.form ? (
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-                      形态
-                    </div>
-                    <div className="text-sm font-medium">
-                      {card.stage || card.form}
-                    </div>
-                  </div>
-                ) : null}
-                {card.attribute ? (
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-                      属性
-                    </div>
-                    <div className="text-sm font-medium">{card.attribute}</div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {card.digi_types ? (
-              <div>
-                <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-                  特征
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {card.digi_types
-                    .split("/")
-                    .map((t) => t.trim())
-                    .filter(Boolean)
-                    .map((t) => (
-                      <span
-                        key={t}
-                        className="px-2 py-0.5 rounded-md text-sm bg-[var(--color-bg)] border border-[var(--color-border)]"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {card.evolution_cost || card.evolution_requirements ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            {card.evolution_cost ? (
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-                  进化消费
-                </span>
-                <EvolutionCost value={card.evolution_cost} />
-              </div>
-            ) : null}
-            {card.evolution_requirements ? (
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-                  进化条件
-                </span>
-                {/* DigiXros / special-digivolve lines carry the same bracket
-                    tokens as effect text, so chip them the same way. */}
-                <EffectText
-                  text={card.evolution_requirements}
-                  className="text-sm"
-                  keywords={keywords}
-                />
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        <EffectBlock label="主要效果" text={card.main_effect} keywords={keywords} />
-        <EffectBlock label="安全区效果" text={card.security_effect} keywords={keywords} />
-        <EffectBlock label="进化继承效果" text={card.inherited_effect} keywords={keywords} />
-        <EffectBlock label="源池效果" text={card.source_effect} keywords={keywords} />
+        {TEXT_BLOCKS.filter(([f]) => shown.includes(f)).map(([f, label]) => (
+          <EffectBlock
+            key={f}
+            label={label}
+            text={card[FIELD_SOURCE[f].base] as string | null}
+            keywords={keywords}
+          />
+        ))}
 
         <DualFace card={card} keywords={keywords} />
 
         <LinkFace card={card} keywords={keywords} />
-
-        <EffectBlock label="特别规则" text={card.special_rule} keywords={keywords} />
 
         <SetList sets={splitSetNames(card.set_names)} />
 
