@@ -119,11 +119,10 @@ test("the member picker shows deck covers, many to a row", async ({ page }) => {
   await expect(tiles.locator("img").first()).toBeVisible();
 });
 
-test("banner: title holds its place, and title/notes edit in place", async ({ page }) => {
+test("banner: edit in place, no shift, colours and exports where asked", async ({ page }) => {
   const name = `E2E Banner ${Date.now()}`;
   const url = await createDeck(page, name);
 
-  // Give it a cover so the banner is in its art-backed form.
   await page.getByRole("link", { name: /🛠 组建/ }).click();
   await page.getByPlaceholder("搜卡加入卡组…").fill("Omnimon");
   const add = page.getByLabel("加入卡组 Omnimon");
@@ -137,36 +136,65 @@ test("banner: title holds its place, and title/notes edit in place", async ({ pa
   await page.goto(url);
   const title = page.getByRole("heading", { level: 1 });
   await expect(title).toHaveText(name);
+
+  // The banner no longer opens anything: no 更多 button, no panel.
+  await expect(page.getByRole("button", { name: /更多/ })).toHaveCount(0);
   await expect(page.getByText("卡组信息")).toHaveCount(0);
 
-  // (1) Where the title sits must not depend on whether notes exist.
-  const before = await title.evaluate((e) => Math.round(e.getBoundingClientRect().top));
+  // (1) The title is the input — focusing it must not move the text, and
+  //     there is no box drawn around it.
+  const boxBefore = await title.boundingBox();
+  await title.click();
+  await expect(title).toBeFocused();
+  const boxAfter = await title.boundingBox();
+  expect(Math.abs(boxAfter!.x - boxBefore!.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(boxAfter!.y - boxBefore!.y)).toBeLessThanOrEqual(1);
 
-  // (2) Click the notes line and type — no panel opened first.
-  await page.getByTitle("点击编辑备注").click();
+  // (2) Typing into the notes saves without opening anything, and the title
+  //     does not move because the notes row already reserved its height.
+  const titleY = boxBefore!.y;
   const notes = page.getByLabel("备注");
-  await expect(notes).toBeFocused();
-  await notes.fill("店赛用");
-  await notes.blur();
-
-  // Autosave is debounced; the value has to survive a full reload.
-  await expect(page.getByText("店赛用")).toBeVisible();
+  await notes.click();
+  await notes.pressSequentially("店赛用");
   await page.waitForTimeout(1200);
   await page.reload();
-  await expect(page.getByText("店赛用")).toBeVisible();
+  await expect(page.getByLabel("备注")).toHaveText("店赛用");
+  const titleY2 = (await page.getByRole("heading", { level: 1 }).boundingBox())!.y;
+  expect(Math.abs(titleY2 - titleY)).toBeLessThanOrEqual(1);
 
-  const after = await title.evaluate((e) => Math.round(e.getBoundingClientRect().top));
-  expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
-
-  // (3) The title edits in place too, and the notes survive it — saving one
-  // field must not blank the other.
-  await title.click();
-  const input = page.getByLabel("卡组名");
-  await expect(input).toBeFocused();
-  await input.fill(name + " 改");
-  await input.press("Enter");
+  // (3) Renaming in place, and the notes survive it — one field per save.
+  await page.getByRole("heading", { level: 1 }).click();
+  // Select-all then retype: pressing End inside a contentEditable moves to the
+  // end of the visual LINE, which is not the end of the value.
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type(name + " 改");
   await page.waitForTimeout(1200);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(name + " 改");
-  await expect(page.getByText("店赛用")).toBeVisible();
+  await expect(page.getByLabel("备注")).toHaveText("店赛用");
+
+  // (4) Three colour dots, and the cover dot is ringed once adopted.
+  await expect(page.getByLabel("主色")).toBeVisible();
+  await expect(page.getByLabel("副色")).toBeVisible();
+  const coverDot = page.getByTitle("使用封面卡的颜色");
+  await expect(coverDot).toBeVisible();
+  // Adopting the cover's colour rings that dot and unrings the custom pair.
+  await coverDot.click();
+  await expect(coverDot).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(400);
+  const rings = await page.evaluate(() => ({
+    pair: getComputedStyle(
+      document.querySelector('[title="自选颜色"]')!,
+    ).boxShadow,
+    cover: getComputedStyle(
+      document.querySelector('[title="使用封面卡的颜色"]')!,
+    ).boxShadow,
+  }));
+  expect(rings.pair).toBe("none");
+  expect(rings.cover).toContain("0px 0px 0px 4px");
+
+  // (5) Export buttons sit in the toolbar; delete moved to the sidebar.
+  await expect(page.getByRole("button", { name: /导出文本/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /导出链接/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /删除卡组/ })).toBeVisible();
 });

@@ -9,6 +9,8 @@ import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { DeckCardSearch } from "@/components/deck-card-search";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckHeader } from "@/components/deck-header";
+import { DeckCopyButtons } from "@/components/deck-copy-buttons";
+import { DeckDeleteButton } from "@/components/deck-delete-button";
 import { DeckPoolPicker } from "@/components/deck-pool-picker";
 import { DeckImageExport } from "@/components/deck-image-export";
 import {
@@ -560,8 +562,6 @@ export default async function DeckEditPage({
             deck={loaded.deck}
             cover={loaded.cover}
             mine={mine}
-            exportText={exportText}
-            exportUrl={exportUrl}
           />
 
           {/* mode switcher — only show build/purchase tabs if this deck is mine */}
@@ -616,6 +616,7 @@ export default async function DeckEditPage({
           >
             🎲 试玩
           </Link>
+          <DeckCopyButtons text={exportText} url={exportUrl} />
           <DeckImageExport
             deckName={loaded.deck.name}
             accent={loaded.deck.accent_color}
@@ -856,6 +857,17 @@ export default async function DeckEditPage({
 
           {loaded.cards.length > 0 ? (
             <DeckStats panels={loaded.statsPanels} />
+          ) : null}
+
+          {/* Last thing in the column, deliberately: the banner above is full
+              of click-to-edit fields, and this is the one action there is no
+              undo for. */}
+          {mine ? (
+            <DeckDeleteButton
+              game={game}
+              deckId={loaded.deck.id}
+              deckName={loaded.deck.name}
+            />
           ) : null}
         </aside>
       </main>

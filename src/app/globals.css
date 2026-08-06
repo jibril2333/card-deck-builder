@@ -130,3 +130,34 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Placeholder for the contentEditable fields in the deck banner. A real
+   input's ::placeholder isn't available here, and rendering the hint as text
+   would make it part of the value the moment someone typed. ::before draws it
+   without ever entering the DOM's text content. */
+[contenteditable].is-empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-muted-fg);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* `<input type=color>` as a plain circle. The native control draws its own
+   inset swatch with a border and padding; without these it shows as a small
+   rectangle inside the circle rather than filling it. */
+.deck-dot {
+  -webkit-appearance: none;
+  appearance: none;
+  overflow: hidden;
+}
+.deck-dot::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.deck-dot::-webkit-color-swatch {
+  border: none;
+  border-radius: 9999px;
+}
+.deck-dot::-moz-color-swatch {
+  border: none;
+  border-radius: 9999px;
+}
