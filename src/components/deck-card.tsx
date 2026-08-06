@@ -91,6 +91,10 @@ export function DeckCard({
           });
         }
       : undefined;
+  // Hide it again when the pointer leaves this tile — the provider waits a
+  // beat first, so moving on to the next card swaps the panel instead of
+  // blinking it. Paired with onHover: both exist, or neither does.
+  const onLeave = onHover ? () => preview!.clear() : undefined;
 
   // Optimistic copy of the card row. Lets +/- and the quantity/purchased
   // inputs update the number on screen the instant the user clicks, while the
@@ -140,6 +144,7 @@ export function DeckCard({
   return (
     <div
       onMouseEnter={onHover}
+      onMouseLeave={onLeave}
       className={`group relative rounded-lg overflow-hidden border bg-[var(--color-card)] transition-colors ${
         done
           ? "border-green-500/60 ring-1 ring-green-500/30"

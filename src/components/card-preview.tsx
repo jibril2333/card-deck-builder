@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 /** Viewport rect of the hovered tile, used to place the panel beside it. */
 type Anchor = { top: number; bottom: number; left: number; right: number };
@@ -16,7 +24,21 @@ type Preview = {
 
 const CardPreviewContext = createContext<{
   set: (p: Preview) => void;
+  /** Hide the panel — call on leaving a tile. See GRACE_MS. */
+  clear: () => void;
 } | null>(null);
+
+/**
+ * How long `clear` waits before the panel actually goes away.
+ *
+ * Tiles are separated by grid gaps, so sliding from one card to the next means
+ * leaving the first before entering the second. Hiding on that leave makes the
+ * panel blink off and back on for every card the pointer crosses. The delay is
+ * shorter than that transit, and `set` cancels a pending clear, so moving
+ * between cards swaps the panel while moving OFF the cards still hides it —
+ * fast enough to read as immediate.
+ */
+const GRACE_MS = 90;
 
 // Panel geometry. Width is also declared in the className below; keep them in
 // sync — the placement math needs the number, Tailwind needs the literal.
@@ -47,12 +69,50 @@ export function CardPreviewProvider({
   children: React.ReactNode;
 }) {
   const [preview, setPreview] = useState<Preview>(null);
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelPending = useCallback(() => {
+    if (pending.current) {
+      clearTimeout(pending.current);
+      pending.current = null;
+    }
+  }, []);
+
+  const set = useCallback(
+    (p: Preview) => {
+      cancelPending();
+      setPreview(p);
+    },
+    [cancelPending],
+  );
+
+  const clear = useCallback(() => {
+    cancelPending();
+    pending.current = setTimeout(() => {
+      pending.current = null;
+      setPreview(null);
+    }, GRACE_MS);
+  }, [cancelPending]);
+
+  // A timer outliving the provider would setState on an unmounted tree.
+  useEffect(() => cancelPending, [cancelPending]);
+
+  const ctx = useMemo(() => ({ set, clear }), [set, clear]);
 
   return (
-    <CardPreviewContext.Provider value={{ set: setPreview }}>
-      {/* Clearing on leave of the whole grid (not per-tile) avoids flicker
-          when the pointer crosses the gaps between cards. */}
-      <div onMouseLeave={() => setPreview(null)}>{children}</div>
+    <CardPreviewContext.Provider value={ctx}>
+      {/* Tiles hide the panel themselves on leave; this catches the pointer
+          leaving the grid by a route that skips a tile's own mouseleave —
+          off the window entirely, or across the padding around the grid.
+          Immediate, because there is no next card to wait for. */}
+      <div
+        onMouseLeave={() => {
+          cancelPending();
+          setPreview(null);
+        }}
+      >
+        {children}
+      </div>
 
       {preview && preview.image_url ? (
         <div
