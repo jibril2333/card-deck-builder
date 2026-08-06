@@ -11,7 +11,6 @@ const cache: DBCache = (globalForDB.__dbCache ??= {});
 
 const ENV_VAR_NAME: Record<GameId, string> = {
   digimon: "CDB_DIGIMON_DB",
-  unionarena: "CDB_UA_DB",
 };
 
 export function getDB(game: GameId): Database.Database {

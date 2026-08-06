@@ -2,10 +2,10 @@
  * Shared deck-repository implementation for both games.
  *
  * Why this exists:
- *   Both `digimon.ts` and `unionarena.ts` ship ~15 functions that do the SAME
+ *   `digimon.ts` builds its repo from this factory. It was written when a
  *   thing — manipulate `user.decks` / `user.deck_cards` / `user.card_prices`.
  *   The only real differences are:
- *     - the row type (DigimonCard vs UACard, DigimonDeck vs UADeck)
+ *   second game shared it; the parameterisation is kept because it also
  *     - the ORDER BY column inside getDeckCards (level vs energy_cost)
  *
  * Multi-user model:
@@ -47,7 +47,7 @@ type RepoOptions = {
   /** ORDER BY clause body for `getDeckCards`. Differs by game's most-useful
    *  default sort (Digimon: level, UA: energy_cost). */
   deckCardOrderBy: string;
-  /** Source key in `card_restrictions`, e.g. "digimon" / "unionarena". */
+  /** Source key in `card_restrictions`, e.g. "digimon". */
   restrictionSource: string;
   /** Map a `cards.code` to its restriction identity for deck-limit checks.
    *  - Digimon: identity = code (alt-art lives in card_images table)

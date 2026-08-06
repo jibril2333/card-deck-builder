@@ -8,7 +8,6 @@
  *   - Throttled at ~700ms per request to avoid hammering them. A typical
  *     full run (~4 000 codes) takes ~45 min. Use `--my-collection` to scope
  *     to just what you own.
- *   - Cardrush doesn't currently sell UNION ARENA cards, so this script
  *     intentionally only runs against the digimon DB.
  *
  * Usage:

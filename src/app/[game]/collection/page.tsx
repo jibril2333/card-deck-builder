@@ -43,7 +43,6 @@ import { FilterForm, type FilterField } from "@/components/filter-form";
 import { ActiveFilters, type ChipSpec } from "@/components/active-filters";
 import { requireUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
-import * as ua from "@/lib/db/unionarena";
 
 export const dynamic = "force-dynamic";
 
@@ -71,283 +70,147 @@ export default async function CollectionPage({
   const offset = (page - 1) * PAGE_SIZE;
   const sort = pickSort(sp);
 
-  let rows: TileRow[];
-  let total: number;
-  let fields: FilterField[];
-  let sortOptions: { value: string; label: string }[];
-  let chipSpecs: ChipSpec[];
 
-  if (game === "digimon") {
-    const colors = digimon.distinct("color");
-    const types = digimon.distinct("card_type");
-    const rarities = [
-      ...new Set(digimon.distinct("rarity").map((r) => r.toUpperCase())),
-    ].sort();
-    const forms = digimon.distinct("form");
-    const stages = digimon.distinct("stage");
-    const attributes = digimon.distinct("attribute");
-    const levels = digimon.distinctNumbers("level");
-    const playCosts = digimon.distinctNumbers("play_cost");
-    const dps = digimon.distinctNumbers("dp");
-    const setNames = digimon.distinctSetNames();
+  const colors = digimon.distinct("color");
+  const types = digimon.distinct("card_type");
+  const rarities = [
+    ...new Set(digimon.distinct("rarity").map((r) => r.toUpperCase())),
+  ].sort();
+  const forms = digimon.distinct("form");
+  const stages = digimon.distinct("stage");
+  const attributes = digimon.distinct("attribute");
+  const levels = digimon.distinctNumbers("level");
+  const playCosts = digimon.distinctNumbers("play_cost");
+  const dps = digimon.distinctNumbers("dp");
+  const setNames = digimon.distinctSetNames();
 
-    fields = [
-      { type: "search", key: "q", label: "关键词", placeholder: "名称 / 编号 / 效果" },
-      {
-        type: "multi",
-        key: "color",
-        label: "颜色",
-        options: colors,
-        colorChips: true,
-        maxSelect: 2,
-      },
-      { type: "multi", key: "card_type", label: "类型", options: types },
-      { type: "multi", key: "rarity", label: "稀有度", options: rarities },
-      { type: "range", key: "level", label: "等级", options: levels },
-      { type: "range", key: "play_cost", label: "费用", options: playCosts },
-      {
-        type: "range",
-        key: "dp",
-        label: "DP",
-        options: dps.map((n) => ({ value: n, label: n.toLocaleString() })),
-      },
-      {
-        type: "group",
-        key: "more",
-        label: "更多筛选",
-        fields: [
-          { type: "multi", key: "form", label: "Form", options: forms },
-          { type: "multi", key: "stage", label: "Stage", options: stages },
-          { type: "multi", key: "attribute", label: "属性", options: attributes },
-          {
-            type: "multi-scroll",
-            key: "set",
-            label: "卡包 / Card Set",
-            options: setNames,
-          },
-        ],
-      },
-    ];
+  const fields: FilterField[] = [
+    { type: "search", key: "q", label: "关键词", placeholder: "名称 / 编号 / 效果" },
+    {
+      type: "multi",
+      key: "color",
+      label: "颜色",
+      options: colors,
+      colorChips: true,
+      maxSelect: 2,
+    },
+    { type: "multi", key: "card_type", label: "类型", options: types },
+    { type: "multi", key: "rarity", label: "稀有度", options: rarities },
+    { type: "range", key: "level", label: "等级", options: levels },
+    { type: "range", key: "play_cost", label: "费用", options: playCosts },
+    {
+      type: "range",
+      key: "dp",
+      label: "DP",
+      options: dps.map((n) => ({ value: n, label: n.toLocaleString() })),
+    },
+    {
+      type: "group",
+      key: "more",
+      label: "更多筛选",
+      fields: [
+        { type: "multi", key: "form", label: "Form", options: forms },
+        { type: "multi", key: "stage", label: "Stage", options: stages },
+        { type: "multi", key: "attribute", label: "属性", options: attributes },
+        {
+          type: "multi-scroll",
+          key: "set",
+          label: "卡包 / Card Set",
+          options: setNames,
+        },
+      ],
+    },
+  ];
 
-    sortOptions = [
-      { value: "code", label: "编号 ↑" },
-      { value: "-code", label: "编号 ↓" },
-      { value: "name", label: "名称 ↑" },
-      { value: "-name", label: "名称 ↓" },
-      { value: "level", label: "等级 ↑" },
-      { value: "-level", label: "等级 ↓" },
-      { value: "play_cost", label: "费用 ↑" },
-      { value: "-play_cost", label: "费用 ↓" },
-      { value: "dp", label: "DP ↑" },
-      { value: "-dp", label: "DP ↓" },
-    ];
+  const sortOptions = [
+    { value: "code", label: "编号 ↑" },
+    { value: "-code", label: "编号 ↓" },
+    { value: "name", label: "名称 ↑" },
+    { value: "-name", label: "名称 ↓" },
+    { value: "level", label: "等级 ↑" },
+    { value: "-level", label: "等级 ↓" },
+    { value: "play_cost", label: "费用 ↑" },
+    { value: "-play_cost", label: "费用 ↓" },
+    { value: "dp", label: "DP ↑" },
+    { value: "-dp", label: "DP ↓" },
+  ];
 
-    chipSpecs = [
-      { kind: "list", key: "color", label: "颜色" },
-      { kind: "list", key: "card_type", label: "类型" },
-      { kind: "list", key: "rarity", label: "稀有度" },
-      { kind: "list", key: "form", label: "Form" },
-      { kind: "list", key: "stage", label: "Stage" },
-      { kind: "list", key: "attribute", label: "属性" },
-      { kind: "list", key: "set", label: "卡包" },
-      {
-        kind: "range",
-        minKey: "level_min",
-        maxKey: "level_max",
-        label: "等级",
-      },
-      {
-        kind: "range",
-        minKey: "play_cost_min",
-        maxKey: "play_cost_max",
-        label: "费用",
-      },
-      { kind: "range", minKey: "dp_min", maxKey: "dp_max", label: "DP" },
-    ];
+  const chipSpecs: ChipSpec[] = [
+    { kind: "list", key: "color", label: "颜色" },
+    { kind: "list", key: "card_type", label: "类型" },
+    { kind: "list", key: "rarity", label: "稀有度" },
+    { kind: "list", key: "form", label: "Form" },
+    { kind: "list", key: "stage", label: "Stage" },
+    { kind: "list", key: "attribute", label: "属性" },
+    { kind: "list", key: "set", label: "卡包" },
+    {
+      kind: "range",
+      minKey: "level_min",
+      maxKey: "level_max",
+      label: "等级",
+    },
+    {
+      kind: "range",
+      minKey: "play_cost_min",
+      maxKey: "play_cost_max",
+      label: "费用",
+    },
+    { kind: "range", minKey: "dp_min", maxKey: "dp_max", label: "DP" },
+  ];
 
-    const r = digimon.searchCards({
-      q: pickStr(sp, "q"),
-      colors: pickList(sp, "color"),
-      card_types: pickList(sp, "card_type"),
-      rarities: pickList(sp, "rarity"),
-      forms: pickList(sp, "form"),
-      stages: pickList(sp, "stage"),
-      attributes: pickList(sp, "attribute"),
-      sets: pickList(sp, "set"),
-      level_min: pickNum(sp, "level_min"),
-      level_max: pickNum(sp, "level_max"),
-      play_cost_min: pickNum(sp, "play_cost_min"),
-      play_cost_max: pickNum(sp, "play_cost_max"),
-      dp_min: pickNum(sp, "dp_min"),
-      dp_max: pickNum(sp, "dp_max"),
-      has_inherited: pickStr(sp, "has_inherited") === "1",
-      has_security: pickStr(sp, "has_security") === "1",
-      show_alt_arts: true, // ← collection page forces alt-art expansion
-      // The physical cards on the shelf are the Japanese printings, so this
-      // page always shows those — independent of the site language toggle,
-      // which only decides what language you want to READ cards in.
-      art_lang: COLLECTION_LANG,
-      sort_field: sort.field,
-      sort_dir: sort.dir,
-      limit: PAGE_SIZE,
-      offset,
-    });
-    const collMap = digimon.getCollectionMap(me.id);
-    const restrictionMap = digimon.getRestrictionMap(r.rows.map((c) => c.id));
-    // Tiles here are per-PRINTING (alt arts expanded), so keep each tile's
-    // own art and only localize the name.
-    const tMap = digimon.getDisplayTranslations(
-      r.rows.map((c) => c.code),
-      COLLECTION_LANG,
-    );
-    rows = r.rows.map((c) => ({
-      card_id: c.id,
-      code: c.code,
-      name: tMap.get(c.code)?.name ?? c.name,
-      color: c.color,
-      rarity: c.rarity,
-      image_url: c.display_image,
-      variant: c.variant,
-      quantity: collMap.get(`${c.id}|${c.variant}`) ?? 0,
-      restriction: restrictionMap.get(c.id) ?? null,
-    }));
-    total = r.total;
-  } else {
-    const colors = ua.distinct("color");
-    const types = ua.distinct("card_type");
-    const rarities = ua
-      .distinct("rarity")
-      .filter((r) => !r.startsWith("Pc") && !r.includes("★"));
-    const series = (() => {
-      const list = ua.seriesList().map((s) => s.name);
-      const isEva = (s: string) =>
-        s.includes("ヴァンゲリヲン") || s.includes("エヴァ");
-      const eva = list.filter(isEva);
-      const rest = list.filter((s) => !isEva(s));
-      return [...eva, ...rest];
-    })();
-    const energies = ua.distinctNumbers("energy_cost");
-    const aps = ua.distinctNumbers("ap_cost");
-    const bps = ua.distinctNumbers("bp").filter((n) => n > 0);
-    const packs = ua.distinctPacks();
-
-    fields = [
-      { type: "search", key: "q", label: "关键词", placeholder: "名称 / 编号 / 效果" },
-      {
-        type: "select",
-        key: "series",
-        label: "作品",
-        options: series,
-        placeholder: "全部作品",
-      },
-      {
-        type: "multi",
-        key: "color",
-        label: "颜色",
-        options: colors,
-        colorChips: true,
-        maxSelect: 2,
-      },
-      { type: "multi", key: "card_type", label: "类型", options: types },
-      { type: "multi", key: "rarity", label: "稀有度", options: rarities },
-      { type: "range", key: "energy_cost", label: "必要能量", options: energies },
-      { type: "range", key: "ap_cost", label: "消耗 AP", options: aps },
-      {
-        type: "range",
-        key: "bp",
-        label: "BP",
-        options: bps.map((n) => ({ value: n, label: n.toLocaleString() })),
-      },
-      {
-        type: "group",
-        key: "more",
-        label: "更多筛选",
-        fields: [
-          {
-            type: "multi-scroll",
-            key: "pack",
-            label: "卡包前缀",
-            options: packs,
-          },
-        ],
-      },
-    ];
-
-    sortOptions = [
-      { value: "code", label: "编号 ↑" },
-      { value: "-code", label: "编号 ↓" },
-      { value: "name", label: "名称 ↑" },
-      { value: "-name", label: "名称 ↓" },
-      { value: "energy_cost", label: "能量 ↑" },
-      { value: "-energy_cost", label: "能量 ↓" },
-      { value: "bp", label: "BP ↑" },
-      { value: "-bp", label: "BP ↓" },
-    ];
-
-    chipSpecs = [
-      { kind: "single", key: "series", label: "作品" },
-      { kind: "list", key: "color", label: "颜色" },
-      { kind: "list", key: "card_type", label: "类型" },
-      { kind: "list", key: "rarity", label: "稀有度" },
-      { kind: "list", key: "pack", label: "卡包" },
-      {
-        kind: "range",
-        minKey: "energy_min",
-        maxKey: "energy_max",
-        label: "能量",
-      },
-      {
-        kind: "range",
-        minKey: "ap_min",
-        maxKey: "ap_max",
-        label: "AP",
-      },
-      { kind: "range", minKey: "bp_min", maxKey: "bp_max", label: "BP" },
-    ];
-
-    const r = ua.searchCards({
-      q: pickStr(sp, "q"),
-      series_list: pickList(sp, "series"),
-      colors: pickList(sp, "color"),
-      card_types: pickList(sp, "card_type"),
-      rarities: pickList(sp, "rarity"),
-      packs: pickList(sp, "pack"),
-      energy_min: pickNum(sp, "energy_min"),
-      energy_max: pickNum(sp, "energy_max"),
-      ap_min: pickNum(sp, "ap_min"),
-      ap_max: pickNum(sp, "ap_max"),
-      bp_min: pickNum(sp, "bp_min"),
-      bp_max: pickNum(sp, "bp_max"),
-      show_alt_arts: true, // ← collection forces alt-art expansion
-      sort_field: sort.field,
-      sort_dir: sort.dir,
-      limit: PAGE_SIZE,
-      offset,
-    });
-    const collMap = ua.getCollectionMap(me.id);
-    const uaRestrictionMap = ua.getRestrictionMap(r.rows.map((c) => c.id));
-    rows = r.rows.map((c) => ({
-      card_id: c.id,
-      code: c.code,
-      name: c.name,
-      color: c.color,
-      rarity: c.rarity,
-      image_url: c.image_url,
-      variant: "",
-      quantity: collMap.get(`${c.id}|`) ?? 0,
-      restriction: uaRestrictionMap.get(c.id) ?? null,
-    }));
-    total = r.total;
-  }
+  const r = digimon.searchCards({
+    q: pickStr(sp, "q"),
+    colors: pickList(sp, "color"),
+    card_types: pickList(sp, "card_type"),
+    rarities: pickList(sp, "rarity"),
+    forms: pickList(sp, "form"),
+    stages: pickList(sp, "stage"),
+    attributes: pickList(sp, "attribute"),
+    sets: pickList(sp, "set"),
+    level_min: pickNum(sp, "level_min"),
+    level_max: pickNum(sp, "level_max"),
+    play_cost_min: pickNum(sp, "play_cost_min"),
+    play_cost_max: pickNum(sp, "play_cost_max"),
+    dp_min: pickNum(sp, "dp_min"),
+    dp_max: pickNum(sp, "dp_max"),
+    has_inherited: pickStr(sp, "has_inherited") === "1",
+    has_security: pickStr(sp, "has_security") === "1",
+    show_alt_arts: true, // ← collection page forces alt-art expansion
+    // The physical cards on the shelf are the Japanese printings, so this
+    // page always shows those — independent of the site language toggle,
+    // which only decides what language you want to READ cards in.
+    art_lang: COLLECTION_LANG,
+    sort_field: sort.field,
+    sort_dir: sort.dir,
+    limit: PAGE_SIZE,
+    offset,
+  });
+  const collMap = digimon.getCollectionMap(me.id);
+  const restrictionMap = digimon.getRestrictionMap(r.rows.map((c) => c.id));
+  // Tiles here are per-PRINTING (alt arts expanded), so keep each tile's
+  // own art and only localize the name.
+  const tMap = digimon.getDisplayTranslations(
+    r.rows.map((c) => c.code),
+    COLLECTION_LANG,
+  );
+  const rows: TileRow[] = r.rows.map((c) => ({
+    card_id: c.id,
+    code: c.code,
+    name: tMap.get(c.code)?.name ?? c.name,
+    color: c.color,
+    rarity: c.rarity,
+    image_url: c.display_image,
+    variant: c.variant,
+    quantity: collMap.get(`${c.id}|${c.variant}`) ?? 0,
+    restriction: restrictionMap.get(c.id) ?? null,
+  }));
+  const total: number = r.total;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Aggregate stats for the header — only counts owned cards in the user's
   // overall collection (not just the current filtered page).
-  const ownedSummary =
-    game === "digimon"
-      ? sumMap(digimon.getCollectionMap(me.id))
-      : sumMap(ua.getCollectionMap(me.id));
+  const ownedSummary = sumMap(digimon.getCollectionMap(me.id));
 
   return (
     <>
