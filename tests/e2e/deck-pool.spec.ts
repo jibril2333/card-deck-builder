@@ -73,3 +73,48 @@ test("the picker is absent on a deck you don't own", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /共享卡池/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /新建卡池/ })).toHaveCount(0);
 });
+
+test("the member picker shows deck covers, many to a row", async ({ page }) => {
+  const stamp = Date.now();
+
+  // Three decks, each with a different cover, so the picker has something to
+  // tell apart — a coverless fixture would only ever exercise the fallback.
+  const covers = ["MetalGreymon", "Omnimon", "Monodramon"];
+  for (const cardName of covers) {
+    await createDeck(page, `E2E ${cardName} ${stamp}`);
+    await page.getByRole("link", { name: /🛠 组建/ }).click();
+    await page.getByPlaceholder("搜卡加入卡组…").fill(cardName);
+    // The result list is fetched, so the ＋ button doesn't exist yet.
+    const add = page.getByLabel(`加入卡组 ${cardName}`);
+    await add.waitFor();
+    await add.click();
+    // Likewise the tile only appears once the Server Action has landed.
+    const star = page.getByTitle("设为封面");
+    await star.waitFor();
+    await star.click();
+    await expect(page.getByTitle(/已是封面/)).toBeVisible();
+  }
+
+  // Still on the last deck's page — make a pool from it, which lands on the
+  // pool where the member picker lives.
+  await page.getByRole("button", { name: /新建卡池/ }).click();
+  await page.getByPlaceholder("卡池名称").fill(`E2E 封面池 ${stamp}`);
+  await page.getByRole("button", { name: "建", exact: true }).click();
+  await page.waitForURL(/\/digimon\/groups\/[a-z0-9-]+/i);
+
+  await page.getByRole("button", { name: /管理成员/ }).click();
+  const tiles = page.locator("label:has(input[type=checkbox])");
+  await expect(tiles.first()).toBeVisible();
+
+  // The complaint was two per row. Assert on laid-out geometry rather than the
+  // class list: how many tiles actually share a row is the thing that changed.
+  const perRow = await tiles.evaluateAll((els) => {
+    const tops = els.map((e) => Math.round(e.getBoundingClientRect().top));
+    const first = tops[0];
+    return tops.filter((t) => t === first).length;
+  });
+  expect(perRow).toBeGreaterThan(2);
+
+  // And the tiles render art, not just a name.
+  await expect(tiles.locator("img").first()).toBeVisible();
+});

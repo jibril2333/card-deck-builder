@@ -13,6 +13,8 @@ type DeckLite = {
   name: string;
   accent_color: string;
   accent_color2: string | null;
+  /** Cover art, already resolved to the deck's chosen printing. */
+  cover_image_url: string | null;
 };
 
 /**
@@ -132,18 +134,25 @@ export function GroupEditor({
           <div className="text-xs text-[var(--color-muted-fg)] mb-2">
             勾选要共享同一套卡的卡组（只在这些卡组之间组合）：
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          {/* Cover tiles, not a checkbox list. Decks are recognised by their
+              art long before their name is read, and the page is up to 1500px
+              wide — two columns of text left most of it empty and made a
+              dozen decks a scroll. */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
             {allDecks.map((d) => {
               const on = picked.has(d.id);
               return (
                 <label
                   key={d.id}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded-md border cursor-pointer text-sm ${
+                  title={d.name}
+                  className={`group relative rounded-lg border overflow-hidden cursor-pointer transition-all ${
                     on
-                      ? "border-[var(--color-accent)] bg-[var(--color-accent)]/8"
-                      : "border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                      ? "border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40"
+                      : "border-[var(--color-border)] hover:border-[var(--color-fg)]"
                   }`}
                 >
+                  {/* The real control, kept for keyboard and screen readers —
+                      the tile is its label, so clicking anywhere toggles. */}
                   <input
                     type="checkbox"
                     checked={on}
@@ -155,13 +164,51 @@ export function GroupEditor({
                         return n;
                       })
                     }
-                    className="accent-[var(--color-accent)]"
+                    className="sr-only"
                   />
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ background: dot(d) }}
-                  />
-                  <span className="truncate">{d.name}</span>
+                  <div className="card-thumb relative">
+                    {d.cover_image_url ? (
+                      <img
+                        src={d.cover_image_url}
+                        alt=""
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        draggable={false}
+                        className={on ? "" : "opacity-55 group-hover:opacity-80"}
+                      />
+                    ) : (
+                      // Same fallback the deck list uses: accent wash plus the
+                      // first two characters, so a coverless deck still reads
+                      // as itself rather than as a blank tile.
+                      <div
+                        className="w-full h-full flex items-center justify-center"
+                        style={{
+                          background: d.accent_color2
+                            ? `linear-gradient(135deg, ${d.accent_color}55, ${d.accent_color2}55)`
+                            : `linear-gradient(135deg, ${d.accent_color}44, ${d.accent_color}11)`,
+                        }}
+                      >
+                        <span
+                          className="font-bold opacity-80"
+                          style={{ color: d.accent_color }}
+                        >
+                          {d.name.slice(0, 2)}
+                        </span>
+                      </div>
+                    )}
+                    {on ? (
+                      <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-xs font-bold flex items-center justify-center shadow">
+                        ✓
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-1 px-1.5 py-1 bg-[var(--color-card)]">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: dot(d) }}
+                    />
+                    <span className="truncate text-xs">{d.name}</span>
+                  </div>
                 </label>
               );
             })}

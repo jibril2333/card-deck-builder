@@ -36,13 +36,20 @@ export default async function GroupPage({
   if (!group) notFound();
 
   const pool = lib(game).getGroupPool(id);
+  // Reads return every user's decks by design (see deck-shared.ts), but
+  // `setGroupDecks` only ever inserts the caller's own — so an unfiltered list
+  // offers checkboxes that silently do nothing. Harmless while this is a
+  // single-account install; not once a friend has an account.
   const allDecks = lib(game)
-    .listDecks(me.id)
+    .listDecksWithCover(me.id)
+    .filter((d) => d.user_id === me.id)
     .map((d) => ({
       id: d.id,
       name: d.name,
       accent_color: d.accent_color,
       accent_color2: d.accent_color2,
+      // listDecks already resolves this against the deck's cover_variant.
+      cover_image_url: d.cover_image_url,
     }));
 
   // Localize names (Digimon) per the language cookie.

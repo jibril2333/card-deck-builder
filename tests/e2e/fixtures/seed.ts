@@ -69,11 +69,22 @@ type CardSeed = {
   dp?: number | null;
   rarity?: string;
   main_effect?: string | null;
+  /** Set to give this card art — see STUB_IMAGE. Null/absent = no image. */
+  image?: string | null;
 };
 
+/**
+ * A 1×1 PNG as a data: URI. Anything rendering card art needs a non-null
+ * `image_url` to take its image branch at all, and a data: URI exercises that
+ * branch while still issuing no request — which is the point of leaving the
+ * rest null.
+ */
+const STUB_IMAGE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
 // Real card data sampled from the live DB so search / filter behavior matches
-// real-world expectations. Image URLs are intentionally left null so tests
-// don't make outbound HTTP requests.
+// real-world expectations. Image URLs are left null except where a test needs
+// the image branch (see `image`), so tests make no outbound HTTP requests.
 const SEED_CARDS: CardSeed[] = [
   {
     code: "BT1-001",
@@ -101,6 +112,7 @@ const SEED_CARDS: CardSeed[] = [
     dp: 3000,
     rarity: "C",
     main_effect: "When this Digimon attacks,\ndraw 1.",
+    image: STUB_IMAGE,
   },
   {
     code: "BT1-021",
@@ -111,6 +123,7 @@ const SEED_CARDS: CardSeed[] = [
     play_cost: 6,
     dp: 7000,
     rarity: "R",
+    image: STUB_IMAGE,
   },
   {
     code: "BT1-084",
@@ -122,6 +135,7 @@ const SEED_CARDS: CardSeed[] = [
     dp: 15000,
     rarity: "SR",
     main_effect: "End your turn.",
+    image: STUB_IMAGE,
   },
   {
     code: "BT1-085",
@@ -154,9 +168,11 @@ export function seedDigimonDb(dbPath: string): void {
 
     const insert = db.prepare(
       `INSERT INTO cards (
-         id, code, name, card_type, color, level, play_cost, dp, rarity, main_effect
+         id, code, name, card_type, color, level, play_cost, dp, rarity, main_effect,
+         image_url
        ) VALUES (
-         @id, @code, @name, @card_type, @color, @level, @play_cost, @dp, @rarity, @main_effect
+         @id, @code, @name, @card_type, @color, @level, @play_cost, @dp, @rarity, @main_effect,
+         @image_url
        )`,
     );
     const insertMany = db.transaction((rows: CardSeed[]) => {
@@ -172,6 +188,7 @@ export function seedDigimonDb(dbPath: string): void {
           dp: r.dp ?? null,
           rarity: r.rarity ?? null,
           main_effect: r.main_effect ?? null,
+          image_url: r.image ?? null,
         });
       }
     });
