@@ -118,3 +118,36 @@ test("the member picker shows deck covers, many to a row", async ({ page }) => {
   // And the tiles render art, not just a name.
   await expect(tiles.locator("img").first()).toBeVisible();
 });
+
+test("deck info lives in the banner, and editing is opt-in", async ({ page }) => {
+  const name = `E2E Banner ${Date.now()}`;
+  await createDeck(page, name);
+
+  // Give it a cover so the banner is in its art-backed form, not the bare one.
+  await page.getByRole("link", { name: /🛠 组建/ }).click();
+  await page.getByPlaceholder("搜卡加入卡组…").fill("Omnimon");
+  const add = page.getByLabel("加入卡组 Omnimon");
+  await add.waitFor();
+  await add.click();
+  const star = page.getByTitle("设为封面");
+  await star.waitFor();
+  await star.click();
+  await expect(page.getByTitle(/已是封面/)).toBeVisible();
+
+  // The name is the banner's h1 — and only there. It used to be both this and
+  // an input in the sidebar.
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await expect(page.getByText("卡组信息")).toHaveCount(0);
+
+  // The form is behind the toggle, not always mounted.
+  const nameField = page.locator("input[value='" + name + "']");
+  await expect(nameField).toHaveCount(0);
+  await page.getByRole("button", { name: /编辑/ }).click();
+  await expect(nameField).toBeVisible();
+  await expect(page.getByRole("button", { name: /删除卡组/ })).toBeVisible();
+
+  // And it collapses again.
+  await page.getByRole("button", { name: /收起/ }).click();
+  await expect(nameField).toHaveCount(0);
+
+});

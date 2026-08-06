@@ -8,8 +8,7 @@ import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { DeckCardSearch } from "@/components/deck-card-search";
 import { CardPreviewProvider } from "@/components/card-preview";
-import { DeckMetaForm } from "@/components/deck-meta-form";
-import { CoverVariantPicker } from "@/components/cover-variant-picker";
+import { DeckHeader } from "@/components/deck-header";
 import { DeckPoolPicker } from "@/components/deck-pool-picker";
 import { DeckImageExport } from "@/components/deck-image-export";
 import {
@@ -556,56 +555,14 @@ export default async function DeckEditPage({
           >
             ← 全部卡组
           </Link>
-          {loaded.cover?.image_url ? (
-            <div
-              className="relative h-32 sm:h-40 rounded-lg overflow-hidden border border-[var(--color-border)] mb-3"
-              style={{
-                background: loaded.deck.accent_color2
-                  ? `linear-gradient(135deg, ${loaded.deck.accent_color}55, ${loaded.deck.accent_color2}55)`
-                  : `linear-gradient(135deg, ${loaded.deck.accent_color}33, transparent)`,
-              }}
-            >
-              <img
-                src={loaded.cover.image_url}
-                alt={loaded.cover.name}
-                referrerPolicy="no-referrer"
-                className="absolute inset-0 w-full h-full object-cover object-center opacity-90"
-                style={{ filter: "blur(8px) saturate(1.2)" }}
-              />
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(0deg, var(--color-bg) 0%, transparent 60%)`,
-                }}
-              />
-              <img
-                src={loaded.cover.image_url}
-                alt={loaded.cover.name}
-                referrerPolicy="no-referrer"
-                className="absolute left-4 bottom-3 h-20 sm:h-28 aspect-[5/7] object-cover rounded-md shadow-lg border-2 border-white/80"
-              />
-            </div>
-          ) : (
-            <div
-              className="h-2 rounded-full mb-3"
-              style={{
-                background: loaded.deck.accent_color2
-                  ? `linear-gradient(90deg, ${loaded.deck.accent_color}, ${loaded.deck.accent_color2})`
-                  : loaded.deck.accent_color,
-              }}
-            />
-          )}
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold">{loaded.deck.name}</h1>
-            {!mine && loaded.deck.user_id ? (
-              <span
-                className="px-2 py-0.5 text-xs rounded-full bg-[var(--color-muted)] text-[var(--color-muted-fg)] border border-[var(--color-border)]"
-                title="这是别人的卡组,你只能浏览"
-              >
-                👁 只读
-              </span>
-            ) : null}
-          </div>
+          <DeckHeader
+            game={game}
+            deck={loaded.deck}
+            cover={loaded.cover}
+            mine={mine}
+            exportText={exportText}
+            exportUrl={exportUrl}
+          />
 
           {/* mode switcher — only show build/purchase tabs if this deck is mine */}
           <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -876,55 +833,13 @@ export default async function DeckEditPage({
         </section>
 
         <aside className="space-y-4">
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-            <h3 className="text-sm font-semibold mb-3">卡组信息</h3>
-            {mine ? (
-              <>
-                <DeckMetaForm
-                  game={game}
-                  deck={loaded.deck}
-                  coverAccent={loaded.cover?.accent ?? null}
-                  coverAccent2={loaded.cover?.accent2 ?? null}
-                  exportText={exportText}
-                  exportUrl={exportUrl}
-                />
-                {/* Only worth showing when the cover card actually has more
-                    than one printing to choose between. */}
-                {loaded.cover && loaded.cover.arts.length > 1 ? (
-                  <div className="mt-3 pt-3 border-t border-[var(--color-border)]">
-                    <CoverVariantPicker
-                      game={game}
-                      deckId={loaded.deck.id}
-                      arts={loaded.cover.arts}
-                      current={loaded.deck.cover_variant ?? ""}
-                    />
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="text-xs text-[var(--color-muted-fg)]">
-                    名称
-                  </span>
-                  <div className="font-medium">{loaded.deck.name}</div>
-                </div>
-                {loaded.deck.notes ? (
-                  <div>
-                    <span className="text-xs text-[var(--color-muted-fg)]">
-                      备注
-                    </span>
-                    <div className="whitespace-pre-wrap">
-                      {loaded.deck.notes}
-                    </div>
-                  </div>
-                ) : null}
-                <div className="text-xs text-[var(--color-muted-fg)] pt-2 border-t border-[var(--color-border)]">
-                  这是别人的卡组,你只能浏览。
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Someone else's deck: say so once, here. Name and notes now live
+              in the banner, so this panel would otherwise repeat them. */}
+          {!mine ? (
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 text-xs text-[var(--color-muted-fg)]">
+              这是别人的卡组,你只能浏览。
+            </div>
+          ) : null}
 
           {mine ? (
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
