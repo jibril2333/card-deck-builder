@@ -99,7 +99,14 @@ export async function updateDeckMetaAction(formData: FormData) {
   const game = String(formData.get("game"));
   const id = String(formData.get("id"));
   const name = String(formData.get("name") ?? "").trim();
-  const notes = String(formData.get("notes") ?? "");
+  // notes follows the same absent/empty/value trinary as accent_color2 below.
+  // It used to read `?? ""`, which meant a post that didn't carry the field
+  // silently blanked the notes — fine when the only caller was a form that
+  // always sent every field, but the banner's inline editors save one field
+  // at a time and editing the title would have wiped the notes with it.
+  const notesRaw = formData.get("notes");
+  const notes: string | undefined =
+    notesRaw === null ? undefined : String(notesRaw);
   const accent_color = String(formData.get("accent_color") ?? "").trim();
   // accent_color2 semantics:
   //   field absent       → undefined  (don't touch — backward compat for old form posts)

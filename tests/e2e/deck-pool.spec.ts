@@ -119,11 +119,11 @@ test("the member picker shows deck covers, many to a row", async ({ page }) => {
   await expect(tiles.locator("img").first()).toBeVisible();
 });
 
-test("deck info lives in the banner, and editing is opt-in", async ({ page }) => {
+test("banner: title holds its place, and title/notes edit in place", async ({ page }) => {
   const name = `E2E Banner ${Date.now()}`;
-  await createDeck(page, name);
+  const url = await createDeck(page, name);
 
-  // Give it a cover so the banner is in its art-backed form, not the bare one.
+  // Give it a cover so the banner is in its art-backed form.
   await page.getByRole("link", { name: /🛠 组建/ }).click();
   await page.getByPlaceholder("搜卡加入卡组…").fill("Omnimon");
   const add = page.getByLabel("加入卡组 Omnimon");
@@ -134,20 +134,39 @@ test("deck info lives in the banner, and editing is opt-in", async ({ page }) =>
   await star.click();
   await expect(page.getByTitle(/已是封面/)).toBeVisible();
 
-  // The name is the banner's h1 — and only there. It used to be both this and
-  // an input in the sidebar.
-  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
+  await page.goto(url);
+  const title = page.getByRole("heading", { level: 1 });
+  await expect(title).toHaveText(name);
   await expect(page.getByText("卡组信息")).toHaveCount(0);
 
-  // The form is behind the toggle, not always mounted.
-  const nameField = page.locator("input[value='" + name + "']");
-  await expect(nameField).toHaveCount(0);
-  await page.getByRole("button", { name: /编辑/ }).click();
-  await expect(nameField).toBeVisible();
-  await expect(page.getByRole("button", { name: /删除卡组/ })).toBeVisible();
+  // (1) Where the title sits must not depend on whether notes exist.
+  const before = await title.evaluate((e) => Math.round(e.getBoundingClientRect().top));
 
-  // And it collapses again.
-  await page.getByRole("button", { name: /收起/ }).click();
-  await expect(nameField).toHaveCount(0);
+  // (2) Click the notes line and type — no panel opened first.
+  await page.getByTitle("点击编辑备注").click();
+  const notes = page.getByLabel("备注");
+  await expect(notes).toBeFocused();
+  await notes.fill("店赛用");
+  await notes.blur();
 
+  // Autosave is debounced; the value has to survive a full reload.
+  await expect(page.getByText("店赛用")).toBeVisible();
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect(page.getByText("店赛用")).toBeVisible();
+
+  const after = await title.evaluate((e) => Math.round(e.getBoundingClientRect().top));
+  expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
+
+  // (3) The title edits in place too, and the notes survive it — saving one
+  // field must not blank the other.
+  await title.click();
+  const input = page.getByLabel("卡组名");
+  await expect(input).toBeFocused();
+  await input.fill(name + " 改");
+  await input.press("Enter");
+  await page.waitForTimeout(1200);
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(name + " 改");
+  await expect(page.getByText("店赛用")).toBeVisible();
 });
