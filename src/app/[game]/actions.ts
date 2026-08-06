@@ -4,10 +4,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isGameId, type GameId, GAMES } from "@/lib/games";
 import * as digimon from "@/lib/db/digimon";
+import * as ua from "@/lib/db/unionarena";
 import { backupBeforeWrite } from "@/lib/db/connection";
 import { parseDeckText } from "@/lib/deck-formats";
 import { stripAltArt } from "@/lib/alt-art";
 import { requireUser } from "@/lib/auth/session";
+
+function lib(game: GameId) {
+  return game === "digimon" ? digimon : ua;
+}
 
 // ---------- Cache invalidation helpers ----------
 //
@@ -58,7 +63,7 @@ export async function createDeckAction(formData: FormData) {
   // rename via the meta form afterward; this just keeps the create button
   // useful when someone clicks it without filling in the input.
   const name = rawName || "新卡组";
-  const id = digimon.createDeck({
+  const id = lib(game).createDeck({
     user_id: me.id,
     name,
     notes,
@@ -78,7 +83,7 @@ export async function createDeckQuietAction(formData: FormData): Promise<string>
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
   if (!name) throw new Error("name required");
-  const id = digimon.createDeck({
+  const id = lib(game).createDeck({
     user_id: me.id,
     name,
     accent_color: accent,
@@ -112,12 +117,37 @@ export async function updateDeckMetaAction(formData: FormData) {
   // UA locks use the same "absent / empty / value" trinary as accent2.
   // Only forwarded to the UA branch since Digimon's repo signature doesn't
   // accept these keys (and the DB column doesn't exist).
-  digimon.updateDeckMeta(me.id, id, {
-    name: name || undefined,
-    notes: notes,
-    accent_color: accent_color || undefined,
-    accent_color2,
-  });
+  if (game === "unionarena") {
+    const seriesRaw = formData.get("locked_series");
+    const colorRaw = formData.get("locked_color");
+    const locked_series: string | null | undefined =
+      seriesRaw === null
+        ? undefined
+        : String(seriesRaw).trim() === ""
+          ? null
+          : String(seriesRaw).trim();
+    const locked_color: string | null | undefined =
+      colorRaw === null
+        ? undefined
+        : String(colorRaw).trim() === ""
+          ? null
+          : String(colorRaw).trim();
+    ua.updateDeckMeta(me.id, id, {
+      name: name || undefined,
+      notes: notes,
+      accent_color: accent_color || undefined,
+      accent_color2,
+      locked_series,
+      locked_color,
+    });
+  } else {
+    digimon.updateDeckMeta(me.id, id, {
+      name: name || undefined,
+      notes: notes,
+      accent_color: accent_color || undefined,
+      accent_color2,
+    });
+  }
   bumpDeckAndList(game, id);
 }
 
@@ -127,7 +157,7 @@ export async function deleteDeckAction(formData: FormData) {
   const id = String(formData.get("id"));
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  digimon.deleteDeck(me.id, id);
+  lib(game).deleteDeck(me.id, id);
   bumpDeckList(game);
   redirect(`/${game}/decks`);
 }
@@ -154,10 +184,10 @@ function syncPoolForCard(
   deckId: string,
   cardId: string,
 ): boolean {
-  const peers = digimon.decksSharingPoolWith(userId, deckId);
+  const peers = lib(game).decksSharingPoolWith(userId, deckId);
   if (peers.length <= 1) return false;
-  const owned = digimon.pooledOwnedForCard(peers, cardId);
-  digimon.reconcilePoolCard([deckId], cardId, owned);
+  const owned = lib(game).pooledOwnedForCard(peers, cardId);
+  lib(game).reconcilePoolCard([deckId], cardId, owned);
   return true;
 }
 
@@ -167,10 +197,10 @@ export async function createGroupAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim() || "新组合";
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  const id = digimon.createGroup(me.id, name);
+  const id = lib(game).createGroup(me.id, name);
   // A new group is empty; seed it with any decks ticked on the create form.
   const deckIds = formData.getAll("deck_id").map(String).filter(Boolean);
-  if (deckIds.length) digimon.setGroupDecks(me.id, id, deckIds);
+  if (deckIds.length) lib(game).setGroupDecks(me.id, id, deckIds);
   bumpGroups(game);
   redirect(`/${game}/groups/${id}`);
 }
@@ -183,7 +213,7 @@ export async function renameGroupAction(formData: FormData) {
   if (!isGameId(game)) throw new Error("invalid game");
   if (!name) return;
   backupBeforeWrite(game);
-  digimon.renameGroup(me.id, id, name);
+  lib(game).renameGroup(me.id, id, name);
   bumpGroups(game, id);
 }
 
@@ -193,7 +223,7 @@ export async function deleteGroupAction(formData: FormData) {
   const id = String(formData.get("id"));
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  digimon.deleteGroup(me.id, id);
+  lib(game).deleteGroup(me.id, id);
   bumpGroups(game);
   redirect(`/${game}/decks`);
 }
@@ -205,7 +235,7 @@ export async function setGroupDecksAction(formData: FormData) {
   const deckIds = formData.getAll("deck_id").map(String).filter(Boolean);
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  digimon.setGroupDecks(me.id, id, deckIds);
+  lib(game).setGroupDecks(me.id, id, deckIds);
   bumpGroups(game, id);
 }
 
@@ -217,7 +247,7 @@ export async function adjustDeckCardAction(formData: FormData) {
   const delta = Number(formData.get("delta") ?? 0);
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  digimon.adjustDeckCard(me.id, deckId, cardId, delta);
+  lib(game).adjustDeckCard(me.id, deckId, cardId, delta);
   // Pooled deck: a card just added/resized should inherit the pool's held.
   if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
   else bumpDeck(game, deckId);
@@ -231,7 +261,7 @@ export async function reorderDecksAction(formData: FormData) {
   backupBeforeWrite(game);
   const ids = idsRaw.split(",").map((s) => s.trim()).filter(Boolean);
   if (ids.length === 0) return;
-  digimon.reorderDecks(me.id, ids);
+  lib(game).reorderDecks(me.id, ids);
   bumpDeckList(game);
 }
 
@@ -249,7 +279,7 @@ export async function addDeckAdjustmentAction(formData: FormData) {
   if (!deckId || !cardId) throw new Error("missing deck_id/card_id");
   if (kind !== "add" && kind !== "remove") throw new Error("invalid kind");
   backupBeforeWrite(game);
-  digimon.addDeckAdjustment(me.id, deckId, cardId, kind);
+  lib(game).addDeckAdjustment(me.id, deckId, cardId, kind);
   bumpDeck(game, deckId);
 }
 
@@ -261,7 +291,7 @@ export async function removeDeckAdjustmentAction(formData: FormData) {
   if (!isGameId(game)) throw new Error("invalid game");
   if (!id) throw new Error("missing id");
   backupBeforeWrite(game);
-  digimon.removeDeckAdjustment(me.id, id);
+  lib(game).removeDeckAdjustment(me.id, id);
   if (deckId) bumpDeck(game, deckId);
 }
 
@@ -276,7 +306,7 @@ export async function setDeckAdjustmentQuantityAction(formData: FormData) {
   if (!Number.isFinite(quantity)) throw new Error("invalid quantity");
   backupBeforeWrite(game);
   // The repo clamps the range; this only rejects outright nonsense.
-  digimon.setDeckAdjustmentQuantity(me.id, id, quantity);
+  lib(game).setDeckAdjustmentQuantity(me.id, id, quantity);
   if (deckId) bumpDeck(game, deckId);
 }
 
@@ -289,7 +319,7 @@ export async function setDeckAdjustmentNoteAction(formData: FormData) {
   if (!isGameId(game)) throw new Error("invalid game");
   if (!id) throw new Error("missing id");
   backupBeforeWrite(game);
-  digimon.setDeckAdjustmentNote(me.id, id, note);
+  lib(game).setDeckAdjustmentNote(me.id, id, note);
   if (deckId) bumpDeck(game, deckId);
 }
 
@@ -319,11 +349,11 @@ export async function searchCardsAction(
   if (!isGameId(game)) throw new Error("invalid game");
   const query = q.trim();
   if (query.length < 2) return [];
-  const { rows } = digimon.searchCards({ q: query, limit: 12 });
+  const { rows } = lib(game).searchCards({ q: query, limit: 12 });
 
   const lang = opts?.lang;
   const names =
-    lang === "zh" || lang === "ja"
+    game === "digimon" && (lang === "zh" || lang === "ja")
       ? digimon.getDisplayTranslations(
           rows.map((r) => r.code),
           lang,
@@ -332,7 +362,7 @@ export async function searchCardsAction(
 
   const inDeck = new Map<string, number>();
   if (opts?.deckId) {
-    for (const c of digimon.getDeckCards(opts.deckId)) {
+    for (const c of lib(game).getDeckCards(opts.deckId)) {
       inDeck.set(c.id, c.quantity);
     }
   }
@@ -358,7 +388,7 @@ export async function setDeckCoverVariantAction(formData: FormData) {
   if (!isGameId(game)) throw new Error("invalid game");
   if (!deckId) throw new Error("missing deck_id");
   backupBeforeWrite(game);
-  digimon.setDeckCoverVariant(me.id, deckId, variant);
+  lib(game).setDeckCoverVariant(me.id, deckId, variant);
   bumpDeck(game, deckId);
   bumpDeckList(game);
 }
@@ -377,7 +407,7 @@ export async function setDeckPinnedAction(formData: FormData) {
   if (!deckId) throw new Error("missing deck_id");
   backupBeforeWrite(game);
   // Owner-scoped in the repo: someone else's deck id is a silent no-op.
-  digimon.setDeckPinned(me.id, deckId, pinned);
+  lib(game).setDeckPinned(me.id, deckId, pinned);
   bumpDeckList(game);
 }
 
@@ -389,7 +419,7 @@ export async function setCardPriceAction(formData: FormData) {
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
   const price = raw === "" ? null : Number(raw);
-  digimon.setCardPrice(
+  lib(game).setCardPrice(
     me.id,
     cardId,
     price !== null && Number.isFinite(price) ? price : null,
@@ -406,7 +436,7 @@ export async function setDeckCoverAction(formData: FormData) {
   const cardId = raw === null || raw === "" ? null : String(raw);
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  digimon.setDeckCover(me.id, deckId, cardId);
+  lib(game).setDeckCover(me.id, deckId, cardId);
   bumpDeckAndList(game, deckId);
 }
 
@@ -418,7 +448,7 @@ export async function setDeckCardQuantityAction(formData: FormData) {
   const quantity = Math.max(0, Number(formData.get("quantity") ?? 0));
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  digimon.setDeckCardQuantity(me.id, deckId, cardId, quantity);
+  lib(game).setDeckCardQuantity(me.id, deckId, cardId, quantity);
   if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
   else bumpDeck(game, deckId);
 }
@@ -433,17 +463,17 @@ export async function adjustDeckCardPurchasedAction(formData: FormData) {
   backupBeforeWrite(game);
   // Pooled deck: ±1 adjusts the SHARED held count (max across the pool), then
   // re-applies it to every member deck (each capped at its own quantity).
-  const peers = digimon.decksSharingPoolWith(me.id, deckId);
+  const peers = lib(game).decksSharingPoolWith(me.id, deckId);
   if (peers.length > 1) {
-    const cur = digimon.pooledOwnedForCard(peers, cardId);
+    const cur = lib(game).pooledOwnedForCard(peers, cardId);
     const owned = Math.min(
       Math.max(0, cur + delta),
-      digimon.maxNeedForCard(peers, cardId),
+      lib(game).maxNeedForCard(peers, cardId),
     );
-    digimon.reconcilePoolCard(peers, cardId, owned);
+    lib(game).reconcilePoolCard(peers, cardId, owned);
     bumpGame(game);
   } else {
-    digimon.adjustDeckCardPurchased(me.id, deckId, cardId, delta);
+    lib(game).adjustDeckCardPurchased(me.id, deckId, cardId, delta);
     bumpDeck(game, deckId);
   }
 }
@@ -457,11 +487,11 @@ export async function setPoolCardOwnedAction(formData: FormData) {
   const owned = Math.max(0, Number(formData.get("owned") ?? 0));
   if (!isGameId(game)) throw new Error("invalid game");
   // Ownership: getGroup returns undefined unless the caller owns the group.
-  if (!digimon.getGroup(me.id, groupId)) throw new Error("not found");
+  if (!lib(game).getGroup(me.id, groupId)) throw new Error("not found");
   backupBeforeWrite(game);
-  const members = digimon.groupMemberDeckIds(groupId);
-  const capped = Math.min(owned, digimon.maxNeedForCard(members, cardId));
-  digimon.reconcilePoolCard(members, cardId, capped);
+  const members = lib(game).groupMemberDeckIds(groupId);
+  const capped = Math.min(owned, lib(game).maxNeedForCard(members, cardId));
+  lib(game).reconcilePoolCard(members, cardId, capped);
   bumpGroups(game, groupId);
 }
 
@@ -493,7 +523,7 @@ export async function importDeckAction(formData: FormData): Promise<{
     };
   }
 
-  const l = digimon;
+  const l = lib(game);
 
   // Normalize alt-art / parallel suffixes (e.g. "EX2-060_P1" → "EX2-060") to
   // the base printing — that's the restriction identity for both games — and
@@ -546,8 +576,8 @@ export async function importDeckAction(formData: FormData): Promise<{
   // The first valid card "wins" — its series + color become the lock, and
   // every later card has to match. Mirrors the runtime behavior of
   // setDeckCardQuantity for a brand-new deck.
-  const pendingSeries: string | null = null;
-  const pendingColor: string | null = null;
+  let pendingSeries: string | null = null;
+  let pendingColor: string | null = null;
 
   const drops: Drop[] = [];
   /** Codes the parser read but the card DB doesn't have, with the requested
@@ -562,7 +592,10 @@ export async function importDeckAction(formData: FormData): Promise<{
   const heroCandidates: { id: string; name: string; qty: number }[] = [];
 
   for (const [code, qty] of merged) {
-    const card = digimon.getCardByCode(code);
+    const card =
+      game === "digimon"
+        ? digimon.getCardByCode(code)
+        : ua.getCardByCode(code);
     if (!card) {
       missing.push({ code, qty });
       continue;
@@ -594,6 +627,31 @@ export async function importDeckAction(formData: FormData): Promise<{
     // the pendingSeries/pendingColor; subsequent cards must match. Same
     // semantics as the runtime clamp, just predicted here so we can drop
     // mismatches into the notes with an explicit reason.
+    if (game === "unionarena") {
+      const uaCard = card as ua.UACard;
+      if (pendingSeries === null) {
+        pendingSeries = uaCard.series;
+      } else if (uaCard.series !== pendingSeries) {
+        drops.push({
+          type: "wrong_series",
+          code,
+          expected: pendingSeries,
+          got: uaCard.series,
+        });
+        continue;
+      }
+      if (pendingColor === null) {
+        pendingColor = uaCard.color;
+      } else if (uaCard.color !== pendingColor) {
+        drops.push({
+          type: "wrong_color",
+          code,
+          expected: pendingColor,
+          got: uaCard.color,
+        });
+        continue;
+      }
+    }
 
     // Per-card restriction (banned / limited).
     const r = restrictionByIdentity.get(identity);
@@ -626,7 +684,7 @@ export async function importDeckAction(formData: FormData): Promise<{
 
     // Track potential heroes. The cast is safe under the game branch
     // since we just fetched via digimon.getCardByCode in that arm.
-    if ((card as digimon.DigimonCard).level === 6) {
+    if (game === "digimon" && (card as digimon.DigimonCard).level === 6) {
       heroCandidates.push({
         id: card.id,
         name: (card as digimon.DigimonCard).name,
@@ -777,16 +835,16 @@ export async function setDeckCardPurchasedAction(formData: FormData) {
   backupBeforeWrite(game);
   // If this deck shares a pool, held is a shared count — set it for the whole
   // pool (each deck capped at its own quantity). Otherwise just this deck.
-  const peers = digimon.decksSharingPoolWith(me.id, deckId);
+  const peers = lib(game).decksSharingPoolWith(me.id, deckId);
   if (peers.length > 1) {
     const owned = Math.min(
       purchased,
-      digimon.maxNeedForCard(peers, cardId),
+      lib(game).maxNeedForCard(peers, cardId),
     );
-    digimon.reconcilePoolCard(peers, cardId, owned);
+    lib(game).reconcilePoolCard(peers, cardId, owned);
     bumpGame(game);
   } else {
-    digimon.setDeckCardPurchased(me.id, deckId, cardId, purchased);
+    lib(game).setDeckCardPurchased(me.id, deckId, cardId, purchased);
     bumpDeck(game, deckId);
   }
 }
@@ -807,7 +865,7 @@ export async function setCardCollectionAction(formData: FormData) {
   const quantity = Math.max(0, Number(formData.get("quantity") ?? 0));
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  digimon.setCardCollectionQuantity(me.id, cardId, variant, quantity);
+  lib(game).setCardCollectionQuantity(me.id, cardId, variant, quantity);
   bumpCollection(game);
 }
 
@@ -819,7 +877,7 @@ export async function adjustCardCollectionAction(formData: FormData) {
   const delta = Number(formData.get("delta") ?? 0);
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  digimon.adjustCardCollection(me.id, cardId, variant, delta);
+  lib(game).adjustCardCollection(me.id, cardId, variant, delta);
   bumpCollection(game);
 }
 
@@ -843,7 +901,7 @@ export async function adjustCollectionByCodeAction(
     return { ok: false, error: "数量必须 ≥ 1" };
   }
   const card =
-    digimon.getCardByCode(code);
+    game === "digimon" ? digimon.getCardByCode(code) : ua.getCardByCode(code);
   if (!card) {
     return {
       ok: false,
@@ -851,7 +909,7 @@ export async function adjustCollectionByCodeAction(
     };
   }
   backupBeforeWrite(game);
-  digimon.adjustCardCollection(me.id, card.id, variant, delta);
+  lib(game).adjustCardCollection(me.id, card.id, variant, delta);
   bumpCollection(game);
   return { ok: true };
 }

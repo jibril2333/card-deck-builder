@@ -1,6 +1,6 @@
 import path from "path";
 
-export type GameId = "digimon";
+export type GameId = "digimon" | "unionarena";
 
 type GameInfo = {
   id: GameId;
@@ -8,9 +8,9 @@ type GameInfo = {
   short: string;
   emoji: string;
   accent: string;
-  /** Reference data (cards, card_images). Override via CDB_DIGIMON_DB. */
+  /** Reference data (cards, card_images). Override via CDB_DIGIMON_DB / CDB_UA_DB. */
   dbPath: string;
-  /** User data (decks, deck_cards, card_prices). Override via CDB_DIGIMON_USER_DB. */
+  /** User data (decks, deck_cards, card_prices). Override via CDB_DIGIMON_USER_DB / CDB_UA_USER_DB. */
   userDbPath: string;
 };
 
@@ -32,6 +32,7 @@ type GameInfo = {
 // DB for each game sit side-by-side, distinguished by a "<game>-" filename
 // prefix so the two games' user data can't collide:
 //   data.nosync/digimon.db        data.nosync/digimon-user.db
+//   data.nosync/unionarena.db     data.nosync/unionarena-user.db
 //   data.nosync/backups/<db-name>/<date>.db
 //
 // `data.nosync/` is gitignored — it holds personal user data and the repo
@@ -40,9 +41,12 @@ type GameInfo = {
 const DATA_BASE =
   process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync");
 const DEFAULT_DIGIMON_DB = path.join(DATA_BASE, "digimon.db");
+const DEFAULT_UA_DB = path.join(DATA_BASE, "unionarena.db");
 const DEFAULT_DIGIMON_USER_DB = path.join(DATA_BASE, "digimon-user.db");
+const DEFAULT_UA_USER_DB = path.join(DATA_BASE, "unionarena-user.db");
 
 const DIGIMON_DB = process.env.CDB_DIGIMON_DB ?? DEFAULT_DIGIMON_DB;
+const UA_DB = process.env.CDB_UA_DB ?? DEFAULT_UA_DB;
 
 export const GAMES: Record<GameId, GameInfo> = {
   digimon: {
@@ -54,12 +58,21 @@ export const GAMES: Record<GameId, GameInfo> = {
     dbPath: DIGIMON_DB,
     userDbPath: process.env.CDB_DIGIMON_USER_DB ?? DEFAULT_DIGIMON_USER_DB,
   },
+  unionarena: {
+    id: "unionarena",
+    label: "Union Arena",
+    short: "UNION ARENA",
+    emoji: "⚔️",
+    accent: "#7c3aed",
+    dbPath: UA_DB,
+    userDbPath: process.env.CDB_UA_USER_DB ?? DEFAULT_UA_USER_DB,
+  },
 };
 
-export const GAME_IDS: GameId[] = ["digimon"];
+export const GAME_IDS: GameId[] = ["digimon", "unionarena"];
 
 export function isGameId(v: string): v is GameId {
-  return v === "digimon";
+  return v === "digimon" || v === "unionarena";
 }
 
 // Common color → display map (covers both games)

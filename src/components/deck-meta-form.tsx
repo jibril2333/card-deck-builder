@@ -242,7 +242,26 @@ export function DeckMetaForm({
         ) : null}
       </div>
 
-      
+      {game === "unionarena" ? (
+        <div className="space-y-1">
+          <Label>规则锁定</Label>
+          <p className="text-[11px] text-[var(--color-muted-fg)]">
+            官方规则:单作品 + 单颜色。第一张加进卡组的卡会自动锁定,后续不符的卡会被拦截;清空卡组后自动解锁。
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            <LockChip
+              label="作品"
+              value={lockedSeries}
+              emptyLabel="未锁定(下一张卡决定)"
+            />
+            <LockChip
+              label="颜色"
+              value={lockedColor}
+              emptyLabel="未锁定(下一张卡决定)"
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-2 pt-2 flex-wrap">
         <SaveStatus status={status} pending={pending} />

@@ -20,6 +20,7 @@ import {
 } from "@/lib/cards/digimon-fields";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
+import * as ua from "@/lib/db/unionarena";
 
 export const dynamic = "force-dynamic";
 
@@ -41,19 +42,71 @@ export default async function CardPage({
   if (!isGameId(game)) notFound();
   const decoded = code.map((s) => decodeURIComponent(s)).join("/");
 
-  const card = digimon.getCardByCode(decoded);
+  if (game === "digimon") {
+    const card = digimon.getCardByCode(decoded);
+    if (!card) notFound();
+    const cardLang = parseCardLang(
+      (await cookies()).get(CARD_LANG_COOKIE)?.value,
+    );
+    // Which field comes from which language is declared once, in
+    // FIELD_SOURCE — see src/lib/cards/digimon-fields.ts. Hand-writing the
+    // fallbacks here is how BT9-104 ended up showing its Japanese trait beside
+    // its English attribute.
+    const t = digimon.getCardTranslation(card.code, cardLang);
+    const view = buildCardView(card, t);
+    const decks = me
+      ? digimon.listDecksWithCardQty(meId, card.id).map((d) => ({
+          id: d.id,
+          name: d.name,
+          accent_color: d.accent_color,
+          accent_color2: d.accent_color2,
+          card_qty: d.card_qty,
+          total: d.total,
+        }))
+      : [];
+    // Art in the reader's language. getCardImages never interleaves languages:
+    // it returns this language's variants, or the EN set when we have no art
+    // for this card in that language at all.
+    let variants = digimon.getCardImages(card.code, cardLang);
+    const haveLocalizedArt = variants.some((v) => v.lang === cardLang);
+    // No probed art in this language, but the translation row carries the
+    // localized base scan — lead with it so the DEFAULT view is in-language
+    // and the EN variants read as clearly-labelled extras behind it.
+    if (!haveLocalizedArt && t?.image_url) {
+      variants = [
+        { variant: `lang-${cardLang}`, image_url: t.image_url, lang: cardLang },
+        ...variants,
+      ];
+    }
+    // Last resort: nothing probed for this code yet — use the card's own
+    // image_url so the page isn't empty.
+    if (variants.length === 0 && card.image_url) {
+      variants = [{ variant: "", image_url: card.image_url, lang: "en" }];
+    }
+    // Cardrush per-illustrator market prices (each distinct printing).
+    const listings = digimon.getExternalListings(card.id);
+    return (
+      <DetailShell game={game}>
+        <DigimonDetail
+          card={view}
+          subName={t?.name && t.name !== card.name ? card.name : undefined}
+          decks={decks}
+          variants={variants}
+          defaultVariant={defaultVariant}
+          cardLang={cardLang}
+          price={digimon.getCardPrice(meId, card.id)}
+          marketListings={listings}
+          rulings={digimon.getCardRulings(card.code)}
+          readonly={!me}
+        />
+      </DetailShell>
+    );
+  }
+
+  const card = ua.getCardByCode(decoded);
   if (!card) notFound();
-  const cardLang = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
-  // Which field comes from which language is declared once, in
-  // FIELD_SOURCE — see src/lib/cards/digimon-fields.ts. Hand-writing the
-  // fallbacks here is how BT9-104 ended up showing its Japanese trait beside
-  // its English attribute.
-  const t = digimon.getCardTranslation(card.code, cardLang);
-  const view = buildCardView(card, t);
   const decks = me
-    ? digimon.listDecksWithCardQty(meId, card.id).map((d) => ({
+    ? ua.listDecksWithCardQty(meId, card.id).map((d) => ({
         id: d.id,
         name: d.name,
         accent_color: d.accent_color,
@@ -62,39 +115,29 @@ export default async function CardPage({
         total: d.total,
       }))
     : [];
-  // Art in the reader's language. getCardImages never interleaves languages:
-  // it returns this language's variants, or the EN set when we have no art
-  // for this card in that language at all.
-  let variants = digimon.getCardImages(card.code, cardLang);
-  const haveLocalizedArt = variants.some((v) => v.lang === cardLang);
-  // No probed art in this language, but the translation row carries the
-  // localized base scan — lead with it so the DEFAULT view is in-language
-  // and the EN variants read as clearly-labelled extras behind it.
-  if (!haveLocalizedArt && t?.image_url) {
-    variants = [
-      { variant: `lang-${cardLang}`, image_url: t.image_url, lang: cardLang },
-      ...variants,
+  let uaVariants = ua
+    .getCardVariants(card.code)
+    .filter((v) => v.image_url)
+    .map((v) => ({
+      variant: v.code,
+      image_url: v.image_url!,
+      label: v.rarity,
+    }));
+  if (uaVariants.length === 0 && card.image_url) {
+    uaVariants = [
+      { variant: card.code, image_url: card.image_url, label: card.rarity },
     ];
   }
-  // Last resort: nothing probed for this code yet — use the card's own
-  // image_url so the page isn't empty.
-  if (variants.length === 0 && card.image_url) {
-    variants = [{ variant: "", image_url: card.image_url, lang: "en" }];
-  }
-  // Cardrush per-illustrator market prices (each distinct printing).
-  const listings = digimon.getExternalListings(card.id);
+  const uaListings = ua.getExternalListings(card.id);
   return (
     <DetailShell game={game}>
-      <DigimonDetail
-        card={view}
-        subName={t?.name && t.name !== card.name ? card.name : undefined}
+      <UADetail
+        card={card}
         decks={decks}
-        variants={variants}
+        variants={uaVariants}
         defaultVariant={defaultVariant}
-        cardLang={cardLang}
-        price={digimon.getCardPrice(meId, card.id)}
-        marketListings={listings}
-        rulings={digimon.getCardRulings(card.code)}
+        price={ua.getCardPrice(meId, card.id)}
+        marketListings={uaListings}
         readonly={!me}
       />
     </DetailShell>
@@ -535,6 +578,146 @@ function DigimonDetail({
   );
 }
 
+function UADetail({
+  card,
+  decks,
+  variants,
+  defaultVariant,
+  price,
+  marketListings,
+  readonly,
+}: {
+  card: ua.UACard;
+  decks: {
+    id: string;
+    name: string;
+    accent_color: string;
+    accent_color2: string | null;
+    card_qty: number;
+    total: number;
+  }[];
+  variants: { variant: string; image_url: string; label?: string }[];
+  defaultVariant?: string;
+  price: number | null;
+  marketListings: ua.ExternalListing[];
+  /** Anon viewer: hide the editable price input + the AddToDeck widget. */
+  readonly: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
+      <div className="space-y-3">
+        <CardImageGallery
+          name={card.name}
+          variants={variants}
+          defaultVariant={defaultVariant}
+        />
+        {/* Everything in this panel is conditional, so the panel has to be
+            too — an anonymous reader looking at a card with no market listings
+            and no price got an empty bordered box. */}
+        {!readonly || marketListings.length > 0 || price != null ? (
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
+          <MarketListingsBlock listings={marketListings} />
+          {readonly ? (
+            price != null ? (
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-medium text-[var(--color-muted-fg)]">
+                  预期价格
+                </span>
+                <span className="font-mono tabular-nums">¥{price}</span>
+              </div>
+            ) : null
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-[var(--color-muted-fg)] shrink-0">
+                  预期价格
+                </span>
+                <CardPriceInput
+                  game="unionarena"
+                  cardId={card.id}
+                  price={price}
+                  className="w-28"
+                />
+              </div>
+              <AddToDeck game="unionarena" cardId={card.id} decks={decks} />
+            </>
+          )}
+        </div>
+        ) : null}
+      </div>
+
+      <div className="space-y-5">
+        <div>
+          <div className="text-xs font-mono text-[var(--color-muted-fg)]">
+            {card.code}
+          </div>
+          <h1 className="text-2xl font-bold leading-tight">{card.name}</h1>
+          {card.name_reading ? (
+            <div className="text-xs text-[var(--color-muted-fg)] mt-0.5">
+              {card.name_reading}
+            </div>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <span className="chip">
+              <span
+                className="chip-dot"
+                style={{ background: colorHex(card.color) }}
+              />
+              {card.color}
+            </span>
+            <Badge>{card.card_type}</Badge>
+            <Badge>{card.rarity}</Badge>
+            <Badge className="bg-[var(--color-accent)]/10 text-[var(--color-accent)] border-[var(--color-accent)]/30">
+              {card.series}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)]">
+          <Stat label="Energy" value={card.energy_cost} />
+          <Stat label="AP" value={card.ap_cost} />
+          <Stat label="BP" value={card.bp || null} />
+        </div>
+
+        <EffectBlock label="Trigger" text={card.trigger_text} />
+        <EffectBlock label="Effect" text={card.effect_text} />
+
+        <div className="grid grid-cols-2 gap-3 text-xs text-[var(--color-muted-fg)] pt-3 border-t border-[var(--color-border)]">
+          <Stat label="Locale" value={card.locale} />
+          <Stat label="Source" value={card.source} />
+          {card.source_url ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] uppercase tracking-wide">源</span>
+              <a
+                href={card.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm underline truncate"
+              >
+                查看页面 ↗
+              </a>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One row showing a scraped third-party market price. Renders nothing if
+ * `entry` is null (no data scraped for this variant yet). When the cheapest
+ * listing scraped was sold out we still show the price but strike it through
+ * — it's the most recent signal, even if you can't buy it right now.
+ */
+/**
+ * Cardrush market-price breakout: one row per (variant_type, illustrator)
+ * pair. The same card_id can have several rows — e.g. Omnimon's "sasasi"
+ * base art (¥100) and "Tonamikanji" re-illustration (¥19,300) both
+ * register as "base" but are visually different printings.
+ *
+ * Renders nothing when no listings have been scraped yet.
+ */
 function MarketListingsBlock({
   listings,
 }: {

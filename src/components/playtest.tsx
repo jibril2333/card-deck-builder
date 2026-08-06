@@ -11,6 +11,7 @@ import { pAtLeastOne, expectedCount } from "@/lib/probability";
  *   - digimon: 50-card main deck, opening hand 5, top 5 set aside as
  *     security after the hand is kept, Digi-Egg cards live in a separate
  *     egg deck and are never drawn. One mulligan (full redraw, must keep).
+ *   - unionarena: 50-card deck, opening hand 7, one mulligan.
  *
  * The probability table treats "seen by turn T" as opening hand + T draws —
  * a uniform random subset of the deck (see src/lib/probability.ts), so

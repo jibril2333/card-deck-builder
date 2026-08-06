@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Card Deck Builder",
-  description: "Search cards and build decks for the Digimon Card Game",
+  description: "Search cards and build decks for Digimon & Union Arena",
 };
 
 export default function RootLayout({

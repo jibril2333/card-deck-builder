@@ -16,6 +16,7 @@ import { GAMES, type GameId } from "../src/lib/games";
 import {
   parseDigimonRestrictions,
   parseDigimonBannedPairs,
+  parseUARestrictions,
   type ParsedRestriction,
   type ParsedPair,
 } from "../src/lib/scraper/restrictions";
@@ -34,6 +35,10 @@ const SOURCES: Record<
     parse: parseDigimonRestrictions,
     parsePairs: parseDigimonBannedPairs,
   },
+  unionarena: {
+    url: "https://www.unionarena-tcg.com/jp/rules/limited.php",
+    parse: parseUARestrictions,
+  },
 };
 
 const UA_HEADER =
@@ -50,8 +55,8 @@ function parseArgs() {
   }
   const game = pick("--game");
   const dryRun = args.includes("--dry-run");
-  if (game && game !== "digimon") {
-    console.error(`bad --game "${game}" (digimon)`);
+  if (game && game !== "digimon" && game !== "unionarena") {
+    console.error(`bad --game "${game}" (digimon | unionarena)`);
     process.exit(2);
   }
   return { game: game as GameId | null, dryRun };
@@ -160,7 +165,7 @@ async function runFor(game: GameId, dryRun: boolean) {
 
 async function main() {
   const { game, dryRun } = parseArgs();
-  const games: GameId[] = game ? [game] : ["digimon"];
+  const games: GameId[] = game ? [game] : ["digimon", "unionarena"];
   for (const g of games) {
     try {
       await runFor(g, dryRun);

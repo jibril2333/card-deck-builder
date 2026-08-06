@@ -5,6 +5,7 @@ import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { RestrictionBadge } from "@/components/restriction-badge";
 import * as digimon from "@/lib/db/digimon";
+import * as ua from "@/lib/db/unionarena";
 
 export const dynamic = "force-dynamic";
 
@@ -28,31 +29,129 @@ export default async function RestrictionsPage({
   const { game } = await params;
   if (!isGameId(game)) notFound();
 
-  let rows = digimon.listRestrictions();
-  let pairEdges = digimon.listBannedPairs();
+  const lib = game === "digimon" ? digimon : ua;
+  let rows = lib.listRestrictions();
+  let pairEdges = lib.listBannedPairs();
 
   // Digimon: localize the displayed card names per the user's language pick.
-  const cardLang = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
-  const codes = [
-    ...rows.map((r) => r.card_code).filter((c): c is string => !!c),
-    ...pairEdges.flatMap((e) => [e.trigger_code, e.banned_code]),
-  ].filter((c): c is string => !!c);
-  const tMap = digimon.getDisplayTranslations(codes, cardLang);
-  if (tMap.size > 0) {
-    rows = rows.map((r) => {
-      const t = r.card_code ? tMap.get(r.card_code) : undefined;
-      return t?.name ? { ...r, card_name: t.name } : r;
-    });
-    pairEdges = pairEdges.map((e) => ({
-      ...e,
-      trigger_name:
-        (e.trigger_code && tMap.get(e.trigger_code)?.name) || e.trigger_name,
-      banned_name:
-        (e.banned_code && tMap.get(e.banned_code)?.name) || e.banned_name,
-    }));
+  if (game === "digimon") {
+    const cardLang = parseCardLang(
+      (await cookies()).get(CARD_LANG_COOKIE)?.value,
+    );
+    const codes = [
+      ...rows.map((r) => r.card_code).filter((c): c is string => !!c),
+      ...pairEdges.flatMap((e) => [e.trigger_code, e.banned_code]),
+    ].filter((c): c is string => !!c);
+    const tMap = digimon.getDisplayTranslations(codes, cardLang);
+    if (tMap.size > 0) {
+      rows = rows.map((r) => {
+        const t = r.card_code ? tMap.get(r.card_code) : undefined;
+        return t?.name ? { ...r, card_name: t.name } : r;
+      });
+      pairEdges = pairEdges.map((e) => ({
+        ...e,
+        trigger_name:
+          (e.trigger_code && tMap.get(e.trigger_code)?.name) || e.trigger_name,
+        banned_name:
+          (e.banned_code && tMap.get(e.banned_code)?.name) || e.banned_name,
+      }));
+    }
   }
+
+  const banned = rows.filter((r) => r.status === "banned");
+  const limited1 = rows.filter((r) => r.status === "limited_1");
+  const limited2 = rows.filter((r) => r.status === "limited_2");
+
+  // Group banned-pair edges by trigger so the UI can render "A ⇒ B1, B2, …"
+  // groups rather than a long flat list of edges.
+  const pairGroups = (() => {
+    const m = new Map<string, typeof pairEdges>();
+    for (const edge of pairEdges) {
+      const arr = m.get(edge.trigger_identity) ?? [];
+      arr.push(edge);
+      m.set(edge.trigger_identity, arr);
+    }
+    return [...m.entries()].map(([trigger, edges]) => ({
+      trigger,
+      // The trigger metadata is on every edge — grab from the first one.
+      trigger_code: edges[0].trigger_code,
+      trigger_name: edges[0].trigger_name,
+      trigger_image_url: edges[0].trigger_image_url,
+      trigger_color: edges[0].trigger_color,
+      banned: edges.map((e) => ({
+        identity: e.banned_identity,
+        code: e.banned_code,
+        name: e.banned_name,
+        image_url: e.banned_image_url,
+        color: e.banned_color,
+      })),
+    }));
+  })();
+
+  // Latest fetched_at across rows = "last sync" stamp for the source.
+  const lastSync = (() => {
+    const allTimes = [...rows, ...pairEdges].map((x) => x.fetched_at);
+    return allTimes.reduce<string | null>(
+      (acc, t) => (acc === null || t > acc ? t : acc),
+      null,
+    );
+  })();
+
+  return (
+    <>
+      <main className="w-full mx-auto max-w-[1500px] px-4 sm:px-6 py-6">
+        <header className="mb-5">
+          <h1 className="text-xl font-semibold flex items-center gap-2">
+            <span aria-hidden>🚫</span>
+            禁卡 / 制限卡
+            <span className="text-[var(--color-muted-fg)] font-normal text-sm tabular-nums">
+              ({rows.length}
+              {pairGroups.length > 0 ? ` · ${pairGroups.length} 组合` : ""})
+            </span>
+          </h1>
+          <p className="text-xs text-[var(--color-muted-fg)] mt-1">
+            官方规则,卡组构筑时按身份(本体 + 异画合计)计算。
+            {lastSync ? (
+              <>
+                {" "}最后同步: <span className="tabular-nums">{lastSync.slice(0, 10)}</span>
+              </>
+            ) : null}
+          </p>
+        </header>
+
+        {rows.length === 0 && pairGroups.length === 0 ? (
+          <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">
+            数据库里还没有禁卡/制限卡数据,等下一次 scraper 同步。
+          </div>
+        ) : (
+          <div className="space-y-8">
+            <Section
+              kind="banned"
+              title="禁卡"
+              caption="不能放入卡组"
+              rows={banned}
+              game={game}
+            />
+            <Section
+              kind="limited_1"
+              title="制限 1"
+              caption="卡组中最多 1 张(含异画)"
+              rows={limited1}
+              game={game}
+            />
+            <Section
+              kind="limited_2"
+              title="制限 2"
+              caption="卡组中最多 2 张(含异画)"
+              rows={limited2}
+              game={game}
+            />
+            <PairsSection groups={pairGroups} game={game} />
+          </div>
+        )}
+      </main>
+    </>
+  );
 }
 
 type Row = {

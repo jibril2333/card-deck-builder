@@ -30,7 +30,7 @@ import { SESSION_COOKIE } from "@/lib/auth/types";
  * (Login / register are not listed here because they're meant to be
  * accessed unauthenticated; gating them would create a redirect loop.)
  */
-const PROTECTED_RE = /^\/(?:account(?:\/|$)|digimon\/collection(?:\/|$))/;
+const PROTECTED_RE = /^\/(?:account(?:\/|$)|(?:digimon|unionarena)\/collection(?:\/|$))/;
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

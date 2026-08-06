@@ -4,6 +4,7 @@
  *
  * Both games encode parallel printings with a `_pN` suffix on the code:
  *   - Digimon (uppercase):   "BT1-001_P1"            "BT1-001_P2" …
+ *   - UNION ARENA (lower):   "EX01BT/HTR-1-030_p1"   "…_p2" …
  *
  * The two games' DB models for alt-art differ deeply (Digimon stores alt-art
  * in a side table `card_images`; UA stores each parallel as its own `cards`

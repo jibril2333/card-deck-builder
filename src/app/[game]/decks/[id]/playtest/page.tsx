@@ -5,6 +5,7 @@ import { isGameId, type GameId } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { Playtest, type PlaytestCard } from "@/components/playtest";
 import * as digimon from "@/lib/db/digimon";
+import * as ua from "@/lib/db/unionarena";
 
 /**
  * Deck playtesting page: opening-hand simulator + draw-probability table.
@@ -18,23 +19,39 @@ export default async function PlaytestPage({
   const { game, id } = await params;
   if (!isGameId(game)) notFound();
 
-  const deck = digimon.getDeck(id);
-  if (!deck) notFound();
-  const deckName = deck.name;
-  const cardLang = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
-  const cards: PlaytestCard[] = digimon.overlayDisplay(
-    digimon.getDeckCards(id).map((c) => ({
+  let deckName: string;
+  let cards: PlaytestCard[];
+  if (game === "digimon") {
+    const deck = digimon.getDeck(id);
+    if (!deck) notFound();
+    deckName = deck.name;
+    const cardLang = parseCardLang(
+      (await cookies()).get(CARD_LANG_COOKIE)?.value,
+    );
+    cards = digimon.overlayDisplay(
+      digimon.getDeckCards(id).map((c) => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        image_url: c.image_url,
+        quantity: c.quantity,
+        isEgg: c.card_type === "Digi-Egg",
+      })),
+      cardLang,
+    );
+  } else {
+    const deck = ua.getDeck(id);
+    if (!deck) notFound();
+    deckName = deck.name;
+    cards = ua.getDeckCards(id).map((c) => ({
       id: c.id,
       code: c.code,
       name: c.name,
       image_url: c.image_url,
       quantity: c.quantity,
-      isEgg: c.card_type === "Digi-Egg",
-    })),
-    cardLang,
-  );
+      isEgg: false,
+    }));
+  }
 
   return (
     <>

@@ -9,8 +9,13 @@ import { PoolHeldStepper } from "@/components/pool-held-stepper";
 import { PoolSwap } from "@/components/pool-swap";
 import { requireUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
+import * as ua from "@/lib/db/unionarena";
 
 export const dynamic = "force-dynamic";
+
+function lib(game: GameId) {
+  return game === "digimon" ? digimon : ua;
+}
 
 /**
  * Shared-pool view for a deck group: how many physical copies of each card to
@@ -27,11 +32,11 @@ export default async function GroupPage({
   const { game, id } = await params;
   if (!isGameId(game)) notFound();
 
-  const group = digimon.getGroup(me.id, id);
+  const group = lib(game).getGroup(me.id, id);
   if (!group) notFound();
 
-  const pool = digimon.getGroupPool(id);
-  const allDecks = digimon
+  const pool = lib(game).getGroupPool(id);
+  const allDecks = lib(game)
     .listDecks(me.id)
     .map((d) => ({
       id: d.id,
@@ -42,10 +47,13 @@ export default async function GroupPage({
 
   // Localize names (Digimon) per the language cookie.
   const cardLang = parseCardLang((await cookies()).get(CARD_LANG_COOKIE)?.value);
-  const tMap = digimon.getDisplayTranslations(
-    pool.map((c) => c.code),
-    cardLang,
-  );
+  const tMap =
+    game === "digimon"
+      ? digimon.getDisplayTranslations(
+          pool.map((c) => c.code),
+          cardLang,
+        )
+      : new Map();
 
   const memberDecks = group.decks;
   const deckColor = (d: (typeof memberDecks)[number]) =>

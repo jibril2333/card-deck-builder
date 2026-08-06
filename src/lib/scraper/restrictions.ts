@@ -6,6 +6,7 @@
  *     `#application` ("List of Currently Affected Cards") is the
  *     authoritative current state — only that part is parsed.
  *
+ *   - UNION ARENA: https://www.unionarena-tcg.com/jp/rules/limited.php
  *     Section `#limitedCardlist` ("現在施行中のカードの使用制限について")
  *     is the authoritative current list.
  *
@@ -79,6 +80,108 @@ export function parseDigimonRestrictions(html: string): ParsedRestriction[] {
   return out;
 }
 
+/**
+ * Parse UA's banlist (Japanese, unionarena-tcg.com).
+ *
+ * The page splits restrictions across multiple sections:
+ *   - "YYYY年MM月DD日(X)施行" — restrictions added/effective on that date
+ *   - "現在施行中の…" — the current authoritative aggregated list
+ *
+ * In practice "現在施行中" doesn't always include the newly-effective
+ * cards from recent announcements until the next update cycle. To get a
+ * complete picture we scan every "制限カード(1枚)" / "制限カード(2枚)" h3
+ * in the whole document and deduplicate by `identity`, taking the
+ * STRICTEST limit when the same identity appears in multiple sections.
+ *
+ * Each card lives in a `.contentsCol`; the full code is recovered from
+ * the base-art image URL (e.g.
+ * `/jp/images/rules/limited/UA01BT_CGH-1-083_R.png` → `UA01BT/CGH-1-083`).
+ * The `※パラレルカード含む` marker is read explicitly per-card.
+ */
+export function parseUARestrictions(html: string): ParsedRestriction[] {
+  const $ = cheerio.load(html);
+  const byIdentity = new Map<string, ParsedRestriction>();
+
+  $("h3.mediumTit").each((_i, el) => {
+    const text = $(el).text().replace(/\s+/g, " ").trim();
+    let status: ParsedRestriction["status"];
+    let max: ParsedRestriction["max_count"];
+    if (text.includes("制限カード(1枚)")) {
+      status = "limited_1";
+      max = 1;
+    } else if (text.includes("制限カード(2枚)")) {
+      status = "limited_2";
+      max = 2;
+    } else {
+      return;
+    }
+
+    // Walk forward through siblings until the next h3 (or end-of-section).
+    let $cur = $(el).next();
+    while ($cur.length && !$cur.is("h3.mediumTit")) {
+      if ($cur.hasClass("contentsCol")) {
+        const includesParallel = $cur
+          .find(".commonNoticeList")
+          .text()
+          .includes("パラレル");
+
+        // A contentsCol can list MULTIPLE cards (when a restriction
+        // covers a set of cards together — e.g. "EVA-1-051 + EVA-1-063").
+        // Iterate every <h5 class="xSmallTit"> for the codes; pair each
+        // with a corresponding image to recover the set-prefix.
+        //
+        // Image URL patterns we accept:
+        //   /jp/images/rules/limited/UA01BT_CGH-1-083_R.png   (rules/limited)
+        //   /jp/images/cardlist/card/UA44BT_EVA-1-051.png      (cardlist/card)
+        // Either way the filename encodes `{SET}_{SUBCODE}` after the
+        // last `/`.
+        const codeRe = /^([A-Z]+-\d+-\d+)\b/;
+        const $codes = $cur.find("h5.xSmallTit");
+        $codes.each((_j, h5) => {
+          const m = $(h5).text().replace(/\s+/g, " ").trim().match(codeRe);
+          if (!m) return;
+          const subCode = m[1];
+
+          // Find an image whose filename matches this subCode.
+          let setPrefix: string | null = null;
+          $cur.find("img").each((_k, img) => {
+            const src = $(img).attr("src") ?? "";
+            const fm = src.match(
+              new RegExp(
+                "/([A-Z0-9]+)_" +
+                  subCode.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+                  "(?:_[A-Za-z0-9]+)?\\.png$",
+              ),
+            );
+            if (fm) {
+              setPrefix = fm[1];
+              return false;
+            }
+          });
+          if (!setPrefix) return;
+
+          const identity = `${setPrefix}/${subCode}`;
+          const next: ParsedRestriction = {
+            identity,
+            status,
+            max_count: max,
+            includes_parallel: includesParallel,
+          };
+          // De-dupe across sections: keep the strictest restriction
+          // (lowest max_count) when the same identity appears multiple
+          // times (e.g. listed under both "施行" and "現在施行中").
+          const prior = byIdentity.get(identity);
+          if (!prior || next.max_count < prior.max_count) {
+            byIdentity.set(identity, next);
+          }
+        });
+      }
+      $cur = $cur.next();
+    }
+  });
+
+  return [...byIdentity.values()];
+}
 
 export type ParsedPair = {
   /** Code of the trigger card ("Component Card A" — its presence in a deck
