@@ -17,6 +17,7 @@ import {
   parseAll,
   JA_LABELS,
   lastUnknownLabels,
+  canonicalJpType,
 } from "../src/lib/scraper/digimon";
 import {
   checkScrapeSanity,
@@ -117,6 +118,22 @@ async function main() {
                       link_dp    = COALESCE(@link_dp, link_dp)
       WHERE code = @code`,
   );
+  // WHAT a card is, like which fields it has, is a fact about the printed card
+  // and not about the language — and here too this site is the one that gets it
+  // right. world.digimoncard.com calls all twelve of LM-027…038 "Digimon";
+  // they are Options (the Scramble and Memory Boost! cards), and the giveaway
+  // is that the same page prints neither a level nor a DP for them. The EN
+  // scraper assigns `card_type` unconditionally, so its verdict used to be
+  // final and the type filter simply never returned those cards.
+  //
+  // Only the closed set below is mapped: an unrecognized word means the site
+  // said something we don't model, and guessing is how a real type gets
+  // overwritten with a wrong one. `card_type` on `cards` stays English —
+  // `card_translations` already carries the Japanese for display.
+  const alignType = db.prepare(
+    `UPDATE cards SET card_type = @card_type
+      WHERE code = @code AND card_type <> @card_type`,
+  );
 
   const prefixes = only
     ? [only]
@@ -148,6 +165,12 @@ async function main() {
     }
     return true;
   }
+
+  // Corrections this run made to `cards.card_type`, and any type word the map
+  // above doesn't know. Both are reported at the end: a silent retype is a
+  // scraper quietly overruling another source, which is worth seeing.
+  const retyped: string[] = [];
+  const unknownTypes = new Set<string>();
 
   function upsertCards(cards: ReturnType<typeof parseAll>): number {
     let n = 0;
@@ -190,6 +213,13 @@ async function main() {
           has_evocost: c.evolution_cost ? 1 : 0,
           has_evoreq: c.evolution_requirements ? 1 : 0,
         });
+        const canonType = canonicalJpType(c.card_type);
+        if (canonType) {
+          const r = alignType.run({ code: c.code, card_type: canonType });
+          if (r.changes) retyped.push(`${c.code} → ${canonType}`);
+        } else if (c.card_type) {
+          unknownTypes.add(c.card_type.trim());
+        }
         // A Dual card's colour/cost and a Link card's DP aren't
         // language-specific, so they live on `cards` — but for JP-only sets
         // this is the only site that can see them, so they reach `cards` here.
@@ -301,6 +331,19 @@ async function main() {
   console.log(
     `[jp] done. upserted ${total}; coverage ${have.n}/${all.n} cards in DB`,
   );
+  if (retyped.length) {
+    console.log(
+      `[jp] corrected card_type on ${retyped.length} card(s): ` +
+        retyped.slice(0, 12).join(", ") +
+        (retyped.length > 12 ? " …" : ""),
+    );
+  }
+  if (unknownTypes.size) {
+    console.warn(
+      `[jp] UNKNOWN card type(s) ${[...unknownTypes].join(", ")} — left as-is. ` +
+        `Add them to JP_CARD_TYPE.`,
+    );
+  }
   db.close();
   // Exit non-zero so refresh-cards.sh aborts instead of swapping in a DB that
   // is missing whatever the failing sets were supposed to contain.

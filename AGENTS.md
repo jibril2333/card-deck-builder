@@ -176,14 +176,21 @@ may be デジモン or 数码宝贝).
 ### The sources disagree, and each is wrong differently
 
 - **digimoncard.com (JP)** — the most reliable, and the authority on WHICH
-  FIELDS a card has. `scripts/scrape-digimon-jp.ts` clears fields this site
-  doesn't print for a card it returned. Cards it doesn't carry are untouched.
+  FIELDS a card has AND on WHAT TYPE a card is. `scripts/scrape-digimon-jp.ts`
+  clears fields this site doesn't print for a card it returned, and rewrites
+  `cards.card_type` from its verdict via `canonicalJpType` (a closed
+  vocabulary of five words — an unlisted one warns and changes nothing, since
+  a wrong guess overwrites a correct type and is not recoverable). It runs LAST
+  of the text stages, so it gets the final word over the EN site. Cards it
+  doesn't carry are untouched.
 - **world.digimoncard.com (EN)** — authoritative for English wording, but not
   complete and not always right: it omits EX10-012's security effect entirely,
-  prints a digivolve cost on Tamers that have none, and labels the same trait
-  "Attribute" where JP calls it a Type. Do NOT treat its silence as fact — I
-  tried making it authoritative for all text blocks and it deleted four cards'
-  real English text.
+  prints a digivolve cost on Tamers that have none, labels the same trait
+  "Attribute" where JP calls it a Type, and **gets the card TYPE wrong** — it
+  calls all twelve of LM-027…038 (the Scramble and Memory Boost! cards)
+  "Digimon" when they are Options. Do NOT treat its silence as fact — I tried
+  making it authoritative for all text blocks and it deleted four cards' real
+  English text.
 - **digimoncard.io** — a wiki-derived mirror, the only source for sets neither
   official site has published. It has ONE "second effect block" and routes it
   by card type, so the same text lands in whichever slot that implies; it leaks

@@ -11,11 +11,25 @@
  *
  * Two safety properties matter here:
  *
- *   - INSERT-ONLY. Cards missing from the API are never deleted. Our TOKEN
+ *   - NEVER DELETES. Cards missing from the API are never removed. Our TOKEN
  *     cards (BT22-TOKEN, TOKEN01, …) don't exist upstream at all, and a
  *     transient API hiccup returning a short list must never wipe the DB.
  *   - WHITELISTED. The API also serves the 1999-era Bandai card games (BO-,
  *     DD-, DV-, MD-, MO-, DM-, bare `ST-`); `MODERN_CODE` keeps them out.
+ *
+ * It also RE-READS the cards no official source covers. This used to be
+ * insert-only in the stronger sense that an existing row was never touched
+ * again, which quietly froze every field at whatever the very first import
+ * saw — upstream could correct a card and we would never find out. That is
+ * only safe to undo for cards nothing else can speak for: this feed is a
+ * wiki-derived mirror and is measurably WORSE than the official sites on the
+ * fields they both carry (it lowercases every rarity, drops "ACE" off names,
+ * and points image_url at its own scans), so re-reading a card the official
+ * scrapers also touch would trade one stale value for a fresh wrong one.
+ *
+ * "No official source covers it" = no `ja` row in card_translations, i.e.
+ * digimoncard.com has never returned this card. 77 of 4370 today, all of them
+ * originally imported from here anyway.
  *
  * Usage:
  *   npx tsx scripts/sync-cards.ts --dry-run   # report only (default: report+import)
@@ -105,6 +119,22 @@ async function main() {
       (c) => MODERN_CODE.test(c) && !byCode.has(c),
     );
 
+    // Cards no official site has ever returned, so this feed is the only thing
+    // that can correct them — see the header. Everything else is left to the
+    // official scrapers, which run after this one and overwrite what they own.
+    const uncovered = (
+      db
+        .prepare(
+          `SELECT code FROM cards c
+            WHERE NOT EXISTS (SELECT 1 FROM card_translations t
+                              WHERE t.code = c.code AND t.lang = 'ja')`,
+        )
+        .all() as { code: string }[]
+    )
+      .map((r) => r.code)
+      .filter((c) => byCode.has(c))
+      .sort();
+
     if (newCodes.length === 0) {
       console.log("[sync] up to date — no new cards.");
     } else {
@@ -139,18 +169,30 @@ async function main() {
       );
     }
 
+    if (uncovered.length) {
+      console.log(
+        `\n[sync] re-reading ${uncovered.length} card(s) no official source ` +
+          `covers: ` +
+          uncovered.slice(0, 8).join(" ") +
+          (uncovered.length > 8 ? " …" : ""),
+      );
+    }
+
     if (dryRun) {
       console.log("\n[sync] dry-run — no DB writes.");
       return;
     }
-    if (newCodes.length === 0) return;
+    if (newCodes.length === 0 && uncovered.length === 0) return;
 
     const ins = db.prepare(UPSERT_CARD_SQL);
     const tx = db.transaction((codes: string[]) => {
       for (const c of codes) ins.run(toCardRow(byCode.get(c)!));
     });
-    tx(newCodes);
-    console.log(`\n[sync] ✓ imported ${newCodes.length} card(s).`);
+    tx([...newCodes, ...uncovered]);
+    console.log(
+      `\n[sync] ✓ imported ${newCodes.length} card(s), ` +
+        `refreshed ${uncovered.length}.`,
+    );
     console.log(
       "[sync] note: text/art/prices for these are NOT fetched here — run the " +
         "translation, alt-art and price scrapers next.",

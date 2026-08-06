@@ -656,3 +656,30 @@ function fixDigiEggSecurity(c: ScrapedCard): ScrapedCard {
     security_effect: null,
   };
 }
+
+/**
+ * The site's card-type words, in the canonical English `cards.card_type` uses.
+ *
+ * A closed vocabulary — the whole JP corpus is these five values — so
+ * `canonicalJpType` returns undefined for anything unlisted rather than
+ * guessing. It exists because WHAT a card is, like which fields it has, is a
+ * fact about the printed card and not about the language, and this site is the
+ * one that gets it right: world.digimoncard.com calls all twelve of
+ * LM-027…038 "Digimon" when they are Options, and the EN scraper assigns
+ * `card_type` unconditionally, so its verdict was final and the type filter
+ * never returned those cards.
+ */
+export const JP_CARD_TYPE: Record<string, string> = {
+  デジモン: "Digimon",
+  オプション: "Option",
+  テイマー: "Tamer",
+  デジタマ: "Digi-Egg",
+  // Already English by the time it gets here: the parser composes it from the
+  // two halves the site prints separately.
+  Dual: "Dual",
+};
+
+/** Canonical English for a JP type word, or undefined if we don't model it. */
+export function canonicalJpType(t: string | null | undefined): string | undefined {
+  return t ? JP_CARD_TYPE[t.trim()] : undefined;
+}
