@@ -74,7 +74,11 @@ export function DeckHeader({
               src={cover.image_url}
               alt=""
               referrerPolicy="no-referrer"
-              className="absolute inset-0 w-full h-full object-cover object-center opacity-90"
+              // Focus a quarter of the way down, not the middle. A card is
+              // 5:7 and this strip is wide and short, so object-center lands
+              // on the effect box — and on the SAMPLE watermark printed across
+              // it. A quarter down is the illustration.
+              className="absolute inset-0 w-full h-full object-cover object-[50%_25%] opacity-90"
               style={{ filter: "blur(8px) saturate(1.2)" }}
             />
             {/* Solid at the bottom, where the text sits — the name has to stay

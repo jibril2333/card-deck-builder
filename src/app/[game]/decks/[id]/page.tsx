@@ -658,40 +658,45 @@ export default async function DeckEditPage({
 
           {mode !== "purchase" ? (
             <>
-              <div className="text-xs text-[var(--color-muted-fg)] mt-3">
-                主卡组 {main} / {target.main}
-                {loaded.isDigimon ? ` · 蛋卡 ${eggs} / ${target.egg}` : null}
-                {totalPrice > 0 ? (
-                  <span className="ml-2">
-                    · 预期总价{" "}
-                    <b className="text-[var(--color-fg)]">
-                      {fmtPrice(totalPrice)}
-                    </b>
-                  </span>
-                ) : null}
-                {!mainOk ? (
-                  <span className="ml-2 text-red-500">主卡组数量不达标</span>
-                ) : null}
-                {!eggOk ? (
-                  <span className="ml-2 text-red-500">
-                    蛋卡超过 {target.egg} 张
-                  </span>
+              {/* Counts and colour split share one line: both answer "what is
+                  in this deck right now", and on their own rows they pushed
+                  the cards a whole line further down for no added meaning. */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3">
+                <div className="text-xs text-[var(--color-muted-fg)]">
+                  主卡组 {main} / {target.main}
+                  {loaded.isDigimon ? ` · 蛋卡 ${eggs} / ${target.egg}` : null}
+                  {totalPrice > 0 ? (
+                    <span className="ml-2">
+                      · 预期总价{" "}
+                      <b className="text-[var(--color-fg)]">
+                        {fmtPrice(totalPrice)}
+                      </b>
+                    </span>
+                  ) : null}
+                  {!mainOk ? (
+                    <span className="ml-2 text-red-500">主卡组数量不达标</span>
+                  ) : null}
+                  {!eggOk ? (
+                    <span className="ml-2 text-red-500">
+                      蛋卡超过 {target.egg} 张
+                    </span>
+                  ) : null}
+                </div>
+
+                {colorBreakdown.length ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {colorBreakdown.map(([c, n]) => (
+                      <span key={c} className="chip">
+                        <span
+                          className="chip-dot"
+                          style={{ background: colorHex(c) }}
+                        />
+                        {c} · {n}
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
               </div>
-
-              {colorBreakdown.length ? (
-                <div className="flex flex-wrap items-center gap-1.5 mt-3">
-                  {colorBreakdown.map(([c, n]) => (
-                    <span key={c} className="chip">
-                      <span
-                        className="chip-dot"
-                        style={{ background: colorHex(c) }}
-                      />
-                      {c} · {n}
-                </span>
-                  ))}
-                </div>
-              ) : null}
             </>
           ) : (
             <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2">
