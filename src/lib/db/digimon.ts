@@ -538,6 +538,7 @@ export const {
   renameGroup,
   deleteGroup,
   setGroupDecks,
+  setDeckGroups,
   getGroupPool,
   groupMemberDeckIds,
   decksSharingPoolWith,

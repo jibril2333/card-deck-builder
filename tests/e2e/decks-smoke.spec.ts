@@ -27,12 +27,17 @@ test("create deck → land on detail page → switch modes → delete", async ({
 
   // 1. Navigate to the decks list.
   await page.goto("/digimon/decks");
+  // `.first()` is the page's h1. Once the account owns any deck a second
+  // "我的卡组" appears as the section heading above the list, and matching
+  // both is a strict-mode violation.
   await expect(
-    page.getByRole("heading", { name: /我的卡组/ }),
+    page.getByRole("heading", { name: /我的卡组/ }).first(),
   ).toBeVisible();
 
   // 2. Fill the create-deck form and submit.
-  const nameInput = page.getByPlaceholder("给卡组起个名字…");
+  // Substring match: the full placeholder is "卡组名(留空也可以,可后改)…" and
+  // has already been reworded once since this test was written.
+  const nameInput = page.getByPlaceholder("卡组名");
   await nameInput.fill(deckName);
   await page.getByRole("button", { name: /创建/ }).click();
 
@@ -68,9 +73,11 @@ test("empty deck list shows the empty-state helper text", async ({ page }) => {
   await page.goto("/digimon/decks");
   // After the previous test created one deck, this is no longer the literal
   // empty state — but the page should still render the "新建卡组" form.
-  await expect(
-    page.getByText(/新建卡组/),
-  ).toBeVisible();
+  // The create control is a name field + 创建 button in the page header —
+  // there has never been a "新建卡组" label on this page, only in the
+  // add-to-deck widget on card pages.
+  await expect(page.getByPlaceholder("卡组名")).toBeVisible();
+  await expect(page.getByRole("button", { name: /创建/ })).toBeVisible();
 });
 
 test("UA section is reachable via the top-nav switcher", async ({ page }) => {

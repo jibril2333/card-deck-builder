@@ -1348,6 +1348,57 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     levelGroupPurchased(groupId);
   }
 
+  /**
+   * The same membership edit seen from one deck: which pools this deck is in.
+   * `setGroupDecks` can only be driven from a group, so a deck page had no way
+   * to pool a deck without first knowing which group to open.
+   *
+   * A group only ever holds its own owner's decks (`setGroupDecks` inserts via
+   * a `user_id`-checked SELECT), so scoping both sides to `currentUserId` is
+   * enough to keep one user's edit out of another's pool.
+   */
+  function setDeckGroups(
+    currentUserId: string,
+    deckId: string,
+    groupIds: string[],
+  ): void {
+    const ownsDeck = db()
+      .prepare(`SELECT 1 FROM user.decks WHERE id = ? AND user_id = ?`)
+      .get(deckId, currentUserId);
+    if (!ownsDeck) throw new OwnershipError(deckId);
+
+    const before = (
+      db()
+        .prepare(
+          `SELECT m.group_id FROM user.deck_group_members m
+             JOIN user.deck_groups g ON g.id = m.group_id
+            WHERE m.deck_id = ? AND g.user_id = ?`,
+        )
+        .all(deckId, currentUserId) as { group_id: string }[]
+    ).map((r) => r.group_id);
+
+    const tx = db().transaction(() => {
+      db()
+        .prepare(
+          `DELETE FROM user.deck_group_members
+            WHERE deck_id = ?
+              AND group_id IN (SELECT id FROM user.deck_groups WHERE user_id = ?)`,
+        )
+        .run(deckId, currentUserId);
+      const ins = db().prepare(
+        `INSERT OR IGNORE INTO user.deck_group_members (group_id, deck_id)
+         SELECT id, ? FROM user.deck_groups WHERE id = ? AND user_id = ?`,
+      );
+      for (const groupId of groupIds) ins.run(deckId, groupId, currentUserId);
+    });
+    tx();
+    // Every pool whose membership moved has to re-level, exactly as it would
+    // have if the same edit had been made from the group side.
+    for (const groupId of new Set([...before, ...groupIds])) {
+      levelGroupPurchased(groupId);
+    }
+  }
+
   type GroupPoolCard = {
     card_id: string;
     code: string;
@@ -1588,6 +1639,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     renameGroup,
     deleteGroup,
     setGroupDecks,
+    setDeckGroups,
     getGroupPool,
     groupMemberDeckIds,
     decksSharingPoolWith,

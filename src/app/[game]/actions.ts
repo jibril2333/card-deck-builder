@@ -239,6 +239,30 @@ export async function setGroupDecksAction(formData: FormData) {
   bumpGroups(game, id);
 }
 
+/**
+ * Membership from the deck's side: which pools this deck belongs to. Pooling
+ * re-levels held counts across the affected pools, so every one of them is
+ * revalidated, not just the deck.
+ */
+export async function setDeckGroupsAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const deckId = String(formData.get("deck_id"));
+  const groupIds = formData.getAll("group_id").map(String).filter(Boolean);
+  if (!isGameId(game)) throw new Error("invalid game");
+  backupBeforeWrite(game);
+  // Pools it is leaving need refreshing too, so read membership before the
+  // write rather than after.
+  const touched = lib(game)
+    .listGroups(me.id)
+    .filter((g) => g.decks.some((d) => d.id === deckId) || groupIds.includes(g.id))
+    .map((g) => g.id);
+  lib(game).setDeckGroups(me.id, deckId, groupIds);
+  revalidatePath(`/${game}/decks/${deckId}`);
+  bumpGroups(game);
+  for (const id of touched) revalidatePath(`/${game}/groups/${id}`);
+}
+
 export async function adjustDeckCardAction(formData: FormData) {
   const me = await requireUser();
   const game = String(formData.get("game"));

@@ -10,6 +10,7 @@ import { DeckCardSearch } from "@/components/deck-card-search";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckMetaForm } from "@/components/deck-meta-form";
 import { CoverVariantPicker } from "@/components/cover-variant-picker";
+import { DeckPoolPicker } from "@/components/deck-pool-picker";
 import { DeckImageExport } from "@/components/deck-image-export";
 import {
   computeDeckSearchTargets,
@@ -445,6 +446,14 @@ export default async function DeckEditPage({
   const mode: "browse" | "build" | "purchase" = mine
     ? requestedMode
     : "browse";
+  // Shared pools, for the sidebar picker. Only the owner can change membership,
+  // so someone else's view doesn't need the query at all.
+  const pools =
+    mine && me
+      ? game === "digimon"
+        ? digimon.listGroups(me.id)
+        : ua.listGroups(me.id)
+      : [];
   // Purchase mode defaults to "only still-missing cards" — that's the
   // shopping view you actually want when you open it. Showing every card
   // (including ones already bought) is opt-in via ?missing=0.
@@ -916,6 +925,19 @@ export default async function DeckEditPage({
               </div>
             )}
           </div>
+
+          {mine ? (
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
+              <DeckPoolPicker
+                game={game}
+                deckId={loaded.deck.id}
+                pools={pools}
+                memberOf={pools
+                  .filter((p) => p.decks.some((d) => d.id === loaded.deck.id))
+                  .map((p) => p.id)}
+              />
+            </div>
+          ) : null}
 
           {loaded.cards.length > 0 ? (
             <DeckStats panels={loaded.statsPanels} />
