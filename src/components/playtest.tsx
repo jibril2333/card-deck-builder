@@ -315,31 +315,37 @@ export function Playtest({
         {/* ── probability table ── */}
         <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
           <h2 className="font-bold">📈 抽到概率</h2>
-          <p className="text-xs text-[var(--color-muted-fg)] mt-1">
-            「第 T 回合」= 起手 {HAND} 张 + 每回合抽 1 张后,见到至少 1
-            张目标卡的概率(每个编号单独一行,同名不合并;不计调度和检索/抽卡效果,实际概率只会更高)。勾选多行可计算「抽到其中任意一张」的组合概率。
-          </p>
 
-          {picked.size > 0 ? (
-            <div className="mt-3 rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/5 p-3">
-              <div className="text-sm font-medium">
-                已选 {picked.size} 张卡 · 共 {pickedQty} 份 —— 抽到任意一张的概率:
-              </div>
-              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-1.5 text-sm">
-                <span>
-                  起手 <b>{fmt(pAtLeastOne(N, pickedQty, HAND))}</b>
-                </span>
-                {[1, 2, 3, 4, 5].map((t) => (
-                  <span key={t}>
-                    T{t} <b>{fmt(pAtLeastOne(N, pickedQty, seenAt(t)))}</b>
+          {/* Always mounted, so ticking the first row doesn't shove the table
+              down and make you re-find where you were. With nothing ticked
+              every figure would be 0.0%, which is worse than saying what the
+              panel is for. */}
+          <div className="mt-3 rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/5 p-3">
+            {picked.size > 0 ? (
+              <>
+                <div className="text-sm font-medium">
+                  已选 {picked.size} 张卡 · 共 {pickedQty} 份 —— 抽到任意一张的概率:
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-1 mt-1.5 text-sm">
+                  <span>
+                    起手 <b>{fmt(pAtLeastOne(N, pickedQty, HAND))}</b>
                   </span>
-                ))}
-                <span className="text-[var(--color-muted-fg)]">
-                  起手期望 {expectedCount(N, pickedQty, HAND).toFixed(2)} 张
-                </span>
+                  {[1, 2, 3, 4, 5].map((t) => (
+                    <span key={t}>
+                      T{t} <b>{fmt(pAtLeastOne(N, pickedQty, seenAt(t)))}</b>
+                    </span>
+                  ))}
+                  <span className="text-[var(--color-muted-fg)]">
+                    起手期望 {expectedCount(N, pickedQty, HAND).toFixed(2)} 张
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-[var(--color-muted-fg)]">
+                勾选下面任意几行,算「抽到其中任意一张」的组合概率。
               </div>
-            </div>
-          ) : null}
+            )}
+          </div>
 
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm border-collapse">
@@ -441,9 +447,6 @@ export function Playtest({
         {levelRows.length ? (
           <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
             <h2 className="font-bold">🎯 起手等级期望</h2>
-            <p className="text-xs text-[var(--color-muted-fg)] mt-1">
-              起手 {HAND} 张里,平均能摸到几张该等级的数码宝贝。「≥1 张」是至少摸到一张的概率。
-            </p>
             <div className="mt-3 grid grid-cols-2 lg:grid-cols-1 gap-2">
               {levelRows.map(({ level, qty }) => {
                 const exp = expectedCount(N, qty, HAND);
