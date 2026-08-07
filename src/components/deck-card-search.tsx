@@ -36,6 +36,16 @@ export function DeckCardSearch({
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  /** Empty the box and put the caret back in it — clearing is almost always
+   *  the start of typing a different name, not of leaving. */
+  function clear() {
+    setQ("");
+    setHits([]);
+    setOpen(false);
+    inputRef.current?.focus();
+  }
 
   // Debounced lookup. All state changes happen inside the timeout — setting
   // state synchronously in an effect body cascades renders.
@@ -115,12 +125,30 @@ export function DeckCardSearch({
           🔍
         </span>
         <input
+          ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            // Escape clears rather than only closing the list: you press it
+            // when the query was wrong, and closing a dropdown over a box
+            // that still holds the wrong text isn't finished.
+            if (e.key === "Escape") clear();
+          }}
           placeholder="搜卡加入卡组…"
-          className="w-full h-8 pl-8 pr-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
+          className="w-full h-8 pl-8 pr-7 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
         />
+        {/* Same clear affordance as the card browser's search field. */}
+        {q ? (
+          <button
+            type="button"
+            onClick={clear}
+            className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-fg)] text-xs cursor-pointer flex items-center justify-center"
+            aria-label="清空"
+          >
+            ×
+          </button>
+        ) : null}
       </div>
 
       {open && q.trim().length >= 2 ? (
