@@ -7,6 +7,7 @@ import {
   searchCardsAction,
   type CardPickerHit,
 } from "@/app/[game]/actions";
+import { useComposition } from "@/lib/use-composition";
 
 /**
  * Search-and-add box for build mode.
@@ -37,6 +38,7 @@ export function DeckCardSearch({
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { composing, bind: imeBind } = useComposition((final) => setQ(final));
 
   /** Empty the box and put the caret back in it — clearing is almost always
    *  the start of typing a different name, not of leaving. */
@@ -49,7 +51,12 @@ export function DeckCardSearch({
 
   // Debounced lookup. All state changes happen inside the timeout — setting
   // state synchronously in an effect body cascades renders.
+  //
+  // `composing` is a dependency, not just a guard: skipping the search while
+  // an IME is open is only half of it — the effect also has to re-run when the
+  // word is committed, or the finished query never gets searched at all.
   useEffect(() => {
+    if (composing) return;
     const query = q.trim();
     let cancelled = false;
     const t = setTimeout(async () => {
@@ -74,7 +81,7 @@ export function DeckCardSearch({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [q, game, lang, deckId]);
+  }, [q, composing, game, lang, deckId]);
 
   // Click-away closes the results without clearing the query, so re-focusing
   // the box brings the same list back.
@@ -128,12 +135,15 @@ export function DeckCardSearch({
           ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          {...imeBind}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
             // Escape clears rather than only closing the list: you press it
             // when the query was wrong, and closing a dropdown over a box
             // that still holds the wrong text isn't finished.
-            if (e.key === "Escape") clear();
+            // Escape while composing cancels the IME candidate list; wiping
+            // the box then would take the text the user is still working on.
+            if (e.key === "Escape" && !e.nativeEvent.isComposing) clear();
           }}
           placeholder="搜卡加入卡组…"
           className="w-full h-8 pl-8 pr-7 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"

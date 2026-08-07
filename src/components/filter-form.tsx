@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Input, Select } from "@/components/ui/input";
 import { colorHex } from "@/lib/games";
+import { useComposition } from "@/lib/use-composition";
 
 export type FilterField =
   | {
@@ -371,9 +372,14 @@ function SearchField({
     setLocal(value);
   }
 
+  // Keep the box in sync while an IME composes, but don't navigate on the
+  // romaji — see `useComposition`.
+  const ime = useComposition((final) => schedule(final));
+
   function schedule(v: string) {
     setLocal(v);
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (ime.composingRef.current) return;
     debounceRef.current = setTimeout(() => onCommit(v.trim()), 300);
   }
 
@@ -387,8 +393,12 @@ function SearchField({
           placeholder={field.placeholder}
           value={local}
           onChange={(e) => schedule(e.target.value)}
+          {...ime.bind}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            // Enter while composing is the IME accepting a candidate, not the
+            // user submitting — `isComposing` is the only reliable signal,
+            // since some IMEs report keyCode 229 and others don't.
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
               if (debounceRef.current) clearTimeout(debounceRef.current);
               onCommit(local.trim());

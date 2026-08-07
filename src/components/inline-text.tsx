@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useComposition } from "@/lib/use-composition";
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -45,6 +46,9 @@ export function InlineText({
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const [empty, setEmpty] = useState(!initial);
+  // `input` fires for every letter of the romaji, so without this the deck's
+  // autosave writes half-typed pinyin into the name and then corrects it.
+  const ime = useComposition((final) => onChange(final));
 
   // Seed the DOM once. Deliberately not in the dependency list: re-running
   // this on a prop change is the IME bug described above.
@@ -78,9 +82,13 @@ export function InlineText({
       aria-multiline={Tag === "h1" ? undefined : true}
       title={title}
       data-placeholder={placeholder}
+      {...ime.bind}
       onInput={(e: React.FormEvent<HTMLElement>) => {
         const v = e.currentTarget.textContent ?? "";
+        // The placeholder still has to track what's on screen mid-composition;
+        // only the save is held back.
         setEmpty(!v);
+        if (ime.composingRef.current) return;
         onChange(v);
       }}
       onBlur={(e: React.FocusEvent<HTMLElement>) =>

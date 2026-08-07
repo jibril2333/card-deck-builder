@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useComposition } from "@/lib/use-composition";
 import {
   addDeckAdjustmentAction,
   removeDeckAdjustmentAction,
@@ -56,7 +57,13 @@ export function DeckAdjustments({
 
   // Debounced lookup. The action itself ignores queries under 2 chars, so
   // typing a single letter never hits the DB.
+  //
+  // `composing` is a dependency, not just a guard: skipping the search while
+  // an IME is open is only half of it — the effect also has to re-run once the
+  // word is committed, or the finished query never gets searched.
+  const { composing, bind: imeBind } = useComposition((final) => setQ(final));
   useEffect(() => {
+    if (composing) return;
     const query = q.trim();
     let cancelled = false;
     // Everything happens inside the timeout: setting state synchronously in an
@@ -80,7 +87,7 @@ export function DeckAdjustments({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [q, game, lang]);
+  }, [q, composing, game, lang]);
 
   function run(action: (fd: FormData) => Promise<void>, fd: FormData) {
     fd.set("game", game);
@@ -116,6 +123,7 @@ export function DeckAdjustments({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          {...imeBind}
           placeholder="搜卡片（名称或编号），再选加入哪一栏…"
           className="w-full h-9 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
         />
