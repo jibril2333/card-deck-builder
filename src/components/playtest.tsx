@@ -377,25 +377,34 @@ export function Playtest({
                     </td>
                     <td className="py-1.5 pr-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        {/* Same art as the hand simulator above — a row of
-                            codes is not how anyone recognises a card. */}
-                        {/* contain, not cover: the box is 5:7 minus its own
-                          border while a scan is 430×601, and covering that
-                          difference sliced the card's left and right edges
-                          off. Nothing here is worth cropping for — the point
-                          is recognising the card. */}
-                      <span className="w-8 shrink-0 aspect-[5/7] rounded overflow-hidden bg-[var(--color-muted)]">
-                          {r.card.image_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={r.card.image_url}
-                              alt=""
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-contain"
-                            />
-                          ) : null}
-                        </span>
+                        {/* Same art as the hand simulator above — a row of set
+                            codes is not how anyone recognises a card.
+
+                            The aspect ratio goes on the IMAGE, not on a
+                            wrapper it fills with height:100%. This cell is a
+                            `flex items-center` child, so the wrapper is not
+                            stretched, and WebKit will not resolve a
+                            percentage height against a box whose own height
+                            came from aspect-ratio — the image fell back to
+                            its intrinsic 601px, was clipped to the visible
+                            45px, and rendered blank in Safari while looking
+                            correct in Chrome.
+
+                            contain, not cover: a 5:7 box against a 430×601
+                            scan crops ~1.25% off each side, which is exactly
+                            the card's printed frame. */}
+                        {r.card.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={r.card.image_url}
+                            alt=""
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            className="w-8 shrink-0 aspect-[5/7] object-contain rounded bg-[var(--color-muted)]"
+                          />
+                        ) : (
+                          <span className="w-8 shrink-0 aspect-[5/7] rounded bg-[var(--color-muted)]" />
+                        )}
                         <span className="min-w-0">
                           <span className="font-medium">{r.card.name}</span>
                           {r.card.level != null ? (
