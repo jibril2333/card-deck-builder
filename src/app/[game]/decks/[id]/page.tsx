@@ -9,10 +9,9 @@ import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { DeckCardSearch } from "@/components/deck-card-search";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckHeader } from "@/components/deck-header";
-import { DeckCopyButtons } from "@/components/deck-copy-buttons";
 import { DeckDeleteButton } from "@/components/deck-delete-button";
 import { DeckPoolPicker } from "@/components/deck-pool-picker";
-import { DeckImageExport } from "@/components/deck-image-export";
+import { DeckExportMenu } from "@/components/deck-export-menu";
 import {
   computeDeckSearchTargets,
   type SearchGroup,
@@ -616,8 +615,9 @@ export default async function DeckEditPage({
           >
             🎲 试玩
           </Link>
-          <DeckCopyButtons text={exportText} url={exportUrl} />
-          <DeckImageExport
+          <DeckExportMenu
+            text={exportText}
+            url={exportUrl}
             deckName={loaded.deck.name}
             accent={loaded.deck.accent_color}
             accent2={loaded.deck.accent_color2}

@@ -98,9 +98,18 @@ export function DeckCardSearch({
   }
 
   return (
-    // Sits at the right end of the deck toolbar; capped so it doesn't crowd
-    // the mode tabs, and full-width once the row wraps on a narrow screen.
-    <div ref={boxRef} className="relative ml-auto w-full sm:w-72">
+    // Right end of the deck toolbar, and the only item there that can give
+    // ground. At a fixed 18rem it was 288px of an unshrinkable block: the
+    // rest of the row comes to 657px, so anything under 945px of row sent the
+    // whole box onto a second line — which is most windows, since the column
+    // is only ~890px wide even at a 1500px viewport. Growing to the cap when
+    // there's room and shrinking to 8rem when there isn't keeps it on the row
+    // down to a much narrower window, and it still takes a full line of its
+    // own once even that doesn't fit.
+    <div
+      ref={boxRef}
+      className="relative ml-auto w-full sm:w-auto sm:flex-1 sm:min-w-[8rem] sm:max-w-72"
+    >
       <div className="relative">
         <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-muted-fg)] text-sm">
           🔍

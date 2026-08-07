@@ -194,7 +194,15 @@ test("banner: edit in place, no shift, colours and exports where asked", async (
   expect(rings.cover).toContain("0px 0px 0px 4px");
 
   // (5) Export buttons sit in the toolbar; delete moved to the sidebar.
-  await expect(page.getByRole("button", { name: /导出文本/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /导出链接/ })).toBeVisible();
+  // The three export actions live behind one toolbar button now, so the row
+  // fits on a laptop; delete moved to the sidebar.
+  const exportBtn = page.getByRole("button", { name: /导出/ });
+  await expect(exportBtn).toBeVisible();
+  await exportBtn.click();
+  await expect(page.getByRole("menuitem", { name: /文本/ })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /链接/ })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /图片/ })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menuitem", { name: /文本/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /删除卡组/ })).toBeVisible();
 });

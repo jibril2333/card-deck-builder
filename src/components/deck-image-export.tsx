@@ -54,6 +54,7 @@ export function DeckImageExport({
   gameLabel,
   subtitle,
   cards,
+  renderTrigger,
 }: {
   deckName: string;
   accent: string;
@@ -62,6 +63,14 @@ export function DeckImageExport({
   /** e.g. "主卡组 50 张 · 蛋卡 5 张" */
   subtitle: string;
   cards: ExportCard[];
+  /** Supply a different trigger — the toolbar renders this inside its export
+   *  menu, where a bordered button would look like a button inside a button.
+   *  Omitted, it draws its own standalone button. */
+  renderTrigger?: (o: {
+    busy: boolean;
+    disabled: boolean;
+    run: () => void;
+  }) => React.ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -160,11 +169,16 @@ export function DeckImageExport({
     }
   }
 
+  const disabled = busy || cards.length === 0;
+  if (renderTrigger) {
+    return <>{renderTrigger({ busy, disabled, run: exportPng })}</>;
+  }
+
   return (
     <button
       type="button"
       onClick={exportPng}
-      disabled={busy || cards.length === 0}
+      disabled={disabled}
       className="px-3 h-8 rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
       title="把整个卡组排版成一张 PNG 图片下载,方便分享"
     >
