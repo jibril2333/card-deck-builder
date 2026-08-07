@@ -379,7 +379,12 @@ export function Playtest({
                       <div className="flex items-center gap-2 min-w-0">
                         {/* Same art as the hand simulator above — a row of
                             codes is not how anyone recognises a card. */}
-                        <span className="w-8 shrink-0 aspect-[5/7] rounded overflow-hidden border border-[var(--color-border)] bg-[var(--color-muted)]">
+                        {/* contain, not cover: the box is 5:7 minus its own
+                          border while a scan is 430×601, and covering that
+                          difference sliced the card's left and right edges
+                          off. Nothing here is worth cropping for — the point
+                          is recognising the card. */}
+                      <span className="w-8 shrink-0 aspect-[5/7] rounded overflow-hidden bg-[var(--color-muted)]">
                           {r.card.image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -387,7 +392,7 @@ export function Playtest({
                               alt=""
                               loading="lazy"
                               referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                             />
                           ) : null}
                         </span>
