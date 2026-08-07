@@ -65,7 +65,9 @@ export default async function CardsPage({
         type: "search",
         key: "q",
         label: "关键词",
-        placeholder: "名称 / 编号 / 效果",
+        placeholder: "名称 / 编号",
+        wideKey: "q_all",
+        wideLabel: "同时搜索效果和特征",
       },
       {
         type: "multi",
@@ -171,6 +173,11 @@ export default async function CardsPage({
 
     const r = digimon.searchCards({
       q: pickStr(sp, "q"),
+      // Names and codes by default, ranked by how well the NAME matches —
+      // the same mode the add-a-card pickers use. Searching ドラゴン used to
+      // return twelve cards not one of which was named that, because every
+      // effect block was matched too. Ticking the box brings those back.
+      q_mode: pickStr(sp, "q_all") === "1" ? "all" : "name",
       colors: pickList(sp, "color"),
       card_types: pickList(sp, "card_type"),
       rarities: pickList(sp, "rarity"),

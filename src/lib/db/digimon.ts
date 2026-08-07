@@ -295,9 +295,22 @@ export function searchCards(filters: DigimonFilters = {}): {
         .get(params) as { n: number }
     ).n;
   } else {
+    // Same relevance rank as above, qualified for the CTE — otherwise ticking
+    // "异画各版本单独显示" would silently lose the ordering.
+    const rankQualified =
+      filters.q && filters.q_mode === "name"
+        ? `
+      CASE
+        WHEN base.name = @q_exact COLLATE NOCASE THEN 0
+        WHEN base.name LIKE @q_prefix THEN 1
+        WHEN base.name LIKE @q THEN 2
+        WHEN base.code LIKE @q THEN 3
+        ELSE 4
+      END,`
+        : "";
     const orderQualified = sortField
-      ? `ORDER BY base.${sortField} ${sortDir} NULLS LAST, base.code, ci.variant`
-      : `ORDER BY base.level NULLS LAST, base.code, ci.variant`;
+      ? `ORDER BY ${rankQualified} base.${sortField} ${sortDir} NULLS LAST, base.code, ci.variant`
+      : `ORDER BY ${rankQualified} base.level NULLS LAST, base.code, ci.variant`;
     rows = db()
       .prepare(
         `WITH base AS (SELECT * FROM cards ${whereSql})

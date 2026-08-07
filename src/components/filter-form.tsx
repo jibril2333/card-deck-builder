@@ -11,6 +11,14 @@ export type FilterField =
       key: string;
       label: string;
       placeholder?: string;
+      /**
+       * Renders a checkbox under the input that WIDENS what `q` matches,
+       * writing "1" to this query key. Lives with the field rather than as a
+       * filter of its own because it isn't one — it changes how the box above
+       * it behaves, and a row further down the sidebar wouldn't say that.
+       */
+      wideKey?: string;
+      wideLabel?: string;
     }
   | {
       type: "multi";
@@ -105,6 +113,10 @@ export function FilterForm({ basePath, fields, sortOptions }: Props) {
           field={f}
           value={searchParams.get(f.key) ?? ""}
           onCommit={(v) => nav({ [f.key]: v || undefined })}
+          wide={f.wideKey ? searchParams.get(f.wideKey) === "1" : false}
+          onWide={(on) =>
+            f.wideKey ? nav({ [f.wideKey]: on ? "1" : undefined }) : undefined
+          }
         />
       );
     }
@@ -340,8 +352,12 @@ function SearchField({
   field,
   value,
   onCommit,
+  wide,
+  onWide,
 }: {
   field: Extract<FilterField, { type: "search" }>;
+  wide: boolean;
+  onWide: (on: boolean) => void;
   value: string;
   onCommit: (v: string) => void;
 }) {
@@ -399,6 +415,18 @@ function SearchField({
           </button>
         ) : null}
       </div>
+
+      {field.wideKey ? (
+        <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--color-muted-fg)] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={wide}
+            onChange={(e) => onWide(e.target.checked)}
+            className="accent-[var(--color-accent)]"
+          />
+          {field.wideLabel ?? "同时搜索效果文本"}
+        </label>
+      ) : null}
     </div>
   );
 }
