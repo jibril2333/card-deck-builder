@@ -285,6 +285,18 @@ export function DecksGrid({
                   </span>
                 </div>
               )}
+              {/* INSIDE the thumb, so `.card-thumb`'s overflow:hidden clips
+                  it to the same rounded corners the art has — a bar sitting
+                  below the image would run straight past where the image has
+                  already curved away. */}
+              <span
+                className="absolute bottom-0 left-0 right-0 h-1"
+                style={{
+                  background: d.accent_color2
+                    ? `linear-gradient(90deg, ${d.accent_color}, ${d.accent_color2})`
+                    : d.accent_color,
+                }}
+              />
               <span className="absolute top-1.5 left-1.5 px-2 py-0.5 text-xs rounded-md bg-black/75 text-white font-bold tabular-nums">
                 {d.count}
               </span>

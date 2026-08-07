@@ -150,6 +150,18 @@ export function DeckHeader({
             </div>
           ) : null}
         </div>
+
+        {/* The same hairline the deck grid draws under each cover, so a deck
+            reads the same in the list and on its own page. Inside the rounded
+            box, which clips it to the corners. */}
+        <div
+          className="relative h-1 w-full"
+          style={{
+            background: deck.accent_color2
+              ? `linear-gradient(90deg, ${deck.accent_color}, ${deck.accent_color2})`
+              : deck.accent_color,
+          }}
+        />
       </div>
 
       {canPickArt && arts ? (
