@@ -140,7 +140,7 @@ export default async function CardsPage({
     ];
 
     chipSpecs = [
-      { kind: "single", key: "q", label: "关键词" },
+      { kind: "terms", key: "q", label: "关键词" },
       { kind: "list", key: "color", label: "颜色", colorChips: true },
       { kind: "list", key: "card_type", label: "类型" },
       { kind: "list", key: "rarity", label: "稀有度" },
@@ -325,7 +325,7 @@ export default async function CardsPage({
     ];
 
     chipSpecs = [
-      { kind: "single", key: "q", label: "关键词" },
+      { kind: "terms", key: "q", label: "关键词" },
       { kind: "single", key: "series", label: "作品" },
       { kind: "list", key: "color", label: "颜色", colorChips: true },
       { kind: "list", key: "card_type", label: "类型" },

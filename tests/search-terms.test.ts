@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitTerms } from "@/lib/db/digimon";
+import { splitTerms } from "@/lib/search-terms";
 
 /**
  * Every term becomes its own LIKE and all of them must match, so what counts

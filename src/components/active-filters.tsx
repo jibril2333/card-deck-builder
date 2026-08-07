@@ -3,9 +3,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { colorHex } from "@/lib/games";
+import { splitTerms } from "@/lib/search-terms";
 
 export type ChipSpec =
   | { kind: "single"; key: string; label: string }
+  /** A free-text query that the search splits on whitespace — one chip per
+   *  term, each removable on its own. Shown as one chip, "Imperialdramon
+   *  Dragon" reads as a phrase, which is not how it is matched. */
+  | { kind: "terms"; key: string; label: string }
   | { kind: "list"; key: string; label: string; colorChips?: boolean }
   | { kind: "range"; minKey: string; maxKey: string; label: string }
   | { kind: "bool"; key: string; label: string }
@@ -66,6 +71,33 @@ export function ActiveFilters({
           onRemove: () => removeKeys(spec.key),
         });
       }
+    } else if (spec.kind === "terms") {
+      const terms = splitTerms(searchParams.get(spec.key));
+      terms.forEach((term, i) => {
+        chips.push({
+          key: `${spec.key}#${i}=${term}`,
+          node: (
+            <>
+              <span className="opacity-70">{spec.label}:</span> {term}
+            </>
+          ),
+          // Drop just this term and put the rest back, so refining a search
+          // doesn't mean retyping it.
+          onRemove: () => {
+            const rest = terms.filter((_, j) => j !== i);
+            const out = new URLSearchParams();
+            for (const [k, v] of searchParams.entries()) {
+              if (k === spec.key || k === "page") continue;
+              out.append(k, v);
+            }
+            if (rest.length) out.set(spec.key, rest.join(" "));
+            const qs = out.toString();
+            startTransition(() =>
+              router.push(qs ? `${basePath}?${qs}` : basePath),
+            );
+          },
+        });
+      });
     } else if (spec.kind === "list") {
       const values = (searchParams.get(spec.key) ?? "")
         .split(",")
