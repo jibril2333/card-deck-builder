@@ -16,6 +16,7 @@
  */
 
 import Link from "next/link";
+import { Pagination } from "@/components/pagination";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId } from "@/lib/games";
@@ -404,14 +405,23 @@ export default async function CollectionPage({
             </div>
           )}
 
-          {totalPages > 1 ? (
-            <Pagination
-              basePath={`/${game}/collection`}
-              page={page}
-              totalPages={totalPages}
-              sp={sp}
-            />
-          ) : null}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            hrefFor={(n) => {
+              const params = new URLSearchParams();
+              for (const [k, v] of Object.entries(sp)) {
+                if (k === "page") continue;
+                if (Array.isArray(v)) for (const it of v) params.append(k, it);
+                else if (typeof v === "string") params.set(k, v);
+              }
+              if (n > 1) params.set("page", String(n));
+              const qs = params.toString();
+              return qs
+                ? `/${game}/collection?${qs}`
+                : `/${game}/collection`;
+            }}
+          />
         </section>
       </main>
     </>
@@ -422,69 +432,4 @@ function sumMap(m: Map<string, number>): { cards: number; copies: number } {
   let copies = 0;
   for (const v of m.values()) copies += v;
   return { cards: m.size, copies };
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// Pagination — same shape the search page uses. Duplicated here on purpose
-// to avoid coupling collection routing to the search page's internals.
-// ────────────────────────────────────────────────────────────────────────
-
-function Pagination({
-  basePath,
-  page,
-  totalPages,
-  sp,
-}: {
-  basePath: string;
-  page: number;
-  totalPages: number;
-  sp: SearchParamsRecord;
-}) {
-  function hrefFor(n: number): string {
-    const params = new URLSearchParams();
-    for (const [k, v] of Object.entries(sp)) {
-      if (k === "page") continue;
-      if (Array.isArray(v)) {
-        for (const it of v) params.append(k, it);
-      } else if (typeof v === "string") {
-        params.set(k, v);
-      }
-    }
-    if (n > 1) params.set("page", String(n));
-    const qs = params.toString();
-    return qs ? `${basePath}?${qs}` : basePath;
-  }
-  const prev = page > 1 ? hrefFor(page - 1) : null;
-  const next = page < totalPages ? hrefFor(page + 1) : null;
-  return (
-    <nav className="mt-6 flex items-center justify-between gap-2">
-      {prev ? (
-        <Link
-          href={prev}
-          className="px-3 h-9 rounded-md border border-[var(--color-border)] text-sm hover:bg-[var(--color-muted)] inline-flex items-center"
-        >
-          ← 上一页
-        </Link>
-      ) : (
-        <span className="px-3 h-9 rounded-md border border-[var(--color-border)] text-sm text-[var(--color-muted-fg)] opacity-50 inline-flex items-center cursor-not-allowed">
-          ← 上一页
-        </span>
-      )}
-      <span className="text-xs text-[var(--color-muted-fg)]">
-        第 {page} / {totalPages} 页
-      </span>
-      {next ? (
-        <Link
-          href={next}
-          className="px-3 h-9 rounded-md border border-[var(--color-border)] text-sm hover:bg-[var(--color-muted)] inline-flex items-center"
-        >
-          下一页 →
-        </Link>
-      ) : (
-        <span className="px-3 h-9 rounded-md border border-[var(--color-border)] text-sm text-[var(--color-muted-fg)] opacity-50 inline-flex items-center cursor-not-allowed">
-          下一页 →
-        </span>
-      )}
-    </nav>
-  );
 }

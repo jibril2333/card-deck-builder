@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Pagination } from "@/components/pagination";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId } from "@/lib/games";
@@ -442,64 +443,24 @@ export default async function CardsPage({
             </div>
           )}
 
-          {totalPages > 1 ? (
-            <Pagination
-              basePath={`/${game}`}
-              page={page}
-              totalPages={totalPages}
-              sp={sp}
-            />
-          ) : null}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            hrefFor={(p) => {
+              // Every filter rides along; only `page` is replaced.
+              const c = new URLSearchParams();
+              for (const [k, v] of Object.entries(sp)) {
+                if (k === "page" || v === undefined) continue;
+                if (Array.isArray(v)) v.forEach((vv) => c.append(k, vv));
+                else c.set(k, v);
+              }
+              if (p > 1) c.set("page", String(p));
+              const qs = c.toString();
+              return qs ? `/${game}?${qs}` : `/${game}`;
+            }}
+          />
         </section>
       </main>
     </>
-  );
-}
-
-function Pagination({
-  basePath,
-  page,
-  totalPages,
-  sp,
-}: {
-  basePath: string;
-  page: number;
-  totalPages: number;
-  sp: SearchParamsRecord;
-}) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(sp)) {
-    if (k === "page" || v === undefined) continue;
-    if (Array.isArray(v)) v.forEach((vv) => params.append(k, vv));
-    else params.set(k, v);
-  }
-  const mk = (p: number) => {
-    const c = new URLSearchParams(params);
-    c.set("page", String(p));
-    return `${basePath}?${c.toString()}`;
-  };
-
-  return (
-    <nav className="flex items-center justify-center gap-2 mt-8 text-sm">
-      {page > 1 ? (
-        <Link
-          href={mk(page - 1)}
-          className="px-3 h-8 rounded-md border border-[var(--color-border)] hover:bg-[var(--color-muted)] flex items-center"
-        >
-          上一页
-        </Link>
-      ) : null}
-      <span className="text-[var(--color-muted-fg)]">
-        {page} / {totalPages}
-      </span>
-      {page < totalPages ? (
-        <Link
-          href={mk(page + 1)}
-          className="px-3 h-8 rounded-md border border-[var(--color-border)] hover:bg-[var(--color-muted)] flex items-center"
-        >
-          下一页
-        </Link>
-      ) : null}
-    </nav>
   );
 }
