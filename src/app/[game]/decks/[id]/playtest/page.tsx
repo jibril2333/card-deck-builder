@@ -36,6 +36,8 @@ export default async function PlaytestPage({
         image_url: c.image_url,
         quantity: c.quantity,
         isEgg: c.card_type === "Digi-Egg",
+        level: c.level ?? null,
+        cardType: c.card_type,
       })),
       cardLang,
     );
@@ -50,6 +52,8 @@ export default async function PlaytestPage({
       image_url: c.image_url,
       quantity: c.quantity,
       isEgg: false,
+      level: null,
+      cardType: c.card_type,
     }));
   }
 

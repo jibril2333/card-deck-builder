@@ -27,6 +27,10 @@ export type PlaytestCard = {
   quantity: number;
   /** Digimon Digi-Egg cards — separate deck, excluded from draws. */
   isEgg: boolean;
+  /** Digimon only, and only on Digimon-type cards. Drives the level table. */
+  level: number | null;
+  /** Canonical English type ("Digimon" / "Option" / …). */
+  cardType: string;
 };
 
 type SimCard = { key: string; card: PlaytestCard };
@@ -145,26 +149,42 @@ export function Playtest({
   const canSim = pile.length >= HAND + SECURITY;
 
   // ── probability table ────────────────────────────────────────────────
-  // Group printings by name: "any Gatomon" is what people actually ask.
-  const rows = useMemo(() => {
-    const byName = new Map<
-      string,
-      { name: string; codes: string[]; qty: number }
-    >();
-    for (const c of cards) {
-      if (c.isEgg) continue;
-      const r = byName.get(c.name) ?? { name: c.name, codes: [], qty: 0 };
-      r.codes.push(c.code);
-      r.qty += c.quantity;
-      byName.set(c.name, r);
-    }
-    return [...byName.values()].sort((a, b) => b.qty - a.qty);
-  }, [cards]);
+  // One row per PRINTING, not per name. Sharing a name does not make two
+  // cards interchangeable in this game — BT1-009 and BT5-008 are both
+  // "Monodramon" and do entirely different things — so adding their copies
+  // together answered a question nobody asked and overstated the odds for
+  // each of them. Tick several rows to get the combined probability, which
+  // is what the old grouping was really for.
+  const rows = useMemo(
+    () =>
+      cards
+        .filter((c) => !c.isEgg)
+        .map((c) => ({ key: c.id, card: c, qty: c.quantity }))
+        .sort((a, b) => b.qty - a.qty || a.card.code.localeCompare(b.card.code)),
+    [cards],
+  );
 
   const N = pile.length;
+
+  // Expected Digimon per level in the opening hand. The number that decides
+  // whether a curve works: you need a Lv.3 to start, and "how many Lv.3s do
+  // I actually see" is not something the per-card odds add up to by eye.
+  // Hypergeometric expectation is linear, so it is just HAND × K / N — no
+  // independence assumption smuggled in.
+  const levelRows = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const c of cards) {
+      if (c.isEgg || c.cardType !== "Digimon" || c.level == null) continue;
+      m.set(c.level, (m.get(c.level) ?? 0) + c.quantity);
+    }
+    return [...m.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([level, qty]) => ({ level, qty }));
+  }, [cards]);
+
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const pickedQty = rows
-    .filter((r) => picked.has(r.name))
+    .filter((r) => picked.has(r.key))
     .reduce((s, r) => s + r.qty, 0);
 
   const fmt = (p: number) => `${(p * 100).toFixed(1)}%`;
@@ -287,93 +307,157 @@ export function Playtest({
         ) : null}
       </section>
 
-      {/* ── probability table ── */}
-      <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-        <h2 className="font-bold">📈 抽到概率</h2>
-        <p className="text-xs text-[var(--color-muted-fg)] mt-1">
-          「第 T 回合」= 起手 {HAND} 张 + 每回合抽 1 张后,见到至少 1
-          张目标卡的概率(同名卡合并计算;不计调度和检索/抽卡效果,实际概率只会更高)。勾选多行可计算「抽到其中任意一张」的组合概率。
-        </p>
+      {/* Side by side: the table's four number columns are narrow and the
+          name column doesn't need the slack, so the row was mostly empty
+          space between them. The level panel fills it and stops being a
+          band the reader has to scroll past to reach the table. */}
+      <div className="grid lg:grid-cols-[1fr_15rem] gap-4 items-start">
+        {/* ── probability table ── */}
+        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
+          <h2 className="font-bold">📈 抽到概率</h2>
+          <p className="text-xs text-[var(--color-muted-fg)] mt-1">
+            「第 T 回合」= 起手 {HAND} 张 + 每回合抽 1 张后,见到至少 1
+            张目标卡的概率(每个编号单独一行,同名不合并;不计调度和检索/抽卡效果,实际概率只会更高)。勾选多行可计算「抽到其中任意一张」的组合概率。
+          </p>
 
-        {picked.size > 0 ? (
-          <div className="mt-3 rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/5 p-3">
-            <div className="text-sm font-medium">
-              已选 {picked.size} 种 · 共 {pickedQty} 张 —— 抽到任意一张的概率:
-            </div>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 mt-1.5 text-sm">
-              <span>
-                起手 <b>{fmt(pAtLeastOne(N, pickedQty, HAND))}</b>
-              </span>
-              {[1, 2, 3, 4, 5].map((t) => (
-                <span key={t}>
-                  T{t} <b>{fmt(pAtLeastOne(N, pickedQty, seenAt(t)))}</b>
+          {picked.size > 0 ? (
+            <div className="mt-3 rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/5 p-3">
+              <div className="text-sm font-medium">
+                已选 {picked.size} 张卡 · 共 {pickedQty} 份 —— 抽到任意一张的概率:
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-1.5 text-sm">
+                <span>
+                  起手 <b>{fmt(pAtLeastOne(N, pickedQty, HAND))}</b>
                 </span>
-              ))}
-              <span className="text-[var(--color-muted-fg)]">
-                起手期望 {expectedCount(N, pickedQty, HAND).toFixed(2)} 张
-              </span>
+                {[1, 2, 3, 4, 5].map((t) => (
+                  <span key={t}>
+                    T{t} <b>{fmt(pAtLeastOne(N, pickedQty, seenAt(t)))}</b>
+                  </span>
+                ))}
+                <span className="text-[var(--color-muted-fg)]">
+                  起手期望 {expectedCount(N, pickedQty, HAND).toFixed(2)} 张
+                </span>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left text-xs text-[var(--color-muted-fg)] border-b border-[var(--color-border)]">
-                <th className="py-1.5 pr-2 w-8"></th>
-                <th className="py-1.5 pr-3">卡名</th>
-                <th className="py-1.5 pr-3 text-right">张数</th>
-                <th className="py-1.5 pr-3 text-right">起手</th>
-                <th className="py-1.5 pr-3 text-right">T3</th>
-                <th className="py-1.5 pr-3 text-right">T5</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr
-                  key={r.name}
-                  className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-muted)]/40 cursor-pointer"
-                  onClick={() =>
-                    setPicked((p) => {
-                      const n = new Set(p);
-                      if (n.has(r.name)) n.delete(r.name);
-                      else n.add(r.name);
-                      return n;
-                    })
-                  }
-                >
-                  <td className="py-1.5 pr-2">
-                    <input
-                      type="checkbox"
-                      readOnly
-                      checked={picked.has(r.name)}
-                      className="accent-[var(--color-accent)] pointer-events-none"
-                    />
-                  </td>
-                  <td className="py-1.5 pr-3">
-                    <span className="font-medium">{r.name}</span>{" "}
-                    <span className="text-xs font-mono text-[var(--color-muted-fg)]">
-                      {r.codes.join(" ")}
-                    </span>
-                  </td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums">
-                    {r.qty}
-                  </td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums">
-                    {fmt(pAtLeastOne(N, r.qty, HAND))}
-                  </td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums">
-                    {fmt(pAtLeastOne(N, r.qty, seenAt(3)))}
-                  </td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums">
-                    {fmt(pAtLeastOne(N, r.qty, seenAt(5)))}
-                  </td>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-left text-xs text-[var(--color-muted-fg)] border-b border-[var(--color-border)]">
+                  <th className="py-1.5 pr-2 w-8"></th>
+                  <th className="py-1.5 pr-3">卡名</th>
+                  <th className="py-1.5 pr-3 text-right">张数</th>
+                  <th className="py-1.5 pr-3 text-right">起手</th>
+                  <th className="py-1.5 pr-3 text-right">T3</th>
+                  <th className="py-1.5 pr-3 text-right">T5</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr
+                    key={r.key}
+                    className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-muted)]/40 cursor-pointer"
+                    onClick={() =>
+                      setPicked((p) => {
+                        const n = new Set(p);
+                        if (n.has(r.key)) n.delete(r.key);
+                        else n.add(r.key);
+                        return n;
+                      })
+                    }
+                  >
+                    <td className="py-1.5 pr-2">
+                      <input
+                        type="checkbox"
+                        readOnly
+                        checked={picked.has(r.key)}
+                        className="accent-[var(--color-accent)] pointer-events-none"
+                      />
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* Same art as the hand simulator above — a row of
+                            codes is not how anyone recognises a card. */}
+                        <span className="w-8 shrink-0 aspect-[5/7] rounded overflow-hidden border border-[var(--color-border)] bg-[var(--color-muted)]">
+                          {r.card.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={r.card.image_url}
+                              alt=""
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : null}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="font-medium">{r.card.name}</span>
+                          {r.card.level != null ? (
+                            <span className="ml-1.5 text-[10px] px-1 rounded bg-[var(--color-muted)] text-[var(--color-muted-fg)]">
+                              Lv.{r.card.level}
+                            </span>
+                          ) : null}
+                          <span className="block text-xs font-mono text-[var(--color-muted-fg)]">
+                            {r.card.code}
+                          </span>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">
+                      {r.qty}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">
+                      {fmt(pAtLeastOne(N, r.qty, HAND))}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">
+                      {fmt(pAtLeastOne(N, r.qty, seenAt(3)))}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">
+                      {fmt(pAtLeastOne(N, r.qty, seenAt(5)))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* ── expected Digimon per level in the opening hand ── */}
+        {levelRows.length ? (
+          <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
+            <h2 className="font-bold">🎯 起手等级期望</h2>
+            <p className="text-xs text-[var(--color-muted-fg)] mt-1">
+              起手 {HAND} 张里,平均能摸到几张该等级的数码宝贝。「≥1 张」是至少摸到一张的概率。
+            </p>
+            <div className="mt-3 grid grid-cols-2 lg:grid-cols-1 gap-2">
+              {levelRows.map(({ level, qty }) => {
+                const exp = expectedCount(N, qty, HAND);
+                const p1 = pAtLeastOne(N, qty, HAND);
+                return (
+                  <div
+                    key={level}
+                    className="rounded-md border border-[var(--color-border)] px-3 py-2"
+                  >
+                    <div className="text-xs text-[var(--color-muted-fg)]">
+                      Lv.{level} · 共 {qty} 张
+                    </div>
+                    <div className="text-lg font-bold tabular-nums leading-tight">
+                      {exp.toFixed(2)}
+                      <span className="text-xs font-normal text-[var(--color-muted-fg)] ml-1">
+                        张
+                      </span>
+                    </div>
+                    <div className="text-xs text-[var(--color-muted-fg)] tabular-nums">
+                      ≥1 张 {fmt(p1)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+      </div>
     </div>
   );
 }
