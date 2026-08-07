@@ -133,6 +133,29 @@ export type DigimonSearchRow = DigimonCard & {
   display_image: string | null;
 };
 
+/** How many space-separated terms one query may carry. Enough for any real
+ *  search, and it stops a pasted paragraph from building a WHERE clause with
+ *  hundreds of LIKEs in it. */
+const MAX_TERMS = 6;
+
+/**
+ * Split a query into terms on whitespace — ASCII and U+3000, the full-width
+ * space a Japanese or Chinese IME produces, which otherwise reads as an
+ * ordinary character and makes the whole query match nothing.
+ *
+ * Every term has to match, which is what lets 「Imperialdramon Dragon」 find
+ * "Imperialdramon: Dragon Mode". As one literal it never could: the colon sits
+ * between the two words.
+ */
+export function splitTerms(q: string | undefined | null): string[] {
+  if (!q) return [];
+  return q
+    .trim()
+    .split(/[\s\u3000]+/)
+    .filter(Boolean)
+    .slice(0, MAX_TERMS);
+}
+
 export function searchCards(filters: DigimonFilters = {}): {
   rows: DigimonSearchRow[];
   total: number;
@@ -140,31 +163,36 @@ export function searchCards(filters: DigimonFilters = {}): {
   const where: string[] = [];
   const params: Record<string, unknown> = {};
 
-  if (filters.q) {
+  const terms = splitTerms(filters.q);
+
+  if (terms.length) {
     // Translated names are matched in BOTH modes, so 「天女兽」 or 「テイルモン」
     // finds the card whatever the display language — that is still someone
     // typing a name, just not in English.
-    if (filters.q_mode === "name") {
-      where.push(
-        `(name LIKE @q OR code LIKE @q
-          OR EXISTS (
-            SELECT 1 FROM card_translations t
-            WHERE t.code = cards.code AND t.name LIKE @q
-          ))`,
-      );
-    } else {
-      where.push(
-        `(name LIKE @q OR code LIKE @q OR main_effect LIKE @q OR inherited_effect LIKE @q OR security_effect LIKE @q OR digi_types LIKE @q
-          OR EXISTS (
-            SELECT 1 FROM card_translations t
-            WHERE t.code = cards.code
-              AND (t.name LIKE @q OR t.effect_main LIKE @q OR t.traits LIKE @q)
-          ))`,
-      );
-    }
-    params.q = `%${filters.q}%`;
-    params.q_exact = filters.q;
-    params.q_prefix = `${filters.q}%`;
+    terms.forEach((term, i) => {
+      const k = `@q${i}`;
+      if (filters.q_mode === "name") {
+        where.push(
+          `(name LIKE ${k} OR code LIKE ${k}
+            OR EXISTS (
+              SELECT 1 FROM card_translations t
+              WHERE t.code = cards.code AND t.name LIKE ${k}
+            ))`,
+        );
+      } else {
+        where.push(
+          `(name LIKE ${k} OR code LIKE ${k} OR main_effect LIKE ${k} OR inherited_effect LIKE ${k} OR security_effect LIKE ${k} OR digi_types LIKE ${k}
+            OR EXISTS (
+              SELECT 1 FROM card_translations t
+              WHERE t.code = cards.code
+                AND (t.name LIKE ${k} OR t.effect_main LIKE ${k} OR t.traits LIKE ${k})
+            ))`,
+        );
+      }
+      params[`q${i}`] = `%${term}%`;
+    });
+    params.q_exact = filters.q!.trim();
+    params.q_prefix = `${terms[0]}%`;
   }
 
   // Multi-select: build IN clauses with positional placeholders
@@ -247,19 +275,26 @@ export function searchCards(filters: DigimonFilters = {}): {
    * Without it the tie-break is level then code, and typing "Agumon" returned
    * ten Pagumon before the first Agumon — Pagumon is a Lv.2 Digi-Egg, so it
    * sorted first, and a substring match treats the two as equally good. An
-   * exact name wins, then a name that starts with what you typed, then one
-   * that merely contains it, then a code, then a match that only came from a
+   * exact name wins, then a name starting with the first term, then a name
+   * carrying ALL the terms, then a code, then a match that only came from a
    * translated name.
+   *
+   * Tier 2 has to re-test every term against the name: the WHERE clause is
+   * satisfied if each term matched SOMETHING, and a card whose name holds one
+   * term while its code holds the other is a weaker hit than one whose name
+   * holds both.
    */
+  const nameHasAll = terms.map((_, i) => `name LIKE @q${i}`).join(" AND ");
+  const codeHasAll = terms.map((_, i) => `code LIKE @q${i}`).join(" AND ");
   const relevanceSql = `
     CASE
       WHEN name = @q_exact COLLATE NOCASE THEN 0
       WHEN name LIKE @q_prefix THEN 1
-      WHEN name LIKE @q THEN 2
-      WHEN code LIKE @q THEN 3
+      WHEN ${nameHasAll} THEN 2
+      WHEN ${codeHasAll} THEN 3
       ELSE 4
     END,`;
-  const rank = filters.q && filters.q_mode === "name" ? relevanceSql : "";
+  const rank = terms.length && filters.q_mode === "name" ? relevanceSql : "";
   const orderSql = sortField
     ? `ORDER BY ${rank} ${sortField} ${sortDir} NULLS LAST, code`
     : `ORDER BY ${rank} level NULLS LAST, code`;
@@ -298,13 +333,13 @@ export function searchCards(filters: DigimonFilters = {}): {
     // Same relevance rank as above, qualified for the CTE — otherwise ticking
     // "异画各版本单独显示" would silently lose the ordering.
     const rankQualified =
-      filters.q && filters.q_mode === "name"
+      terms.length && filters.q_mode === "name"
         ? `
       CASE
         WHEN base.name = @q_exact COLLATE NOCASE THEN 0
         WHEN base.name LIKE @q_prefix THEN 1
-        WHEN base.name LIKE @q THEN 2
-        WHEN base.code LIKE @q THEN 3
+        WHEN ${terms.map((_, i) => `base.name LIKE @q${i}`).join(" AND ")} THEN 2
+        WHEN ${terms.map((_, i) => `base.code LIKE @q${i}`).join(" AND ")} THEN 3
         ELSE 4
       END,`
         : "";

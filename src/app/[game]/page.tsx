@@ -66,7 +66,7 @@ export default async function CardsPage({
         type: "search",
         key: "q",
         label: "关键词",
-        placeholder: "名称 / 编号",
+        placeholder: "名称 / 编号 · 空格分词",
         wideKey: "q_all",
         wideLabel: "同时搜索效果和特征",
       },
