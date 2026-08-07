@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { hasInAppHistory } from "@/lib/nav-depth";
 
 /**
  * "Back" link that returns to wherever you actually came from.
@@ -31,8 +32,11 @@ export function BackLink({
 
   function canGoBack(): boolean {
     if (typeof window === "undefined") return false;
-    // Need a previous entry in this tab's history.
-    if (window.history.length <= 1) return false;
+    // The previous entry has to be one WE pushed. `history.length` can't tell
+    // you that: a tab opened straight onto a shared link already reports 2
+    // (about:blank plus the page), so this used to go back to about:blank and
+    // the link looked dead. See `nav-depth`.
+    if (!hasInAppHistory()) return false;
     // Don't hop to another site. An empty referrer means same-tab SPA nav or
     // a refresh/typed URL within the app, which is safe to go back through;
     // a cross-origin referrer means we arrived from outside, so we'd rather

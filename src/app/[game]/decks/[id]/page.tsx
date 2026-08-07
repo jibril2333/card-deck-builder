@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex, GAMES } from "@/lib/games";
@@ -550,12 +551,12 @@ export default async function DeckEditPage({
     <>
       <main className="w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         <section className="min-w-0">
-          <Link
-            href={`/${game}/decks`}
+          <BackLink
+            fallback={`/${game}/decks`}
             className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
           >
             ← 全部卡组
-          </Link>
+          </BackLink>
           <DeckHeader
             game={game}
             deck={loaded.deck}

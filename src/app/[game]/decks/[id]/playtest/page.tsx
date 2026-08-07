@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId } from "@/lib/games";
@@ -60,12 +61,12 @@ export default async function PlaytestPage({
   return (
     <>
       <main className="w-full mx-auto max-w-[1100px] px-4 sm:px-6 py-6">
-        <Link
-          href={`/${game}/decks/${id}`}
+        <BackLink
+          fallback={`/${game}/decks/${id}`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
         >
           ← 返回卡组
-        </Link>
+        </BackLink>
         <h1 className="text-2xl font-bold mb-4">{deckName} · 试玩</h1>
         <Playtest game={game} cards={cards} />
       </main>
