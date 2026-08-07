@@ -93,7 +93,14 @@ export default async function CollectionPage({
     const setNames = digimon.distinctSetNames();
 
     fields = [
-      { type: "search", key: "q", label: "关键词", placeholder: "名称 / 编号 / 效果" },
+      {
+        type: "search",
+        key: "q",
+        label: "关键词",
+        placeholder: "名称 / 编号 · 空格分词",
+        wideKey: "q_all",
+        wideLabel: "同时搜索效果和特征",
+      },
       {
         type: "multi",
         key: "color",
@@ -144,6 +151,7 @@ export default async function CollectionPage({
     ];
 
     chipSpecs = [
+      { kind: "terms", key: "q", label: "关键词" },
       { kind: "list", key: "color", label: "颜色" },
       { kind: "list", key: "card_type", label: "类型" },
       { kind: "list", key: "rarity", label: "稀有度" },
@@ -168,6 +176,9 @@ export default async function CollectionPage({
 
     const r = digimon.searchCards({
       q: pickStr(sp, "q"),
+      // Same default as the card browser: names and codes, ranked by how well
+      // the name matches, with effect text behind the checkbox.
+      q_mode: pickStr(sp, "q_all") === "1" ? "all" : "name",
       colors: pickList(sp, "color"),
       card_types: pickList(sp, "card_type"),
       rarities: pickList(sp, "rarity"),
