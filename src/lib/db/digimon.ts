@@ -105,6 +105,15 @@ export type DigimonFilters = {
   sort_dir?: "asc" | "desc";
   limit?: number;
   offset?: number;
+  /**
+   * What `q` is allowed to match.
+   *   "all"  (default) — names, codes, every effect block and traits. What the
+   *          card browser wants: you go there to find cards BY what they do.
+   *   "name" — names and codes only, ranked by how well the name matches. What
+   *          the add-a-card pickers want: you already know which card you
+   *          mean and are typing its name.
+   */
+  q_mode?: "all" | "name";
 };
 
 const SORT_FIELDS: Record<string, string> = {
@@ -132,17 +141,30 @@ export function searchCards(filters: DigimonFilters = {}): {
   const params: Record<string, unknown> = {};
 
   if (filters.q) {
-    // Also match translated names/effects (any language) so 「天女兽」 or
-    // 「テイルモン」 finds the card regardless of the display language.
-    where.push(
-      `(name LIKE @q OR code LIKE @q OR main_effect LIKE @q OR inherited_effect LIKE @q OR security_effect LIKE @q OR digi_types LIKE @q
-        OR EXISTS (
-          SELECT 1 FROM card_translations t
-          WHERE t.code = cards.code
-            AND (t.name LIKE @q OR t.effect_main LIKE @q OR t.traits LIKE @q)
-        ))`,
-    );
+    // Translated names are matched in BOTH modes, so 「天女兽」 or 「テイルモン」
+    // finds the card whatever the display language — that is still someone
+    // typing a name, just not in English.
+    if (filters.q_mode === "name") {
+      where.push(
+        `(name LIKE @q OR code LIKE @q
+          OR EXISTS (
+            SELECT 1 FROM card_translations t
+            WHERE t.code = cards.code AND t.name LIKE @q
+          ))`,
+      );
+    } else {
+      where.push(
+        `(name LIKE @q OR code LIKE @q OR main_effect LIKE @q OR inherited_effect LIKE @q OR security_effect LIKE @q OR digi_types LIKE @q
+          OR EXISTS (
+            SELECT 1 FROM card_translations t
+            WHERE t.code = cards.code
+              AND (t.name LIKE @q OR t.effect_main LIKE @q OR t.traits LIKE @q)
+          ))`,
+      );
+    }
     params.q = `%${filters.q}%`;
+    params.q_exact = filters.q;
+    params.q_prefix = `${filters.q}%`;
   }
 
   // Multi-select: build IN clauses with positional placeholders
@@ -218,9 +240,29 @@ export function searchCards(filters: DigimonFilters = {}): {
     ? SORT_FIELDS[filters.sort_field]
     : undefined;
   const sortDir = filters.sort_dir === "desc" ? "DESC" : "ASC";
+
+  /**
+   * Relevance, for name searches only.
+   *
+   * Without it the tie-break is level then code, and typing "Agumon" returned
+   * ten Pagumon before the first Agumon — Pagumon is a Lv.2 Digi-Egg, so it
+   * sorted first, and a substring match treats the two as equally good. An
+   * exact name wins, then a name that starts with what you typed, then one
+   * that merely contains it, then a code, then a match that only came from a
+   * translated name.
+   */
+  const relevanceSql = `
+    CASE
+      WHEN name = @q_exact COLLATE NOCASE THEN 0
+      WHEN name LIKE @q_prefix THEN 1
+      WHEN name LIKE @q THEN 2
+      WHEN code LIKE @q THEN 3
+      ELSE 4
+    END,`;
+  const rank = filters.q && filters.q_mode === "name" ? relevanceSql : "";
   const orderSql = sortField
-    ? `ORDER BY ${sortField} ${sortDir} NULLS LAST, code`
-    : `ORDER BY level NULLS LAST, code`;
+    ? `ORDER BY ${rank} ${sortField} ${sortDir} NULLS LAST, code`
+    : `ORDER BY ${rank} level NULLS LAST, code`;
 
   const limit = filters.limit ?? 60;
   const offset = filters.offset ?? 0;

@@ -380,7 +380,15 @@ export async function searchCardsAction(
   if (!isGameId(game)) throw new Error("invalid game");
   const query = q.trim();
   if (query.length < 2) return [];
-  const { rows } = lib(game).searchCards({ q: query, limit: 12 });
+  // Name/code only, ranked by how well the name matches. Both callers — the
+  // build-mode picker and the adjustment memo — are "I know which card I want
+  // and I'm typing its name". Matching effect text there buried the card:
+  // searching ドラゴン returned twelve cards, not one of them named that.
+  const { rows } = lib(game).searchCards({
+    q: query,
+    limit: 12,
+    q_mode: "name",
+  });
 
   const lang = opts?.lang;
   const names =
