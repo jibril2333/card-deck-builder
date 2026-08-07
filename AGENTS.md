@@ -92,11 +92,29 @@ arts) · `rulings` · `prices` · `restrictions`.
 
 `scripts/sync-cards.ts` is what makes new sets appear on their own: it diffs
 digimoncard.io's entire catalogue (empty `n=` query → all ~9.7k rows, no cap or
-pagination) against `cards`. It is INSERT-ONLY — TOKEN cards don't exist
-upstream and must never be deleted, and a truncated API response must not be
-able to empty the DB. `MODERN_CODE` in `src/lib/scraper/digimoncardio.ts` keeps
-out the 1999-era Bandai games the same API serves (`BO-`, `DD-`, `DV-`, `MD-`,
-`MO-`, `DM-`, bare `ST-`).
+pagination) against `cards`. `MODERN_CODE` in
+`src/lib/scraper/digimoncardio.ts` keeps out the 1999-era Bandai games the same
+API serves (`BO-`, `DD-`, `DV-`, `MD-`, `MO-`, `DM-`, bare `ST-`).
+
+It **never deletes**. Our TOKEN cards (BT22-TOKEN, TOKEN01, …) don't exist
+upstream at all, and a transient short response from the API must not be able
+to empty the DB.
+
+It **does re-read the cards no official source covers** — no `ja` row in
+`card_translations`, i.e. digimoncard.com has never returned them; 77 of 4370
+today, mostly BT26 and a few LM. This used to be insert-only in the stronger
+sense that an existing row was never touched again, which froze every field at
+whatever the first import saw: upstream could correct a card and we would never
+find out. That is how LM-033 sat filed as a Digimon for four months (see the
+EN-site note below).
+
+Undoing that is only safe for cards nothing else can speak for. This feed is a
+wiki-derived mirror and is measurably WORSE than the official sites on the
+fields they both carry — measured against the live DB, letting it overwrite
+everything would rewrite **4287** image URLs to its own scans, lowercase
+**1586** rarities, and mangle 97 names (`Gaiamon ACE` → `Gaiamon`). So the
+official scrapers keep the cards they own, and this one only fills the gap
+where they are silent.
 
 Runs happen three ways:
 1. **Weekly** — LaunchAgent `com.rei.cdb-refresh-weekly`, Mondays 04:30.
