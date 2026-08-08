@@ -311,12 +311,12 @@ export function DecksGrid({
             </div>
             <div className="px-2 py-1.5 pointer-events-none">
               <div
-                className="text-[10px] text-[var(--color-muted-fg)] font-mono truncate"
+                className="card-code text-[10px] text-[var(--color-muted-fg)] font-mono truncate"
                 title={formatDate(d.updated_at)}
               >
                 {formatDate(d.updated_at)}
               </div>
-              <div className="flex items-center gap-1 text-xs font-medium group-hover:text-[var(--color-accent)] min-w-0">
+              <div className="card-name flex items-center gap-1 text-xs font-medium group-hover:text-[var(--color-accent)] min-w-0">
                 <span className="truncate">{d.name}</span>
                 {d.mine && d.complete ? (
                   <span

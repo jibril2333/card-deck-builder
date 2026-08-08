@@ -77,7 +77,9 @@ export function CardThumb({
         ) : null}
       </div>
       <div className="px-2 py-1.5">
-        <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-muted-fg)] font-mono">
+        {/* card-code / card-name / card-price are styling hooks: the grid
+            shrinks them on a phone (globals.css). */}
+        <div className="card-code flex items-center gap-1.5 text-[10px] text-[var(--color-muted-fg)] font-mono">
           {card.color ? (
             <span
               className="chip-dot shrink-0"
@@ -86,11 +88,14 @@ export function CardThumb({
           ) : null}
           <span className="truncate">{card.code}</span>
         </div>
-        <div className="flex items-center justify-between gap-2 text-xs font-medium group-hover:text-[var(--color-accent)]">
-          <span className="truncate">{card.name}</span>
+        {/* Name and price share a line when there's room and stack when there
+            isn't — side by side in an 85px tile, each gets ~40px and both
+            truncate to nothing. */}
+        <div className="card-caption flex items-center justify-between gap-2 text-xs font-medium group-hover:text-[var(--color-accent)]">
+          <span className="card-name truncate">{card.name}</span>
           {card.market_price != null ? (
             <span
-              className={`shrink-0 text-[10px] font-mono tabular-nums ${
+              className={`card-price shrink-0 text-[10px] font-mono tabular-nums ${
                 card.market_in_stock
                   ? "text-[var(--color-accent2)]"
                   : "text-[var(--color-muted-fg)] line-through opacity-70"

@@ -1,9 +1,9 @@
 /**
- * The deck grid on a phone.
+ * Card grids on a phone.
  *
- * The shared `.card-grid` fits two 150px tiles across a 390px screen, which
- * makes a 50-card deck 25 rows of scrolling. On the deck page you already know
- * what's in it, so the tile only has to be big enough to recognise.
+ * The auto-fill sizing fits two 150px tiles across a 390px screen, so a
+ * 50-card deck was 25 rows of scrolling and a page of results showed eight
+ * cards. Every card grid goes to four across below `sm`.
  */
 import { expect, test } from "@playwright/test";
 
@@ -27,7 +27,7 @@ test("four cards to a row, captions sized to match", async ({ page }) => {
   await page.goto(page.url().replace(/\?.*$/, ""));
   await page.waitForTimeout(1500);
 
-  const grid = page.locator(".card-grid-deck");
+  const grid = page.locator(".card-grid");
   await expect(grid).toBeVisible();
 
   const r = await grid.evaluate((g) => {
@@ -51,14 +51,26 @@ test("four cards to a row, captions sized to match", async ({ page }) => {
   expect(r.tile).toBeLessThan(100);
 });
 
-test("the card browser's grid is untouched", async ({ page }) => {
-  // Deliberately not changed: there you're reading effect text, which needs
-  // the bigger tile.
-  await page.goto("/digimon");
-  await page.waitForTimeout(1500);
-  const perRow = await page.locator(".card-grid").first().evaluate((g) => {
-    const tops = [...g.children].map((k) => Math.round(k.getBoundingClientRect().top));
-    return tops.filter((t) => t === tops[0]).length;
+for (const url of ["/digimon", "/digimon/collection", "/digimon/decks"]) {
+  test(`${url}: four to a row too`, async ({ page }) => {
+    await page.goto(url);
+    await page.waitForTimeout(2000);
+    const grid = page.locator(".card-grid").first();
+    if ((await grid.count()) === 0) test.skip();
+    const r = await grid.evaluate((g) => {
+      const kids = [...g.children];
+      const tops = kids.map((k) => Math.round(k.getBoundingClientRect().top));
+      return {
+        count: kids.length,
+        perRow: tops.filter((t) => t === tops[0]).length,
+        // Nothing may overflow its tile — the caption is the likeliest, being
+        // the only part with a text minimum.
+        overflow: kids.some((k) => k.scrollWidth > k.clientWidth + 1),
+      };
+    });
+    // A row can only hold as many as exist: this fixture's deck list may have
+    // fewer than four in it, and that isn't a layout failure.
+    expect(r.perRow).toBe(Math.min(4, r.count));
+    expect(r.overflow).toBe(false);
   });
-  expect(perRow).toBeLessThan(4);
-});
+}

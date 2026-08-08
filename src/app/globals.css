@@ -164,35 +164,41 @@ body::after {
   gap: 0.75rem;
 }
 
-/* The deck's own grid, on a phone.
+/* Every card grid, on a phone.
  *
- * `.card-grid` fits two 150px tiles across a 390px screen, which turns a
- * 50-card deck into 25 rows of scrolling. Four to a row is the point here:
- * you already know what's in your deck, so the tile only has to be big enough
- * to recognise, and seeing the shape of the whole thing at once is worth more
- * than reading its effect text — which is what the card browser is for, and
- * why that grid is left alone.
+ * The auto-fill sizing above fits two 150px tiles across a 390px screen, so a
+ * 50-card deck was 25 rows of scrolling and a page of search results showed
+ * eight cards. Four to a row: card art is recognisable well below 150px, and
+ * seeing a whole deck or a screen of results at once is worth more than the
+ * extra pixels. Only below `sm` — from there up auto-fill already shows plenty.
  *
- * Only below `sm`; from there up the shared auto-fill sizing is already
- * showing plenty per row. */
+ * The captions come down with the tile. At 85px the shared sizes leave the
+ * name at nearly a third of the card's width and truncate it anyway
+ * ("DemiDevi…"), which reads as broken rather than dense. */
 @media (max-width: 639px) {
-  .card-grid-deck {
+  .card-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.375rem;
   }
 
-  /* The caption has to come down with the tile. At 85px wide the default
-     sizes leave the name at nearly a third of the card's width and truncate
-     it anyway ("DemiDevi…"), which reads as broken rather than dense. */
-  .card-grid-deck .card-code {
+  .card-grid .card-code {
     font-size: 9px;
   }
-  .card-grid-deck .card-name {
+  .card-grid .card-name {
     font-size: 10.5px;
     line-height: 1.25;
   }
-  .card-grid-deck .card-price {
+  .card-grid .card-price {
     font-size: 10px;
+  }
+
+  /* Name beside price only works while there's width for both. Stacked, each
+     gets the full tile instead of ~40px. */
+  .card-grid .card-caption {
+    display: block;
+  }
+  .card-grid .card-caption .card-price {
+    display: block;
   }
 }
 
