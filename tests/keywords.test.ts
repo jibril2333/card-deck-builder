@@ -35,6 +35,39 @@ describe("KEYWORDS", () => {
       // rules (［DNA Digivolution］, ［Link］), so accept either.
       expect(k.display).toMatch(/[＜［]/);
       expect(k.zh.length).toBeGreaterThan(8);
+      // All three names are required: the table's job is recognising a
+      // keyword on a card, and which language that card is in varies.
+      expect(k.ja.length).toBeGreaterThan(0);
+      expect(k.zhName.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("gives each language a distinct name where the game does", () => {
+    // Some genuinely coincide across ja/zh (回避, 不屈, 速攻, 退化 …), so this
+    // only catches a field left as a copy of the English one.
+    for (const k of KEYWORDS) {
+      expect(k.ja).not.toBe(k.official);
+      expect(k.zhName).not.toBe(k.official);
+    }
+  });
+
+  it("has a Japanese name that the official ja list actually contains", () => {
+    const db = existsSync(DB) ? new Database(DB, { readonly: true }) : null;
+    if (!db) return;
+    try {
+      const ja = (
+        db
+          .prepare(`SELECT keyword FROM card_keywords WHERE lang = 'ja'`)
+          .all() as { keyword: string }[]
+      ).map((r) => r.keyword);
+      // Substring, not equality: the scraped list carries the numeric and
+      // card-name variants (デジバースト2, デコイ《黒》) while ours is the base.
+      const missing = KEYWORDS.filter(
+        (k) => !ja.some((o) => o.includes(k.ja)),
+      ).map((k) => `${k.official}→${k.ja}`);
+      expect(missing, `日文名对不上官方表: ${missing.join(", ")}`).toEqual([]);
+    } finally {
+      db.close();
     }
   });
 

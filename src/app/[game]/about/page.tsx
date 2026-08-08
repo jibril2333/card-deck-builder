@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
-import { KEYWORDS } from "@/lib/keywords";
+import { KEYWORDS, type Keyword } from "@/lib/keywords";
 
 export default async function AboutPage({
   params,
@@ -53,7 +53,18 @@ function ColorList({ colors }: { colors: string[] }) {
   );
 }
 
-function KeywordList({ items }: { items: [string, string][] }) {
+/**
+ * One row per keyword: the name in all three card languages, then the Chinese
+ * explanation.
+ *
+ * All three names are shown rather than only the reader's own, because the
+ * point of this table is recognising a keyword on a card — and the cards
+ * you're holding, the ones on the site and the ones in an English article
+ * won't agree on which language that is.
+ */
+/** Simple term/definition list, for sections that aren't the Digimon keyword
+ *  table (UA's triggers, which have no three-language mapping behind them). */
+function TermList({ items }: { items: [string, string][] }) {
   return (
     <dl className="not-prose grid grid-cols-1 gap-y-1.5 text-sm">
       {items.map(([term, def]) => (
@@ -65,6 +76,28 @@ function KeywordList({ items }: { items: [string, string][] }) {
             {term}
           </dt>
           <dd className="text-[var(--color-fg)] leading-relaxed">{def}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function KeywordList({ items }: { items: Keyword[] }) {
+  return (
+    <dl className="not-prose grid grid-cols-1 gap-y-2.5 text-sm">
+      {items.map((k) => (
+        <div key={k.official}>
+          <dt className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="font-mono text-xs font-semibold text-[var(--color-accent)]">
+              {k.display}
+            </span>
+            <span className="text-xs text-[var(--color-muted-fg)]">
+              {k.zhName} · {k.ja}
+            </span>
+          </dt>
+          <dd className="text-[var(--color-fg)] leading-relaxed mt-0.5">
+            {k.zh}
+          </dd>
         </div>
       ))}
     </dl>
@@ -187,11 +220,9 @@ function DigimonAbout() {
 
       <H>关键字（Keywords）</H>
       <P className="!mt-0 text-xs">
-        共 {KEYWORDS.length} 个,取自官方综合规则(2026-06-19 版)。数值或指定卡不同的写法(＜Draw 1＞ 与 ＜Draw 2＞)按规则 16-2 视为同一个关键字,这里合并成一条。
+        共 {KEYWORDS.length} 个,取自官方综合规则(2026-06-19 版)。每条给出英/中/日三种卡面写法。数值或指定卡不同的写法(＜Draw 1＞ 与 ＜Draw 2＞)按规则 16-2 视为同一个关键字,这里合并成一条。
       </P>
-      <KeywordList
-        items={KEYWORDS.map((k) => [k.display, k.zh] as [string, string])}
-      />
+      <KeywordList items={KEYWORDS} />
 
       <H>构筑规则</H>
       <P>
@@ -302,7 +333,7 @@ function UAAbout() {
       <P className="mb-2">
         卡牌右上角的 trigger 图标，在该卡作为生命被翻开时发动：
       </P>
-      <KeywordList
+      <TermList
         items={[
           ["［Color］色", "把这张卡作为能量放入能量区。"],
           ["［Draw］抽卡", "抽 1 张。"],
@@ -315,7 +346,7 @@ function UAAbout() {
       />
 
       <H>关键字（Keywords）</H>
-      <KeywordList
+      <TermList
         items={[
           ["＜Impact N＞", "突破对手前线打到玩家时，额外造成 N 点生命伤害。"],
           ["＜Block＞", "对手攻击时可横置此角色拦截，改为与它战斗。"],
