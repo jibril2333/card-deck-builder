@@ -808,7 +808,7 @@ export default async function DeckEditPage({
             }
             return (
               <CardPreviewProvider>
-                <div className="mt-6 card-grid">
+                <div className="mt-6 card-grid card-grid-deck">
                   {visibleCards.map((c) => (
                     <DeckCard
                       key={c.id}

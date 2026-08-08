@@ -194,7 +194,9 @@ export function DeckCard({
         </div>
 
         <div className="px-2 py-1.5">
-          <div className="flex items-center gap-1.5 text-[10px] text-[var(--color-muted-fg)] font-mono">
+          {/* card-code / card-name / card-price are styling hooks, not
+              behaviour: the deck grid shrinks them on a phone (globals.css). */}
+          <div className="card-code flex items-center gap-1.5 text-[10px] text-[var(--color-muted-fg)] font-mono">
             {card.color ? (
               <span
                 className="chip-dot shrink-0"
@@ -213,7 +215,7 @@ export function DeckCard({
               </span>
             ) : null}
           </div>
-          <div className="text-xs font-medium truncate group-hover:text-[var(--color-accent)]">
+          <div className="card-name text-xs font-medium truncate group-hover:text-[var(--color-accent)]">
             {card.name}
           </div>
         </div>
@@ -221,7 +223,7 @@ export function DeckCard({
 
       {mode === "browse" ? (
         card.price != null ? (
-          <div className="px-2 pb-1.5 text-xs text-[var(--color-accent2)] tabular-nums">
+          <div className="card-price px-2 pb-1.5 text-xs text-[var(--color-accent2)] tabular-nums">
             ¥{card.price}
           </div>
         ) : null
