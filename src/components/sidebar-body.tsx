@@ -73,7 +73,7 @@ export function SidebarBody({
         style={{ background: GAMES[game].accent }}
       />
       <span className="font-semibold tracking-tight truncate">
-        Card Deck Builder
+        DCG Deck Builder
       </span>
     </Link>
   );

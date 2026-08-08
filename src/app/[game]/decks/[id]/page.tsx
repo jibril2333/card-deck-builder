@@ -669,7 +669,7 @@ export default async function DeckEditPage({
                   {totalPrice > 0 ? (
                     <span className="ml-2">
                       · 预期总价{" "}
-                      <b className="text-[var(--color-fg)]">
+                      <b className="text-[var(--color-accent2)]">
                         {fmtPrice(totalPrice)}
                       </b>
                     </span>

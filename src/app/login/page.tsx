@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { LoginForm } from "./login-form";
 
-export const metadata = { title: "登录 · Card Deck Builder" };
+export const metadata = { title: "登录 · DCG Deck Builder" };
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({
@@ -23,7 +23,7 @@ export default async function LoginPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">登录</h1>
           <p className="text-sm text-[var(--color-muted-fg)] mt-1">
-            Card Deck Builder
+            DCG Deck Builder
           </p>
         </div>
 

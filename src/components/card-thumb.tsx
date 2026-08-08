@@ -92,7 +92,7 @@ export function CardThumb({
             <span
               className={`shrink-0 text-[10px] font-mono tabular-nums ${
                 card.market_in_stock
-                  ? "text-[var(--color-fg)]"
+                  ? "text-[var(--color-accent2)]"
                   : "text-[var(--color-muted-fg)] line-through opacity-70"
               }`}
               title={

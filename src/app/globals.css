@@ -1,17 +1,43 @@
 @import "tailwindcss";
 
+/**
+ * ONE theme, and it's dark.
+ *
+ * This file used to carry a light `@theme` plus a dark one wrapped in
+ * `@media (prefers-color-scheme: dark)`. That never worked: Tailwind v4 hoists
+ * `@theme` out of the media query and flattens it onto `:root`, so the
+ * condition was dropped and the dark block — being later in the file — won
+ * unconditionally. The app has therefore always rendered dark for everyone,
+ * including light-mode users, and nobody noticed because dark is what it was
+ * meant to look like.
+ *
+ * Rather than keep a light palette that is dead the moment it's written, the
+ * real values live here plainly. To bring light mode back, Tailwind v4 wants
+ * one `@theme` plus a `@custom-variant` or a class/attribute toggle on the
+ * root element — NOT a media-nested `@theme`. The old light values are in git
+ * (before the DCGO retheme) if they're ever wanted as a starting point.
+ */
 @theme {
-  /* Warm neutral palette (hue ~65) + amber-gold accent — a lighter-mode
-     companion to the near-black/gold dark theme below. */
-  --color-bg: oklch(0.99 0.004 65);
-  --color-fg: oklch(0.2 0.008 65);
-  --color-muted: oklch(0.965 0.005 65);
-  --color-muted-fg: oklch(0.5 0.01 65);
-  --color-border: oklch(0.905 0.006 65);
-  --color-card: oklch(1 0 0);
-  --color-card-fg: oklch(0.2 0.008 65);
-  --color-accent: oklch(0.6 0.15 62);
-  --color-accent-fg: oklch(0.99 0 0);
+  /* Deep blue canvas, cyan + orange accents — the DCGO look. The reference is
+     a splash screen: a whole field of saturated blue works when you look at it
+     for two seconds and fights a wall of card art when you read it for an
+     hour. So the saturation lives in the accents and the interactive states,
+     and the canvas stays dark. */
+  --color-bg: oklch(0.17 0.045 255);
+  --color-fg: oklch(0.96 0.012 250);
+  --color-muted: oklch(0.27 0.04 253);
+  --color-muted-fg: oklch(0.7 0.03 250);
+  --color-border: oklch(0.34 0.045 252);
+  --color-card: oklch(0.225 0.042 253);
+  --color-card-fg: oklch(0.96 0.012 250);
+
+  /* Two accents with a rule, or they're just noise:
+       accent  — things you can act on (buttons, selection, focus, links)
+       accent2 — figures and emphasis (prices, badges) */
+  --color-accent: oklch(0.76 0.135 224);
+  --color-accent-fg: oklch(0.16 0.05 250);
+  --color-accent2: oklch(0.73 0.17 52);
+  --color-accent2-fg: oklch(0.16 0.04 50);
 
   --radius: 0.625rem;
 
@@ -22,28 +48,56 @@
     ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    /* uptcg-style: warm near-black canvas, layered surfaces, amber-gold
-       accent (bright fill + dark text, like its buttons). */
-    --color-bg: oklch(0.15 0.006 65);
-    --color-fg: oklch(0.96 0.004 65);
-    --color-muted: oklch(0.215 0.008 65);
-    --color-muted-fg: oklch(0.67 0.008 65);
-    --color-border: oklch(0.29 0.009 65);
-    --color-card: oklch(0.185 0.007 65);
-    --color-card-fg: oklch(0.96 0.004 65);
-    --color-accent: oklch(0.79 0.145 72);
-    --color-accent-fg: oklch(0.18 0.03 72);
-  }
-}
-
 html,
 body {
   background: var(--color-bg);
   color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Backdrop: a faint circuit grid and a horizon glow, from the DCGO look.
+
+   Both are fixed and pointer-events:none, so they never scroll into the card
+   grid or eat a click, and the grid is masked to fade out below the fold — it
+   belongs behind the header, not behind a wall of card art it would compete
+   with. z-index 0, with the app above it (see layout.tsx). */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  inset: 0;
+  background-image:
+    linear-gradient(
+      transparent 0 calc(100% - 1px),
+      color-mix(in oklch, var(--color-accent) 20%, transparent) calc(100% - 1px)
+    ),
+    linear-gradient(
+      90deg,
+      transparent 0 calc(100% - 1px),
+      color-mix(in oklch, var(--color-accent) 20%, transparent) calc(100% - 1px)
+    );
+  background-size: 48px 48px;
+  mask-image: radial-gradient(120% 70% at 50% 0%, #000 5%, transparent 65%);
+  opacity: 0.45;
+}
+
+body::after {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 340px;
+  background: radial-gradient(
+    70% 100% at 50% 0%,
+    color-mix(in oklch, var(--color-accent) 20%, transparent),
+    transparent 70%
+  );
+  filter: blur(28px);
 }
 
 * {

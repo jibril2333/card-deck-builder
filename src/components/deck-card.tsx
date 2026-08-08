@@ -221,7 +221,7 @@ export function DeckCard({
 
       {mode === "browse" ? (
         card.price != null ? (
-          <div className="px-2 pb-1.5 text-xs text-[var(--color-muted-fg)] tabular-nums">
+          <div className="px-2 pb-1.5 text-xs text-[var(--color-accent2)] tabular-nums">
             ¥{card.price}
           </div>
         ) : null

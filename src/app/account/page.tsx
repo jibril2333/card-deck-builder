@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth/session";
 import { listCredentialsForUser } from "@/lib/auth/webauthn";
 import { PasskeySection } from "./passkey-section";
 
-export const metadata = { title: "账号 · Card Deck Builder" };
+export const metadata = { title: "账号 · DCG Deck Builder" };
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {

@@ -36,7 +36,7 @@ function db() {
   return getDB("digimon");
 }
 
-const RP_NAME = "Card Deck Builder";
+const RP_NAME = "DCG Deck Builder";
 const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export type StoredCredential = {

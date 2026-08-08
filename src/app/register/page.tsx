@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { findInvite } from "@/lib/auth/repo";
 import { RegisterForm } from "./register-form";
 
-export const metadata = { title: "注册 · Card Deck Builder" };
+export const metadata = { title: "注册 · DCG Deck Builder" };
 export const dynamic = "force-dynamic";
 
 export default async function RegisterPage({
