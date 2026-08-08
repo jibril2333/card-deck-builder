@@ -73,12 +73,33 @@ export function DeckAdjustments({
    * always fully on screen.
    */
   const inputRef = useRef<HTMLInputElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+
+  // Click-away closes the list without clearing the query, so focusing the box
+  // again brings the same results back.
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
+
+  /** Empty the box and keep the caret — clearing is the start of typing a
+   *  different name, not of leaving. */
+  function clear() {
+    setQ("");
+    setHits([]);
+    setOpen(false);
+    inputRef.current?.focus();
+  }
   const [drop, setDrop] = useState<{ up: boolean; max: number }>({
     up: false,
     max: 288,
   });
 
-  const listOpen = q.trim().length >= 2;
+  const listOpen = open && q.trim().length >= 2;
   useEffect(() => {
     if (!listOpen) return;
     function measure() {
@@ -158,16 +179,36 @@ export function DeckAdjustments({
         </span>
       </header>
 
-      <div className="relative mb-4">
+      <div ref={boxRef} className="relative mb-4">
         <input
           ref={inputRef}
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
           {...imeBind}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            // Escape while composing closes the IME's candidate list; wiping
+            // the box there would take the word still being typed.
+            if (e.key === "Escape" && !e.nativeEvent.isComposing) clear();
+          }}
           placeholder="搜卡片（名称或编号），再选加入哪一栏…"
-          className="w-full h-9 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
+          className="w-full h-9 pl-3 pr-9 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
         />
-        {q.trim().length >= 2 ? (
+        {/* Same clear affordance as the other two search boxes. */}
+        {q ? (
+          <button
+            type="button"
+            onClick={clear}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-fg)] text-sm cursor-pointer flex items-center justify-center"
+            aria-label="清空"
+          >
+            ×
+          </button>
+        ) : null}
+        {listOpen ? (
           <div
             className={`absolute z-20 left-0 right-0 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-xl ${
               drop.up ? "bottom-full mb-1" : "top-full mt-1"

@@ -69,3 +69,40 @@ test("it opens downward when there is room", async ({ page }) => {
   const r = (await list.boundingBox())!;
   expect(r.y).toBeGreaterThan(b.y);
 });
+
+test("clear button, and click-away closes the list", async ({ page }) => {
+  await page.goto("/digimon/decks");
+  await page.getByPlaceholder("卡组名").fill("ADJ3 " + Date.now());
+  await page.getByRole("button", { name: /创建/ }).click();
+  await page.waitForURL(/\/digimon\/decks\/[a-z0-9-]+/i);
+
+  const box = page.getByPlaceholder(/搜卡片/);
+  await box.scrollIntoViewIfNeeded();
+  const list = page.locator("div.absolute.z-20").first();
+  const clear = page.getByRole("button", { name: "清空" });
+
+  // Nothing to clear yet.
+  await expect(clear).toHaveCount(0);
+
+  await box.fill("mon");
+  await expect(list).toBeVisible();
+  await expect(clear).toBeVisible();
+
+  // Click-away hides the list but keeps the query, so focusing again brings
+  // the same results back rather than making you retype.
+  // A real click on inert page text: it both fires the handler and moves
+  // focus, which a synthetic mousedown does not — and focus is what brings the
+  // list back when you click into the box again.
+  await page.getByText(/主卡组 .* \/ 50/).click();
+  await expect(list).toHaveCount(0);
+  await expect(box).toHaveValue("mon");
+  await box.click();
+  await expect(list).toBeVisible();
+
+  // The × empties the box, drops the list, and leaves the caret behind.
+  await clear.click();
+  await expect(box).toHaveValue("");
+  await expect(list).toHaveCount(0);
+  await expect(clear).toHaveCount(0);
+  await expect(box).toBeFocused();
+});
