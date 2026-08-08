@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useComposition } from "@/lib/use-composition";
@@ -62,6 +62,45 @@ export function DeckAdjustments({
   // an IME is open is only half of it — the effect also has to re-run once the
   // word is committed, or the finished query never gets searched.
   const { composing, bind: imeBind } = useComposition((final) => setQ(final));
+
+  /**
+   * Where the result list goes, and how tall it may be.
+   *
+   * This panel sits below the whole card grid, so a list that always opened
+   * downward with a fixed 18rem cap ran off the bottom of the window — the
+   * matches were there, just below the fold. Measure what's actually free and
+   * flip up when down is the worse side, capping either way so the list is
+   * always fully on screen.
+   */
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [drop, setDrop] = useState<{ up: boolean; max: number }>({
+    up: false,
+    max: 288,
+  });
+
+  const listOpen = q.trim().length >= 2;
+  useEffect(() => {
+    if (!listOpen) return;
+    function measure() {
+      const el = inputRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const GAP = 12;
+      const below = window.innerHeight - r.bottom - GAP;
+      const above = r.top - GAP;
+      // Prefer down — a list that jumps sides as you type is worse than a
+      // short one — and only flip when up genuinely has more room.
+      const up = below < 200 && above > below;
+      setDrop({ up, max: Math.max(120, Math.min(288, up ? above : below)) });
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [listOpen]);
   useEffect(() => {
     if (composing) return;
     const query = q.trim();
@@ -121,6 +160,7 @@ export function DeckAdjustments({
 
       <div className="relative mb-4">
         <input
+          ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           {...imeBind}
@@ -128,7 +168,12 @@ export function DeckAdjustments({
           className="w-full h-9 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
         />
         {q.trim().length >= 2 ? (
-          <div className="absolute z-20 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-xl">
+          <div
+            className={`absolute z-20 left-0 right-0 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-xl ${
+              drop.up ? "bottom-full mb-1" : "top-full mt-1"
+            }`}
+            style={{ maxHeight: drop.max }}
+          >
             {searching && hits.length === 0 ? (
               <div className="px-3 py-2 text-xs text-[var(--color-muted-fg)]">
                 搜索中…
