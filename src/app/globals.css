@@ -104,6 +104,28 @@ body::after {
   border-color: var(--color-border);
 }
 
+/* iOS zooms the whole page when you focus a field whose text is under 16px,
+   and then leaves you scrolled somewhere else. Every input here is text-sm or
+   text-xs, so it fired constantly — searching a card on a phone rearranged the
+   page under your thumb.
+   
+   The other common "fix" is maximum-scale=1 on the viewport, which stops the
+   zoom by taking pinch-zoom away from everyone, including people who need it.
+   Raising the font instead costs a little density on touch screens and nothing
+   else. `pointer: coarse` rather than a width query, because an iPad in
+   landscape is wide and still zooms.
+   
+   Checkbox / radio / color aren't text fields and don't trigger it; sizing
+   them would just make them bigger. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]) {
+    font-size: 16px;
+  }
+}
+
 ::selection {
   background: var(--color-accent);
   color: var(--color-accent-fg);
