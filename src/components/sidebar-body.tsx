@@ -9,13 +9,21 @@ import { UserMenu } from "@/components/user-menu";
 import { CardLangSwitcher } from "@/components/card-lang-switcher";
 import type { CardLang } from "@/lib/card-lang";
 
-type NavId = "search" | "decks" | "collection" | "restrictions" | "about" | "admin";
+type NavId =
+  | "search"
+  | "decks"
+  | "collection"
+  | "restrictions"
+  | "memory"
+  | "about"
+  | "admin";
 
 const NAV: { id: NavId; label: string; icon: string; sub: string }[] = [
   { id: "search", label: "卡牌检索", icon: "🔍", sub: "Cards" },
   { id: "decks", label: "我的卡组", icon: "🗂️", sub: "Decks" },
   { id: "collection", label: "已收集", icon: "📦", sub: "Collection" },
   { id: "restrictions", label: "禁制限卡", icon: "🚫", sub: "Banlist" },
+  { id: "memory", label: "记忆条", icon: "🎚️", sub: "Memory" },
   { id: "about", label: "游戏知识", icon: "📖", sub: "About" },
 ];
 
@@ -34,6 +42,7 @@ function activeFor(pathname: string, game: string): NavId {
     return "decks";
   if (pathname.startsWith(`${base}/collection`)) return "collection";
   if (pathname.startsWith(`${base}/restrictions`)) return "restrictions";
+  if (pathname.startsWith(`${base}/memory`)) return "memory";
   if (pathname.startsWith(`${base}/about`)) return "about";
   return "search"; // /[game], /[game]/card/... and fallbacks
 }
@@ -61,8 +70,14 @@ export function SidebarBody({
   const active = activeFor(pathname, game);
   const [open, setOpen] = useState(false);
 
-  // Collection is the current user's own — hide it for anon.
-  const base = loggedIn ? NAV : NAV.filter((n) => n.id !== "collection");
+  // Collection is the current user's own — hide it for anon. The memory gauge
+  // is a Digimon rule; UA has no shared resource track and the route 404s
+  // there, so don't advertise it.
+  const base = NAV.filter(
+    (n) =>
+      (loggedIn || n.id !== "collection") &&
+      (game === "digimon" || n.id !== "memory"),
+  );
   const items = isAdmin ? [...base, ADMIN_NAV] : base;
 
   const brand = (
