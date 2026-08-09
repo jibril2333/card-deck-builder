@@ -23,18 +23,18 @@
      for two seconds and fights a wall of card art when you read it for an
      hour. So the saturation lives in the accents and the interactive states,
      and the canvas stays dark. */
-  --color-bg: oklch(0.17 0.045 255);
+  --color-bg: oklch(0.195 0.058 256);
   --color-fg: oklch(0.96 0.012 250);
-  --color-muted: oklch(0.27 0.04 253);
+  --color-muted: oklch(0.295 0.048 254);
   --color-muted-fg: oklch(0.7 0.03 250);
-  --color-border: oklch(0.34 0.045 252);
-  --color-card: oklch(0.225 0.042 253);
+  --color-border: oklch(0.375 0.055 253);
+  --color-card: oklch(0.245 0.05 254);
   --color-card-fg: oklch(0.96 0.012 250);
 
   /* Two accents with a rule, or they're just noise:
        accent  — things you can act on (buttons, selection, focus, links)
        accent2 — figures and emphasis (prices, badges) */
-  --color-accent: oklch(0.76 0.135 224);
+  --color-accent: oklch(0.79 0.15 226);
   --color-accent-fg: oklch(0.16 0.05 250);
   --color-accent2: oklch(0.73 0.17 52);
   --color-accent2-fg: oklch(0.16 0.04 50);
@@ -56,48 +56,95 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Backdrop: a faint circuit grid and a horizon glow, from the DCGO look.
-
-   Both are fixed and pointer-events:none, so they never scroll into the card
-   grid or eat a click, and the grid is masked to fade out below the fold — it
-   belongs behind the header, not behind a wall of card art it would compete
-   with. z-index 0, with the app above it (see layout.tsx). */
+/* Backdrop, after the DCGO menu screen: a field of crystalline facets, lines
+ * receding to a horizon, and a bright band of light sitting on it with its own
+ * reflection underneath.
+ *
+ * All of it is fixed and pointer-events:none, and all of it is masked to fade
+ * out before the content starts. That masking is the whole reason it can be
+ * this strong: the reference is a menu with six words on it, while this is a
+ * wall of card art, and an unmasked field of light behind 60 thumbnails
+ * competes with every one of them.
+ *
+ * z-index 0, with the app above it (see layout.tsx). */
 body::before,
 body::after {
   content: "";
   position: fixed;
+  inset: 0;
   pointer-events: none;
   z-index: 0;
 }
 
+/* Facets + the receding grid. The two repeating gradients are at
+   deliberately unrelated angles so their intersections read as irregular
+   shards rather than a plaid. */
 body::before {
-  inset: 0;
   background-image:
+    repeating-linear-gradient(
+      66deg,
+      transparent 0 78px,
+      color-mix(in oklch, var(--color-accent) 10%, transparent) 78px 79px,
+      transparent 79px 190px
+    ),
+    repeating-linear-gradient(
+      -34deg,
+      transparent 0 120px,
+      color-mix(in oklch, var(--color-accent) 8%, transparent) 120px 121px,
+      transparent 121px 260px
+    ),
+    repeating-linear-gradient(
+      14deg,
+      transparent 0 300px,
+      color-mix(in oklch, var(--color-accent) 14%, transparent) 300px 340px,
+      transparent 340px 620px
+    ),
     linear-gradient(
       transparent 0 calc(100% - 1px),
-      color-mix(in oklch, var(--color-accent) 20%, transparent) calc(100% - 1px)
+      color-mix(in oklch, var(--color-accent) 26%, transparent) calc(100% - 1px)
     ),
     linear-gradient(
       90deg,
       transparent 0 calc(100% - 1px),
-      color-mix(in oklch, var(--color-accent) 20%, transparent) calc(100% - 1px)
+      color-mix(in oklch, var(--color-accent) 26%, transparent) calc(100% - 1px)
     );
-  background-size: 48px 48px;
-  mask-image: radial-gradient(120% 70% at 50% 0%, #000 5%, transparent 65%);
-  opacity: 0.45;
+  background-size:
+    auto, auto, auto,
+    54px 54px,
+    54px 54px;
+  mask-image: linear-gradient(#000 0%, #000 55%, color-mix(in srgb, #000 45%, transparent) 100%);
+  opacity: 0.7;
 }
 
+/* The light source: a broad glow off the top edge.
+ *
+ * The reference draws a hard horizon line with a mirrored band under it, and
+ * that is the first thing to go here. All of this is `fixed`, so a crisp
+ * horizontal streak hangs motionless across the screen while the card grid
+ * scrolls under it, and wherever it lands it lands on something — a row of
+ * colour chips, a select, a card's name. Tried at 30vh and at 15vh; both times
+ * it read as a rendering artifact sitting on the UI rather than as depth
+ * behind it.
+ *
+ * With no edge sharp enough to trace, the same light still gives the page a
+ * top and a bottom, which is all it was ever there to do. Sized in vh so it
+ * scales to a phone. */
 body::after {
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 340px;
-  background: radial-gradient(
-    70% 100% at 50% 0%,
-    color-mix(in oklch, var(--color-accent) 20%, transparent),
-    transparent 70%
-  );
-  filter: blur(28px);
+  background-image:
+    radial-gradient(
+      58% 9vh at 50% 6vh,
+      color-mix(in oklch, var(--color-accent) 40%, white) 0%,
+      color-mix(in oklch, var(--color-accent) 22%, transparent) 42%,
+      transparent 100%
+    ),
+    radial-gradient(
+      100% 34vh at 50% 0%,
+      color-mix(in oklch, var(--color-accent) 22%, transparent),
+      transparent 72%
+    );
+  background-repeat: no-repeat;
+  mask-image: linear-gradient(#000 0%, #000 26%, transparent 56%);
+  opacity: 0.9;
 }
 
 * {
