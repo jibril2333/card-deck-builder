@@ -137,107 +137,153 @@ test("UA has no memory gauge", async ({ page }) => {
 });
 
 // ── 桌面模式 ────────────────────────────────────────────────────────────────
-// The phone-on-the-table layout: two zones facing opposite ways, seat-neutral
-// names, and a full-height shared track.
+// The honeycomb replica: 21 hexes folded into three columns, tap to move the
+// counter, digits turned toward whichever player owns them.
 
 test.describe("table mode", () => {
-  test("each seat drives its own side of the shared counter", async ({ page }) => {
-    await open(page);
+  const enter = async (page: import("@playwright/test").Page) => {
     await page.getByRole("button", { name: /桌面模式/ }).click();
+    await expect(page.getByRole("group", { name: "内存条" })).toBeVisible();
+  };
 
-    const blue = page.getByRole("region", { name: "蓝方" });
-    const gold = page.getByRole("region", { name: "橙方" });
+  /** Centre of a hex, in viewport pixels. */
+  const at = async (page: import("@playwright/test").Page, name: string) => {
+    const box = await page.getByRole("button", { name, exact: true }).boundingBox();
+    if (!box) throw new Error(`no hex ${name}`);
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
 
-    // Only the turn player can hand over.
-    await expect(blue.getByRole("button", { name: "蓝方结束回合" })).toBeEnabled();
-    await expect(gold.getByRole("button", { name: "橙方结束回合" })).toBeDisabled();
+  test("tapping a hex moves the counter there", async ({ page }) => {
+    await open(page);
+    await enter(page);
+    await expect(page.getByRole("button", { name: "0", exact: true })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
 
-    await blue.getByRole("button", { name: "花费 4" }).click();
-    await expect(blue.getByLabel("蓝方可用记忆 -4")).toBeVisible();
-    // Same counter, read from the other chair — not a second number.
-    await expect(gold.getByLabel("橙方可用记忆 4")).toBeVisible();
-
-    await blue.getByRole("button", { name: "蓝方结束回合" }).click();
-    await expect(gold.getByRole("button", { name: "橙方结束回合" })).toBeEnabled();
-    await expect(blue.getByRole("button", { name: "蓝方结束回合" })).toBeDisabled();
-
-    // 橙方 overshoots by 2 and pushes it back onto 蓝方's side.
-    await gold.getByRole("button", { name: "花费 6" }).click();
-    await expect(gold.getByLabel("橙方可用记忆 -2")).toBeVisible();
-    await expect(blue.getByLabel("蓝方可用记忆 2")).toBeVisible();
+    await page.getByRole("button", { name: "橙方 4", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "把记忆条移到 蓝方 2" }),
+      page.getByRole("button", { name: "橙方 4", exact: true }),
     ).toHaveAttribute("aria-current", "true");
+    await expect(page.getByRole("button", { name: "0", exact: true })).not.toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+
+    // Leaving the mode keeps the position: 橙方 4 is -4 from 蓝方's seat.
+    await page.getByRole("button", { name: "‹ 返回" }).click();
+    await expect(readout(page)).toHaveText("-4");
   });
 
-  test("the far zone is rotated so its player reads it upright", async ({ page }) => {
+  test("撤销 and 开局 work on the same history as the rest of the page", async ({
+    page,
+  }) => {
     await open(page);
-    await page.getByRole("button", { name: /桌面模式/ }).click();
-    const spin = (name: string) =>
-      page
-        .getByRole("region", { name })
-        .evaluate((el) => getComputedStyle(el).transform);
-
-    // matrix(-1, 0, 0, -1, 0, 0) is a 180° rotation.
-    expect(await spin("橙方")).toBe("matrix(-1, 0, 0, -1, 0, 0)");
-    expect(await spin("蓝方")).toBe("none");
-  });
-
-  test("the gauge carries over when the mode does", async ({ page }) => {
-    await open(page);
-    await page.getByRole("button", { name: "−7", exact: true }).click();
-    await page.getByRole("button", { name: /桌面模式/ }).click();
+    await page.getByRole("button", { name: "−3", exact: true }).click();
+    await enter(page);
     await expect(
-      page.getByRole("region", { name: "蓝方" }).getByLabel("蓝方可用记忆 -7"),
-    ).toBeVisible();
+      page.getByRole("button", { name: "橙方 3", exact: true }),
+    ).toHaveAttribute("aria-current", "true");
 
-    await page.getByRole("button", { name: "蓝方退出桌面模式" }).click();
-    await expect(readout(page)).toHaveText("-7");
+    await page.getByRole("button", { name: "蓝方 6", exact: true }).click();
+    await page.getByRole("button", { name: "撤销" }).click();
+    await expect(
+      page.getByRole("button", { name: "橙方 3", exact: true }),
+    ).toHaveAttribute("aria-current", "true");
+
+    await page.getByRole("button", { name: "开局" }).click();
+    await expect(page.getByRole("button", { name: "0", exact: true })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    await expect(page.getByRole("button", { name: "撤销" })).toBeDisabled();
   });
 
   /**
-   * The keypads keep a 36px minimum while their grid track shrinks under them,
-   * so on a short screen they OVERLAP rather than overflow — nothing throws,
-   * nothing clips, the buttons just sit on top of each other. A layout test
-   * that only checked for overflow passed the bug; this one measures the
-   * rectangles, across the range a phone can actually be held at.
+   * The fold is the whole layout, and it is easy to get subtly wrong — a column
+   * off by one row still looks like a honeycomb. These are the properties that
+   * pin it: three columns, each side confined to two of them, the two halves
+   * point-symmetric about zero, and the left column running 4→10 downward.
    */
-  test("no keypad rows collide at any usable height", async ({ page }) => {
+  test("the honeycomb is folded the way the reference folds it", async ({ page }) => {
     await open(page);
-    await page.getByRole("button", { name: /桌面模式/ }).click();
+    await enter(page);
 
-    // Measured after the layout settles, not immediately: the breakpoint runs
-    // through matchMedia → React state → re-render, so reading the rectangles
-    // in the same tick as the resize measures the OLD layout and reports every
-    // button as overlapping every other one.
-    const collisions = () =>
-      page.evaluate(() => {
-        const out: string[] = [];
-        for (const sec of document.querySelectorAll("section")) {
-          const btns = [...sec.querySelectorAll("button")];
-          for (const b of btns) {
-            if (b.getBoundingClientRect().height < 24) out.push(`tiny:${b.textContent}`);
-          }
-          for (let i = 0; i < btns.length; i++) {
-            for (let j = i + 1; j < btns.length; j++) {
-              const a = btns[i].getBoundingClientRect();
-              const c = btns[j].getBoundingClientRect();
-              if (
-                a.left < c.right - 1 && c.left < a.right - 1 &&
-                a.top < c.bottom - 1 && c.top < a.bottom - 1
-              ) {
-                out.push(`overlap:${btns[i].textContent}/${btns[j].textContent}`);
-              }
-            }
-          }
-        }
-        return [...new Set(out)];
-      });
+    const zero = await at(page, "0");
+    const blue = [];
+    const gold = [];
+    for (let n = 1; n <= 10; n++) {
+      blue.push(await at(page, `蓝方 ${n}`));
+      gold.push(await at(page, `橙方 ${n}`));
+    }
 
-    for (let h = 360; h <= 940; h += 40) {
+    // Exactly three columns, evenly spaced, zero in the middle one.
+    const xs = [...new Set([...blue, ...gold, zero].map((p) => Math.round(p.x)))].sort(
+      (a, b) => a - b,
+    );
+    expect(xs).toHaveLength(3);
+    expect(xs[1] - xs[0]).toBeCloseTo(xs[2] - xs[1], 0);
+    expect(Math.round(zero.x)).toBe(xs[1]);
+
+    // 蓝方 never uses the right column, 橙方 never uses the left.
+    expect(blue.every((p) => Math.round(p.x) <= xs[1])).toBe(true);
+    expect(gold.every((p) => Math.round(p.x) >= xs[1])).toBe(true);
+
+    // Point-symmetric about zero: 蓝方 n mirrors 橙方 n through the 0 hex.
+    for (let i = 0; i < 10; i++) {
+      expect(blue[i].x + gold[i].x).toBeCloseTo(2 * zero.x, 0);
+      expect(blue[i].y + gold[i].y).toBeCloseTo(2 * zero.y, 0);
+    }
+
+    // 1–3 climb the middle column, then 4 steps out and 4–10 come back down
+    // the left one. (Get the turn wrong and 4 sits below 10.)
+    for (const n of [1, 2, 3]) expect(Math.round(blue[n - 1].x)).toBe(xs[1]);
+    for (let n = 4; n <= 10; n++) expect(Math.round(blue[n - 1].x)).toBe(xs[0]);
+    expect(blue[2].y).toBeLessThan(blue[0].y); // 3 above 1
+    for (let n = 5; n <= 10; n++) {
+      expect(blue[n - 1].y).toBeGreaterThan(blue[n - 2].y); // 4→10 descending
+    }
+  });
+
+  test("the two sides' digits face opposite ways", async ({ page }) => {
+    await open(page);
+    await enter(page);
+    const spin = (name: string) =>
+      page
+        .getByRole("button", { name, exact: true })
+        .locator("text")
+        .getAttribute("transform");
+
+    expect(await spin("蓝方 7")).toMatch(/rotate\(-90/);
+    expect(await spin("橙方 7")).toMatch(/rotate\(90/);
+  });
+
+  test("the whole honeycomb stays on screen at any usable height", async ({
+    page,
+  }) => {
+    await open(page);
+    await enter(page);
+
+    for (let h = 400; h <= 940; h += 60) {
       await page.setViewportSize({ width: 390, height: h });
       await expect
-        .poll(collisions, { timeout: 3000, message: `viewport height ${h}` })
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const svg = document.querySelector("svg[aria-label=内存条]");
+              if (!svg) return ["no svg"];
+              const out: string[] = [];
+              const box = svg.getBoundingClientRect();
+              for (const g of svg.querySelectorAll("g")) {
+                const r = g.getBoundingClientRect();
+                if (r.width < 12 || r.height < 12) out.push(`tiny:${g.getAttribute("aria-label")}`);
+                if (r.top < box.top - 1 || r.bottom > box.bottom + 1)
+                  out.push(`clipped:${g.getAttribute("aria-label")}`);
+              }
+              return [...new Set(out)];
+            }),
+          { timeout: 3000, message: `viewport height ${h}` },
+        )
         .toEqual([]);
     }
   });

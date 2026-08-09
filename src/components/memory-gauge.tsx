@@ -168,13 +168,11 @@ export function MemoryGauge() {
   if (table) {
     return (
       <TableMode
-        g={g}
-        onSpend={spendBy}
-        onGain={gainBy}
-        onPass={doPass}
+        value={g.value}
         onSet={setValue}
         onUndo={undo}
         canUndo={past.length > 0}
+        onReset={reset}
         onExit={() => setTable(false)}
       />
     );
@@ -188,7 +186,7 @@ export function MemoryGauge() {
         className="h-12 rounded-xl border border-[var(--color-accent)] text-[var(--color-accent)] text-sm font-medium cursor-pointer hover:bg-[var(--color-accent)]/10"
         style={{ background: "color-mix(in oklch, var(--color-accent) 8%, transparent)" }}
       >
-        📱 桌面模式 · 手机放桌子中间,两边各按各的
+        📱 桌面模式 · 手机放桌子中间,两边一起用
       </button>
       {/* Whose turn — also the control that changes it, because on a gauge
           those are the same question. */}
