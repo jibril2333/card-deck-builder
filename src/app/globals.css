@@ -56,30 +56,30 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Backdrop, after the DCGO menu screen: a field of crystalline facets, lines
- * receding to a horizon, and a bright band of light sitting on it with its own
- * reflection underneath.
+/* Backdrop, after the DCGO menu screen: a field of crystalline facets with
+ * lines receding to a horizon.
  *
- * All of it is fixed and pointer-events:none, and all of it is masked to fade
- * out before the content starts. That masking is the whole reason it can be
- * this strong: the reference is a menu with six words on it, while this is a
- * wall of card art, and an unmasked field of light behind 60 thumbnails
- * competes with every one of them.
+ * Structure only — no light source. The reference hangs a bright band across
+ * its horizon, and every version of that was worse here: hard-edged at 30vh or
+ * at 15vh it sat on the filter controls and the colour chips, and softened to a
+ * broad glow off the top edge it still washed out the header. All of this is
+ * `fixed`, so whatever it lands on, it stays landed on while the page scrolls
+ * underneath. The facets alone carry the style.
  *
- * z-index 0, with the app above it (see layout.tsx). */
-body::before,
-body::after {
+ * Fixed, pointer-events:none, and masked to fade downward — the reference is a
+ * menu with six words on it, while this is a wall of card art, and an unmasked
+ * field behind 60 thumbnails competes with every one of them.
+ *
+ * z-index 0, with the app above it (see layout.tsx).
+ *
+ * The three repeating gradients are at deliberately unrelated angles so their
+ * intersections read as irregular shards rather than a plaid. */
+body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-}
-
-/* Facets + the receding grid. The two repeating gradients are at
-   deliberately unrelated angles so their intersections read as irregular
-   shards rather than a plaid. */
-body::before {
   background-image:
     repeating-linear-gradient(
       66deg,
@@ -114,37 +114,6 @@ body::before {
     54px 54px;
   mask-image: linear-gradient(#000 0%, #000 55%, color-mix(in srgb, #000 45%, transparent) 100%);
   opacity: 0.7;
-}
-
-/* The light source: a broad glow off the top edge.
- *
- * The reference draws a hard horizon line with a mirrored band under it, and
- * that is the first thing to go here. All of this is `fixed`, so a crisp
- * horizontal streak hangs motionless across the screen while the card grid
- * scrolls under it, and wherever it lands it lands on something — a row of
- * colour chips, a select, a card's name. Tried at 30vh and at 15vh; both times
- * it read as a rendering artifact sitting on the UI rather than as depth
- * behind it.
- *
- * With no edge sharp enough to trace, the same light still gives the page a
- * top and a bottom, which is all it was ever there to do. Sized in vh so it
- * scales to a phone. */
-body::after {
-  background-image:
-    radial-gradient(
-      58% 9vh at 50% 6vh,
-      color-mix(in oklch, var(--color-accent) 40%, white) 0%,
-      color-mix(in oklch, var(--color-accent) 22%, transparent) 42%,
-      transparent 100%
-    ),
-    radial-gradient(
-      100% 34vh at 50% 0%,
-      color-mix(in oklch, var(--color-accent) 22%, transparent),
-      transparent 72%
-    );
-  background-repeat: no-repeat;
-  mask-image: linear-gradient(#000 0%, #000 26%, transparent 56%);
-  opacity: 0.9;
 }
 
 * {
