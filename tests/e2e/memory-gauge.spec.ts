@@ -135,3 +135,110 @@ test("UA has no memory gauge", async ({ page }) => {
   await expect(page.getByRole("group", { name: "记忆条" })).toHaveCount(0);
   await expect(page.getByText("This page could not be found")).toBeVisible();
 });
+
+// ── 桌面模式 ────────────────────────────────────────────────────────────────
+// The phone-on-the-table layout: two zones facing opposite ways, seat-neutral
+// names, and a full-height shared track.
+
+test.describe("table mode", () => {
+  test("each seat drives its own side of the shared counter", async ({ page }) => {
+    await open(page);
+    await page.getByRole("button", { name: /桌面模式/ }).click();
+
+    const blue = page.getByRole("region", { name: "蓝方" });
+    const gold = page.getByRole("region", { name: "橙方" });
+
+    // Only the turn player can hand over.
+    await expect(blue.getByRole("button", { name: "蓝方结束回合" })).toBeEnabled();
+    await expect(gold.getByRole("button", { name: "橙方结束回合" })).toBeDisabled();
+
+    await blue.getByRole("button", { name: "花费 4" }).click();
+    await expect(blue.getByLabel("蓝方可用记忆 -4")).toBeVisible();
+    // Same counter, read from the other chair — not a second number.
+    await expect(gold.getByLabel("橙方可用记忆 4")).toBeVisible();
+
+    await blue.getByRole("button", { name: "蓝方结束回合" }).click();
+    await expect(gold.getByRole("button", { name: "橙方结束回合" })).toBeEnabled();
+    await expect(blue.getByRole("button", { name: "蓝方结束回合" })).toBeDisabled();
+
+    // 橙方 overshoots by 2 and pushes it back onto 蓝方's side.
+    await gold.getByRole("button", { name: "花费 6" }).click();
+    await expect(gold.getByLabel("橙方可用记忆 -2")).toBeVisible();
+    await expect(blue.getByLabel("蓝方可用记忆 2")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "把记忆条移到 蓝方 2" }),
+    ).toHaveAttribute("aria-current", "true");
+  });
+
+  test("the far zone is rotated so its player reads it upright", async ({ page }) => {
+    await open(page);
+    await page.getByRole("button", { name: /桌面模式/ }).click();
+    const spin = (name: string) =>
+      page
+        .getByRole("region", { name })
+        .evaluate((el) => getComputedStyle(el).transform);
+
+    // matrix(-1, 0, 0, -1, 0, 0) is a 180° rotation.
+    expect(await spin("橙方")).toBe("matrix(-1, 0, 0, -1, 0, 0)");
+    expect(await spin("蓝方")).toBe("none");
+  });
+
+  test("the gauge carries over when the mode does", async ({ page }) => {
+    await open(page);
+    await page.getByRole("button", { name: "−7", exact: true }).click();
+    await page.getByRole("button", { name: /桌面模式/ }).click();
+    await expect(
+      page.getByRole("region", { name: "蓝方" }).getByLabel("蓝方可用记忆 -7"),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "蓝方退出桌面模式" }).click();
+    await expect(readout(page)).toHaveText("-7");
+  });
+
+  /**
+   * The keypads keep a 36px minimum while their grid track shrinks under them,
+   * so on a short screen they OVERLAP rather than overflow — nothing throws,
+   * nothing clips, the buttons just sit on top of each other. A layout test
+   * that only checked for overflow passed the bug; this one measures the
+   * rectangles, across the range a phone can actually be held at.
+   */
+  test("no keypad rows collide at any usable height", async ({ page }) => {
+    await open(page);
+    await page.getByRole("button", { name: /桌面模式/ }).click();
+
+    // Measured after the layout settles, not immediately: the breakpoint runs
+    // through matchMedia → React state → re-render, so reading the rectangles
+    // in the same tick as the resize measures the OLD layout and reports every
+    // button as overlapping every other one.
+    const collisions = () =>
+      page.evaluate(() => {
+        const out: string[] = [];
+        for (const sec of document.querySelectorAll("section")) {
+          const btns = [...sec.querySelectorAll("button")];
+          for (const b of btns) {
+            if (b.getBoundingClientRect().height < 24) out.push(`tiny:${b.textContent}`);
+          }
+          for (let i = 0; i < btns.length; i++) {
+            for (let j = i + 1; j < btns.length; j++) {
+              const a = btns[i].getBoundingClientRect();
+              const c = btns[j].getBoundingClientRect();
+              if (
+                a.left < c.right - 1 && c.left < a.right - 1 &&
+                a.top < c.bottom - 1 && c.top < a.bottom - 1
+              ) {
+                out.push(`overlap:${btns[i].textContent}/${btns[j].textContent}`);
+              }
+            }
+          }
+        }
+        return [...new Set(out)];
+      });
+
+    for (let h = 360; h <= 940; h += 40) {
+      await page.setViewportSize({ width: 390, height: h });
+      await expect
+        .poll(collisions, { timeout: 3000, message: `viewport height ${h}` })
+        .toEqual([]);
+    }
+  });
+});

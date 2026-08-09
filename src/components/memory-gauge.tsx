@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { TableMode } from "@/components/memory-table-mode";
 import {
   MEMORY_MAX,
   INITIAL_GAUGE,
@@ -60,6 +61,7 @@ export function MemoryGauge() {
   const [g, setG] = useState<Gauge>(INITIAL_GAUGE);
   const [past, setPast] = useState<Snapshot[]>([]);
   const [ready, setReady] = useState(false);
+  const [table, setTable] = useState(false);
 
   useEffect(() => {
     setG(load());
@@ -83,14 +85,23 @@ export function MemoryGauge() {
     });
   }, []);
 
-  const doSpend = useCallback(
-    (n: number) => push({ ...g, value: spend(g.value, g.turn, n) }),
+  // Side-explicit, because table mode has two seats pressing buttons and only
+  // one of them is the turn player. Everything else defaults to whoever's turn
+  // it is.
+  const spendBy = useCallback(
+    (side: Side, n: number) => push({ ...g, value: spend(g.value, side, n) }),
     [g, push],
   );
-  const doGain = useCallback(
-    (n: number) => push({ ...g, value: gain(g.value, g.turn, n) }),
+  const gainBy = useCallback(
+    (side: Side, n: number) => push({ ...g, value: gain(g.value, side, n) }),
     [g, push],
   );
+  const setValue = useCallback(
+    (value: number) => push({ ...g, value }),
+    [g, push],
+  );
+  const doSpend = useCallback((n: number) => spendBy(g.turn, n), [g.turn, spendBy]);
+  const doGain = useCallback((n: number) => gainBy(g.turn, n), [g.turn, gainBy]);
   const doPass = useCallback(() => push(passTurn(g)), [g, push]);
 
   const undo = useCallback(() => {
@@ -154,8 +165,31 @@ export function MemoryGauge() {
   const turnLabel = SIDE_LABEL[g.turn];
   const untouched = past.length === 0 && g.value === 0;
 
+  if (table) {
+    return (
+      <TableMode
+        g={g}
+        onSpend={spendBy}
+        onGain={gainBy}
+        onPass={doPass}
+        onSet={setValue}
+        onUndo={undo}
+        canUndo={past.length > 0}
+        onExit={() => setTable(false)}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-5">
+      <button
+        type="button"
+        onClick={() => setTable(true)}
+        className="h-12 rounded-xl border border-[var(--color-accent)] text-[var(--color-accent)] text-sm font-medium cursor-pointer hover:bg-[var(--color-accent)]/10"
+        style={{ background: "color-mix(in oklch, var(--color-accent) 8%, transparent)" }}
+      >
+        📱 桌面模式 · 手机放桌子中间,两边各按各的
+      </button>
       {/* Whose turn — also the control that changes it, because on a gauge
           those are the same question. */}
       <div className="flex gap-2">
