@@ -91,11 +91,65 @@ test("the board survives a reload", async ({ page }) => {
   await expect(hex(page, "橙方 7")).toHaveAttribute("aria-current", "true");
 });
 
-test("开局 clears the game", async ({ page }) => {
+test("tapping 0 puts the counter back in the middle", async ({ page }) => {
+  // What the 开局 button used to do. It's gone: the 0 hex is right there, and a
+  // control that duplicates a hex is one more thing to hit by mistake.
   await open(page);
   await hex(page, "橙方 6").click();
-  await page.getByRole("button", { name: "开局" }).click();
+  await expect(page.getByRole("button", { name: "开局" })).toHaveCount(0);
+  await hex(page, "0").click();
   await expect(hex(page, "0")).toHaveAttribute("aria-current", "true");
+});
+
+/**
+ * 返回 floats in the bottom-left corner instead of a footer row, which only
+ * works because the honeycomb's diagonal ribbon leaves that corner empty. How
+ * much of it is empty changes with the viewport, so this measures the actual
+ * rectangles at the sizes a phone or tablet can be.
+ */
+test("the corner controls never sit on a hexagon", async ({ page }) => {
+  await open(page);
+
+  for (const [w, h] of [
+    [320, 568],
+    [375, 667],
+    [390, 844],
+    [430, 932],
+    [768, 1024],
+    [844, 390],
+    [1440, 900],
+  ]) {
+    await page.setViewportSize({ width: w, height: h });
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            // Scoped to the board: the sidebar it covers has buttons of its own
+            // sitting underneath, and those overlap the hexes by design.
+            const board = document.querySelector('svg[aria-label="内存条"]')
+              ?.parentElement;
+            if (!board) return ["no board"];
+            const out: string[] = [];
+            for (const btn of board.querySelectorAll(":scope > button")) {
+              const b = btn.getBoundingClientRect();
+              for (const poly of board.querySelectorAll("svg polygon")) {
+                const r = poly.getBoundingClientRect();
+                if (
+                  r.left < b.right - 1 && b.left < r.right - 1 &&
+                  r.top < b.bottom - 1 && b.top < r.bottom - 1
+                ) {
+                  out.push(
+                    `${btn.textContent?.trim() || btn.ariaLabel}×${poly.parentElement?.getAttribute("aria-label")}`,
+                  );
+                }
+              }
+            }
+            return [...new Set(out)];
+          }),
+        { timeout: 3000, message: `viewport ${w}x${h}` },
+      )
+      .toEqual([]);
+  }
 });
 
 /**

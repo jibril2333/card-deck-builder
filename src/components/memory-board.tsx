@@ -148,8 +148,6 @@ export function MemoryBoard({ home }: { home: string }) {
     }
   }, [value, ready]);
 
-  const reset = useCallback(() => setValue(0), []);
-
   const back = useCallback(() => {
     // Same rule as BackLink: only go back through history we pushed, and never
     // off the site. Otherwise land on the game's home page.
@@ -163,7 +161,7 @@ export function MemoryBoard({ home }: { home: string }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col select-none"
+      className="fixed inset-0 z-50 select-none"
       style={{
         background: FIELD,
         overscrollBehavior: "none",
@@ -178,7 +176,11 @@ export function MemoryBoard({ home }: { home: string }) {
         paddingRight: "env(safe-area-inset-right)",
       }}
     >
-      <div className="flex-1 min-h-0 p-1">
+      {/* The board gets the whole screen. The two controls float in the corners
+          the honeycomb's diagonal ribbon leaves empty rather than sitting in a
+          footer row — a row costs every hexagon ~7% of its size, and on a phone
+          on a table that is the difference you actually feel. */}
+      <div className="relative w-full h-full p-1">
         <svg
           viewBox={`${-VB_W / 2} ${-VB_H / 2} ${VB_W} ${VB_H}`}
           preserveAspectRatio="xMidYMid meet"
@@ -220,34 +222,24 @@ export function MemoryBoard({ home }: { home: string }) {
             );
           })}
         </svg>
-      </div>
 
-      <footer className="shrink-0 flex gap-2 px-2 pb-2 pt-1">
         <button
           type="button"
           onClick={back}
-          className="flex-1 h-11 rounded-lg text-white text-[15px] cursor-pointer"
+          className="absolute left-2 bottom-2 h-9 px-4 rounded-lg text-white text-sm cursor-pointer"
           style={{ background: BTN }}
         >
           返回
         </button>
-        <button
-          type="button"
-          onClick={reset}
-          className="flex-1 h-11 rounded-lg text-white text-[15px] cursor-pointer"
-          style={{ background: BTN }}
-        >
-          开局
-        </button>
         <FullscreenButton />
-      </footer>
+      </div>
     </div>
   );
 }
 
 /**
- * Rendered only where the Fullscreen API exists — which is why the footer on an
- * iPhone is exactly the reference's two buttons. iPhone Safari has never
+ * Rendered only where the Fullscreen API exists — which is why an iPhone shows
+ * nothing down here but 返回. iPhone Safari has never
  * implemented `requestFullscreen` on any element, so there the button would be
  * a dead control; the equivalent on that device is Add to Home Screen, which
  * this page's `appleWebApp` metadata turns into a chrome-less standalone launch.
@@ -276,7 +268,7 @@ function FullscreenButton() {
           document.documentElement.requestFullscreen().catch(() => {});
         }
       }}
-      className="shrink-0 w-11 h-11 rounded-lg text-white text-[17px] cursor-pointer"
+      className="absolute right-2 bottom-2 w-9 h-9 rounded-lg text-white text-[15px] cursor-pointer"
       style={{ background: BTN }}
       aria-pressed={on}
       aria-label={on ? "退出全屏" : "全屏"}
