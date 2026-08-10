@@ -9,9 +9,13 @@
  *   and serves page 1 × size 10 — probe with small limits when in doubt.)
  *
  * Each row carries everything we need: `model` is the card code (BT1-001),
- * plus CN name / 三段效果 / 形态 / 属性 / 特征 / CN card image. Parallel-art
- * printings appear as extra rows with the same `model`; text is identical so
- * last-write-wins is fine.
+ * plus CN name / 三段效果 / 形态 / 属性 / 特征 / CN card image.
+ *
+ * Parallel printings get their OWN rows. Since roughly BT7 they carry a
+ * suffixed model — `BT12-085_01`, `BT12-085_LM06`, `BT11-064_BT25` — while
+ * BT1–BT6 and EX1/EX2 just repeat the bare code. Only the artwork differs;
+ * the text belongs to the base code either way, so a suffixed row contributes
+ * an image and nothing else (see `groupCnArt`).
  *
  * Run with:
  *   npx tsx scripts/scrape-digimon-cn.ts
@@ -26,9 +30,12 @@ import {
 import {
   cleanEffect,
   cnEvolutionCost,
+  groupCnArt,
   splitCnDual,
   splitCnLink,
+  splitCnModel,
   splitCnRequirements,
+  type CnArtRow,
 } from "../src/lib/scraper/digimon-cn";
 
 // CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
@@ -82,15 +89,13 @@ async function fetchPage(pageNum: number): Promise<{
 /**
  * Persist the Chinese artwork as `card_images` rows (lang='zh').
  *
- * The CN CDN encodes parallels with a trailing `_NN` (e.g. `BT1-009C.png` is
- * the base print, `BT1-009_01.png` its alt art), so we can tell them apart by
- * filename and map them onto the same `""`/`_P1`/`_P2` variant keys the EN/JP
- * probers use. Only codes we actually carry get rows — the CN list contains
- * plenty of models our `cards` table doesn't have.
+ * Grouping and ordering live in `groupCnArt` (unit-tested); this only writes.
+ * Only codes we actually carry get rows — the CN list contains plenty of models
+ * our `cards` table doesn't have.
  */
 function writeZhCardImages(
   db: Database.Database,
-  imagesByModel: Map<string, Set<string>>,
+  art: Map<string, { base: string; alts: string[] }>,
 ) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS card_images (
@@ -122,43 +127,66 @@ function writeZhCardImages(
      ON CONFLICT(code, lang, variant) DO UPDATE SET
        image_url = excluded.image_url, checked_at = CURRENT_TIMESTAMP`,
   );
+  // A card that loses a printing upstream would otherwise keep the stale row
+  // forever, and the leftover `_P3` would outlive the `_P2` that replaced it.
+  const dropExtra = db.prepare(
+    `DELETE FROM card_images WHERE lang = 'zh' AND code = ? AND variant <> ''
+       AND variant NOT IN (SELECT value FROM json_each(?))`,
+  );
   // Keep the translation's main image pointing at the BASE print rather than
   // whichever row happened to be written last.
   const fixMain = db.prepare(
     `UPDATE card_translations SET image_url = ? WHERE code = ? AND lang = 'zh'`,
   );
-  const parallelNo = (url: string) => {
-    const m = url.match(/_(\d+)\.[a-z]+$/i);
-    return m ? parseInt(m[1], 10) : null;
-  };
 
   let rows = 0;
   let codes = 0;
   let withAlt = 0;
   const tx = db.transaction(() => {
-    for (const [code, set] of imagesByModel) {
+    for (const [code, { base, alts }] of art) {
       if (!known.has(code)) continue;
-      const all = [...set];
-      const bases = all.filter((u) => parallelNo(u) === null);
-      const alts = all
-        .filter((u) => parallelNo(u) !== null)
-        .sort((a, b) => parallelNo(a)! - parallelNo(b)!);
-      // Some codes only ever appear with a `_NN` name; treat the lowest as base.
-      const base = bases[0] ?? alts.shift();
-      if (!base) continue;
       ins.run(code, "", base);
       fixMain.run(base, code);
       rows++;
+      const variants = alts.map((_, i) => `_P${i + 1}`);
       alts.forEach((u, i) => {
-        ins.run(code, `_P${i + 1}`, u);
+        ins.run(code, variants[i], u);
         rows++;
       });
+      dropExtra.run(code, JSON.stringify(variants));
       codes++;
       if (alts.length) withAlt++;
     }
   });
   tx();
   return { rows, codes, withAlt };
+}
+
+/**
+ * Remove zh translation rows for models that aren't cards.
+ *
+ * Every suffixed printing used to be upserted as if it were its own card, so
+ * the table accumulated thousands of rows keyed `BT12-085_01` and friends.
+ * Nothing reads them (every query joins on `cards.code`), but they make the
+ * table lie about its size and hide real coverage gaps.
+ *
+ * Guarded on a sane `cards` count: against a half-built database this would
+ * otherwise delete every Chinese translation we have.
+ */
+function pruneOrphanTranslations(db: Database.Database): number {
+  const cards = (
+    db.prepare("SELECT COUNT(*) n FROM cards").get() as { n: number }
+  ).n;
+  if (cards < 1000) {
+    console.warn(`[cn] only ${cards} cards — skipping orphan prune`);
+    return 0;
+  }
+  return db
+    .prepare(
+      `DELETE FROM card_translations
+        WHERE lang = 'zh' AND code NOT IN (SELECT code FROM cards)`,
+    )
+    .run().changes;
 }
 
 async function main() {
@@ -172,11 +200,10 @@ async function main() {
     `UPDATE cards SET link_dp = COALESCE(@link_dp, link_dp) WHERE code = @code`,
   );
 
-  // Parallel-art printings come back as EXTRA rows with the same `model` but a
-  // different `imageCover`. The text is identical (last-write-wins is fine for
-  // the translation row), but the images are the Chinese alt arts — collect
-  // them so the gallery can show CN art to CN readers instead of English.
-  const imagesByModel = new Map<string, Set<string>>();
+  // Every row's model + image, kept raw and grouped at the end. Grouping can't
+  // happen page by page: a card's printings are scattered across the pagination
+  // and which one becomes `_P1` depends on having seen all of them.
+  const artRows: CnArtRow[] = [];
 
   let page = 1;
   let totalPage = 1;
@@ -186,15 +213,18 @@ async function main() {
     totalPage = tp;
     const tx = db.transaction(() => {
       for (const c of list) {
-        const code = clean(c.model);
+        const model = clean(c.model);
         const name = clean(c.name);
-        if (!code || !name) continue;
-        const img = clean(c.imageCover);
-        if (img) {
-          const set = imagesByModel.get(code) ?? new Set<string>();
-          set.add(img);
-          imagesByModel.set(code, set);
-        }
+        if (!model || !name) continue;
+        artRows.push({ model, imageCover: clean(c.imageCover) });
+
+        // A suffixed model is a PRINTING of a card, not a card. Its text is the
+        // base card's (occasionally with newer errata wording, which isn't ours
+        // to pick), and upserting it wrote thousands of translation rows keyed
+        // to codes that don't exist. Take its picture and move on.
+        const { code, printing } = splitCnModel(model);
+        if (printing !== null) continue;
+
         const { main, req } = splitCnRequirements(cleanEffect(c.effect));
         // A card is Dual or Link, never both, and both hide in the same field.
         const dual = splitCnDual(cleanEffect(c.envolutionEffect));
@@ -240,7 +270,9 @@ async function main() {
     await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
   } while (page <= totalPage);
 
-  const imgWritten = writeZhCardImages(db, imagesByModel);
+  const imgWritten = writeZhCardImages(db, groupCnArt(artRows));
+  const pruned = pruneOrphanTranslations(db);
+  if (pruned) console.log(`[cn] pruned ${pruned} orphan zh translation rows`);
   console.log(
     `[cn] card_images(zh): ${imgWritten.rows} rows for ${imgWritten.codes} codes ` +
       `(${imgWritten.withAlt} with alt art)`,

@@ -189,3 +189,123 @@ export function cnEvolutionCost(raw: string | null | undefined): string | null {
       .join("\n") || null
   );
 }
+
+// ── Artwork ─────────────────────────────────────────────────────────────────
+
+/**
+ * Split a CN feed `model` into the card code and its printing suffix.
+ *
+ * The feed does NOT repeat a card's code for its parallel printings the way the
+ * other sources do. A reprint or alt art gets its own row under a SUFFIXED
+ * model — `BT12-085_01`, `BT12-085_LM06`, `BT17-035_ST22`, `BT11-064_BT25` —
+ * and only the original printing carries the bare code.
+ *
+ * Keying artwork on the raw `model` is what cost us Chinese alt art for almost
+ * the whole game: every suffixed row hashed to a code our `cards` table has
+ * never heard of and was dropped. The 188 that survived came from BT1–BT6 and
+ * EX1/EX2, where the feed happens to repeat the BARE code for the parallel too.
+ *
+ * Safe to split on the first `_`: no Digimon card code contains one (checked
+ * against the live table — 0 of 4370). UA codes do, but they come from a
+ * different feed entirely.
+ */
+export function splitCnModel(model: string): {
+  code: string;
+  printing: string | null;
+} {
+  const i = model.indexOf("_");
+  return i < 0
+    ? { code: model, printing: null }
+    : { code: model.slice(0, i), printing: model.slice(i + 1) || null };
+}
+
+/**
+ * Order two printing suffixes. Plain numbers (`01`, `02`) first and in numeric
+ * order, everything else after them alphabetically.
+ *
+ * Deterministic rather than feed-order, because the suffix decides the
+ * `card_images.variant` key (`_P1`, `_P2`, …). Feed order is whatever the
+ * paginated list happens to return, so using it would reshuffle which art is
+ * `_P1` on a re-scrape.
+ */
+export function comparePrintings(a: string, b: string): number {
+  const na = /^\d+$/.test(a) ? Number(a) : null;
+  const nb = /^\d+$/.test(b) ? Number(b) : null;
+  if (na !== null && nb !== null) return na - nb;
+  if (na !== null) return -1;
+  if (nb !== null) return 1;
+  return a.localeCompare(b);
+}
+
+/** Trailing `_NN` in an image FILENAME, e.g. `BT1-009_01.png` → 1. */
+function filenameParallelNo(url: string): number | null {
+  const m = url.match(/_(\d+)\.[a-z]+$/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+export type CnArtRow = { model: string; imageCover: string | null };
+
+/**
+ * Group the feed's rows into one base print plus ordered alt arts per card
+ * code.
+ *
+ * Two shapes have to be handled at once, because the feed uses both:
+ *
+ *   - suffixed models (everything since about BT7) — the suffix says which
+ *     printing it is, so it decides both "is this an alt" and the ordering;
+ *   - repeated BARE models (BT1–BT6, EX1/EX2, ST1–3) — two rows that both say
+ *     `BT1-009`, told apart only by the filename (`BT1-009C.png` vs
+ *     `BT1-009_01.png`).
+ *
+ * Numbered printings come first so `_P1`/`_P2` line up with the feed's own
+ * `_01`/`_02` wherever it has them.
+ */
+export function groupCnArt(
+  rows: CnArtRow[],
+): Map<string, { base: string; alts: string[] }> {
+  const bare = new Map<string, string[]>();
+  const suffixed = new Map<string, Map<string, string>>();
+
+  for (const r of rows) {
+    const img = (r.imageCover ?? "").trim();
+    if (!img || !r.model) continue;
+    const { code, printing } = splitCnModel(r.model.trim());
+    if (printing === null) {
+      const list = bare.get(code) ?? [];
+      if (!list.includes(img)) list.push(img);
+      bare.set(code, list);
+    } else {
+      const m = suffixed.get(code) ?? new Map<string, string>();
+      // Same printing seen twice: first wins, so a re-scrape is idempotent.
+      if (!m.has(printing)) m.set(printing, img);
+      suffixed.set(code, m);
+    }
+  }
+
+  const out = new Map<string, { base: string; alts: string[] }>();
+  for (const code of new Set([...bare.keys(), ...suffixed.keys()])) {
+    const bareImgs = bare.get(code) ?? [];
+    // Within the bare rows the base is the one whose filename has no `_NN`.
+    const plain = bareImgs.filter((u) => filenameParallelNo(u) === null);
+    const numbered = bareImgs
+      .filter((u) => filenameParallelNo(u) !== null)
+      .sort((a, b) => filenameParallelNo(a)! - filenameParallelNo(b)!);
+    const fromSuffix = [...(suffixed.get(code) ?? new Map())]
+      .sort(([a], [b]) => comparePrintings(a, b))
+      .map(([, img]) => img);
+
+    // Some codes never show up under their bare model at all — only as `_01`,
+    // or with a `_NN` filename. Whichever printing sorts first stands in as the
+    // base; dropping the card because the original print is missing would lose
+    // the art entirely, which is worse than labelling a parallel as the base.
+    const base = plain[0] ?? numbered.shift() ?? fromSuffix.shift();
+    if (!base) continue;
+
+    const alts: string[] = [];
+    for (const u of [...numbered, ...fromSuffix]) {
+      if (u !== base && !alts.includes(u)) alts.push(u);
+    }
+    out.set(code, { base, alts });
+  }
+  return out;
+}
