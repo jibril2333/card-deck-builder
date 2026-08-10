@@ -1,8 +1,30 @@
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { isGameId } from "@/lib/games";
 import { MemoryBoard } from "@/components/memory-board";
 
-export const metadata = { title: "内存条" };
+export const metadata: Metadata = {
+  title: "内存条",
+  // Add to Home Screen from this page and iOS launches it standalone — no
+  // address bar, no toolbar. That is the only way to get a genuinely full
+  // screen on an iPhone: Safari has no Fullscreen API, and its chrome is worth
+  // roughly a hexagon and a half of board.
+  appleWebApp: {
+    capable: true,
+    title: "内存条",
+    statusBarStyle: "black-translucent",
+  },
+};
+
+// Scoped to this route on purpose. `viewport-fit=cover` lets the board reach
+// the physical screen edges (the component pays the safe-area insets back where
+// they matter), but it would also push the rest of the app's chrome under the
+// notch, so the root layout keeps the default.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 /**
  * The memory gauge, and nothing else. The board covers the viewport — sidebar

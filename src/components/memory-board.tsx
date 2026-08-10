@@ -14,12 +14,13 @@ import { MEMORY_MAX, clampMemory } from "@/lib/memory-gauge";
  * their own chair. Modelling it as two numbers is where every home-made memory
  * tracker goes wrong.
  *
- * The run leaves zero heading up-LEFT and climbs, alternating between the left
- * and middle columns: 蓝方 1 is the hex touching 0's upper-left corner, 2 sits
- * above 0, 3 above 1, and so on to 10. 橙方 is that rotated 180°, so the figure
- * is point-symmetric about zero and the two 10s land in opposite corners.
- * (Running all ten straight up one column would double the figure's height and
- * halve the hexes on a phone.)
+ * The fold, the numbering and every hex position are copied off the reference
+ * screenshot; see BLUE_CELLS.
+ *
+ * There is no chrome. No title bar, no back arrow across the top — the board
+ * is the screen, because on a phone lying between two players every pixel of
+ * banner is a pixel of hexagon. 返回 lives in the footer where the reference
+ * puts its left button.
  *
  * Tapping a hex moves the counter there — that is the whole interaction. No
  * keypad: there is nothing to add up when you already know the number you're
@@ -30,7 +31,6 @@ import { MEMORY_MAX, clampMemory } from "@/lib/memory-gauge";
  * as the thing it copies.
  */
 
-const BAR = "#24406c";
 const FIELD = "#2f2f2f";
 const BLUE = "#3f6cb0";
 const GOLD = "#b58a37";
@@ -47,14 +47,30 @@ const COL = 0.75 * W;
 const ROW = H / 2;
 
 /**
- * [column, row] for 蓝方 1…10, in COL/ROW units with the zero hex at the origin.
- * Odd numbers take the left column, even ones the middle, so the run zigzags
- * upward. 橙方 is this list negated — the figure is point-symmetric.
+ * [column, row] for 蓝方 1…10, in COL/ROW units with the zero hex at the origin
+ * — copied off the reference screenshot position for position.
+ *
+ * The fold is a double U: 1, 2, 3 climb the middle column, 4 steps out to the
+ * top of the left column, and 5…10 come back DOWN it. 橙方 is this list negated,
+ * so the figure is point-symmetric about zero and the two 10s land in opposite
+ * corners.
  */
-const BLUE_CELLS: [number, number][] = Array.from({ length: MEMORY_MAX }, (_, i) => {
-  const n = i + 1;
-  return [n % 2 === 1 ? -1 : 0, -n] as [number, number];
-});
+const BLUE_CELLS: [number, number][] = [
+  [0, -2], // 1
+  [0, -4], // 2
+  [0, -6], // 3
+  [-1, -7], // 4 — steps out to the left column, then turns back down
+  [-1, -5], // 5
+  [-1, -3], // 6
+  [-1, -1], // 7
+  [-1, 1], // 8
+  [-1, 3], // 9
+  [-1, 5], // 10
+];
+
+if (BLUE_CELLS.length !== MEMORY_MAX) {
+  throw new Error("hex layout and MEMORY_MAX disagree");
+}
 
 type Cell = { value: number; x: number; y: number; fill: string; spin: number };
 
@@ -74,10 +90,10 @@ const CELLS: Cell[] = [
   }),
 ];
 
-// The figure spans ±MEMORY_MAX rows plus half a hex, and ±1 column plus half a
-// width.
+// The figure spans ±7 rows plus half a hex, and ±1 column plus half a width.
+const ROW_SPAN = Math.max(...BLUE_CELLS.map(([, r]) => Math.abs(r)));
 const VB_W = 2 * COL + W;
-const VB_H = 2 * MEMORY_MAX * ROW + H;
+const VB_H = 2 * ROW_SPAN * ROW + H;
 
 function hexPoints(x: number, y: number, scale = 0.97): string {
   const w = (W / 2) * scale;
@@ -113,7 +129,6 @@ export function MemoryBoard({ home }: { home: string }) {
   // Starts at 0 rather than from storage so the server HTML and the first
   // client render agree; the saved game arrives in an effect.
   const [value, setValue] = useState(0);
-  const [past, setPast] = useState<number[]>([]);
   const [ready, setReady] = useState(false);
   const router = useRouter();
 
@@ -133,26 +148,7 @@ export function MemoryBoard({ home }: { home: string }) {
     }
   }, [value, ready]);
 
-  const move = useCallback((to: number) => {
-    setValue((cur) => {
-      if (to === cur) return cur;
-      setPast((p) => [...p.slice(-49), cur]);
-      return to;
-    });
-  }, []);
-
-  const undo = useCallback(() => {
-    setPast((p) => {
-      if (p.length === 0) return p;
-      setValue(p[p.length - 1]);
-      return p.slice(0, -1);
-    });
-  }, []);
-
-  const reset = useCallback(() => {
-    setPast([]);
-    setValue(0);
-  }, []);
+  const reset = useCallback(() => setValue(0), []);
 
   const back = useCallback(() => {
     // Same rule as BackLink: only go back through history we pushed, and never
@@ -172,26 +168,17 @@ export function MemoryBoard({ home }: { home: string }) {
         background: FIELD,
         overscrollBehavior: "none",
         touchAction: "manipulation",
+        // The page asks for viewport-fit=cover so the field reaches the screen
+        // edges; these keep the hexes and the buttons out from under the notch
+        // and the home indicator. Without cover, iOS reserves those strips for
+        // us and the board simply gets smaller.
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)",
       }}
     >
-      <header
-        className="relative shrink-0 h-12 flex items-center px-2 text-white"
-        style={{ background: BAR }}
-      >
-        <button
-          type="button"
-          onClick={back}
-          className="h-9 px-2 text-[15px] cursor-pointer"
-        >
-          ‹ 返回
-        </button>
-        <span className="absolute left-1/2 -translate-x-1/2 text-[17px] font-semibold">
-          内存条
-        </span>
-        <FullscreenButton />
-      </header>
-
-      <div className="flex-1 min-h-0 p-2">
+      <div className="flex-1 min-h-0 p-1">
         <svg
           viewBox={`${-VB_W / 2} ${-VB_H / 2} ${VB_W} ${VB_H}`}
           preserveAspectRatio="xMidYMid meet"
@@ -207,7 +194,7 @@ export function MemoryBoard({ home }: { home: string }) {
                 role="button"
                 aria-label={cellName(c.value)}
                 aria-current={here ? "true" : undefined}
-                onClick={() => move(c.value)}
+                onClick={() => setValue(c.value)}
                 style={{ cursor: "pointer" }}
               >
                 <polygon
@@ -235,15 +222,14 @@ export function MemoryBoard({ home }: { home: string }) {
         </svg>
       </div>
 
-      <footer className="shrink-0 flex gap-3 px-3 pb-4 pt-1">
+      <footer className="shrink-0 flex gap-2 px-2 pb-2 pt-1">
         <button
           type="button"
-          onClick={undo}
-          disabled={past.length === 0}
-          className="flex-1 h-11 rounded-lg text-white text-[15px] cursor-pointer disabled:opacity-40"
+          onClick={back}
+          className="flex-1 h-11 rounded-lg text-white text-[15px] cursor-pointer"
           style={{ background: BTN }}
         >
-          撤销
+          返回
         </button>
         <button
           type="button"
@@ -253,16 +239,18 @@ export function MemoryBoard({ home }: { home: string }) {
         >
           开局
         </button>
+        <FullscreenButton />
       </footer>
     </div>
   );
 }
 
 /**
- * Rendered only where the Fullscreen API exists. iPhone Safari has never
- * implemented `requestFullscreen` on any element, so on the device this screen
- * is most likely to be used the button would be a dead control — better absent
- * than broken. (Adding the app to the Home Screen is the equivalent there.)
+ * Rendered only where the Fullscreen API exists — which is why the footer on an
+ * iPhone is exactly the reference's two buttons. iPhone Safari has never
+ * implemented `requestFullscreen` on any element, so there the button would be
+ * a dead control; the equivalent on that device is Add to Home Screen, which
+ * this page's `appleWebApp` metadata turns into a chrome-less standalone launch.
  */
 function FullscreenButton() {
   const [supported, setSupported] = useState(false);
@@ -288,10 +276,12 @@ function FullscreenButton() {
           document.documentElement.requestFullscreen().catch(() => {});
         }
       }}
-      className="ml-auto h-9 px-2 text-[15px] cursor-pointer"
+      className="shrink-0 w-11 h-11 rounded-lg text-white text-[17px] cursor-pointer"
+      style={{ background: BTN }}
       aria-pressed={on}
+      aria-label={on ? "退出全屏" : "全屏"}
     >
-      {on ? "⤡ 退出全屏" : "⤢ 全屏"}
+      {on ? "⤡" : "⤢"}
     </button>
   );
 }

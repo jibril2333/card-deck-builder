@@ -28,18 +28,45 @@ async function at(page: import("@playwright/test").Page, name: string) {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2, w: box.width, h: box.height };
 }
 
-test("the nav entry lands straight on the board", async ({ page }) => {
+test("the nav entry lands straight on the board, and 返回 goes back", async ({
+  page,
+}) => {
   await page.goto("/digimon");
   await page.getByRole("link", { name: /内存条/ }).click();
   await page.waitForURL(/\/digimon\/memory$/);
 
-  // No intermediate page: the board is up immediately, and the app chrome it
-  // covers is not reachable behind it.
+  // No intermediate page, and no chrome on the board: every pixel of banner is
+  // a pixel of hexagon, so the title bar and its back arrow are gone and 返回
+  // lives in the footer.
   await expect(page.getByRole("group", { name: "内存条" })).toBeVisible();
   await expect(page.getByRole("button", { name: /桌面模式/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "撤销" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "‹ 返回" }).click();
+  // Nothing above the honeycomb. Asserted as pixels rather than as "no element
+  // says 内存条", because the sidebar's nav entry says that too and is still in
+  // the DOM underneath the board — the property that matters is that no banner
+  // is eating height.
+  const svg = await page.locator('svg[aria-label="内存条"]').boundingBox();
+  expect(svg?.y).toBeLessThan(12);
+
+  await page.getByRole("button", { name: "返回" }).click();
   await page.waitForURL(/\/digimon$/);
+});
+
+test("the route asks for the whole screen", async ({ page }) => {
+  await open(page);
+
+  // viewport-fit=cover is what lets the field reach the physical screen edges
+  // instead of sitting inside iOS's reserved strips; appleWebApp is what makes
+  // Add to Home Screen launch without Safari's chrome. Both are route-scoped
+  // exports that would silently stop applying if moved or dropped.
+  const meta = (sel: string) =>
+    page.locator(sel).first().getAttribute("content");
+  expect(await meta('meta[name="viewport"]')).toContain("viewport-fit=cover");
+  expect(await meta('meta[name="mobile-web-app-capable"]')).toBe("yes");
+  expect(await meta('meta[name="apple-mobile-web-app-status-bar-style"]')).toBe(
+    "black-translucent",
+  );
 });
 
 test("tapping a hex moves the counter there", async ({ page }) => {
@@ -64,27 +91,21 @@ test("the board survives a reload", async ({ page }) => {
   await expect(hex(page, "蓝方 7")).toHaveAttribute("aria-current", "true");
 });
 
-test("撤销 steps back one move, 开局 clears the game", async ({ page }) => {
+test("开局 clears the game", async ({ page }) => {
   await open(page);
-  await expect(page.getByRole("button", { name: "撤销" })).toBeDisabled();
-
-  await hex(page, "橙方 3").click();
   await hex(page, "蓝方 6").click();
-  await page.getByRole("button", { name: "撤销" }).click();
-  await expect(hex(page, "橙方 3")).toHaveAttribute("aria-current", "true");
-
   await page.getByRole("button", { name: "开局" }).click();
   await expect(hex(page, "0")).toHaveAttribute("aria-current", "true");
-  await expect(page.getByRole("button", { name: "撤销" })).toBeDisabled();
 });
 
 /**
  * The fold is the whole layout, and a column off by one row still looks like a
- * honeycomb. These are the properties that pin it: three columns, each side
- * confined to two of them, the halves point-symmetric about zero, 1 touching
- * zero's upper-left corner, and the run climbing monotonically from there.
+ * honeycomb. These pin it to the reference screenshot: three columns, each side
+ * confined to two of them, the halves point-symmetric about zero, 1 directly
+ * above 0, and 4 stepping out to the TOP of the left column so 5…10 come back
+ * down it.
  */
-test("the honeycomb is folded the way it's meant to be", async ({ page }) => {
+test("the honeycomb is folded the way the reference folds it", async ({ page }) => {
   await open(page);
 
   const zero = await at(page, "0");
@@ -113,24 +134,19 @@ test("the honeycomb is folded the way it's meant to be", async ({ page }) => {
     expect(blue[i].y + gold[i].y).toBeCloseTo(2 * zero.y, 0);
   }
 
-  // One row step, derived from two hexes in the SAME column (2 and 4 are both
-  // in the middle one) rather than from a bounding box — a hex's <g> box also
-  // contains its rotated digit, so it is taller than the hexagon.
-  const step = (blue[1].y - blue[3].y) / 2;
+  // 1, 2, 3 climb the middle column straight up from 0.
+  for (const n of [1, 2, 3]) expect(Math.round(blue[n - 1].x)).toBe(xs[1]);
+  expect(blue[0].y).toBeLessThan(zero.y);
+  expect(blue[1].y).toBeLessThan(blue[0].y);
+  expect(blue[2].y).toBeLessThan(blue[1].y);
 
-  // 蓝方 1 touches zero's upper-LEFT corner — one column across, one row up.
-  expect(blue[0].x).toBeLessThan(zero.x);
-  expect(zero.x - blue[0].x).toBeCloseTo(xs[1] - xs[0], 0);
-  expect(zero.y - blue[0].y).toBeCloseTo(step, 0);
-
-  // …and 2 sits directly above 0, so the run zigzags rather than drifting off.
-  expect(Math.round(blue[1].x)).toBe(Math.round(zero.x));
-
-  // The numbers climb the whole way; nothing doubles back.
-  for (let n = 2; n <= 10; n++) {
-    expect(blue[n - 1].y).toBeLessThan(blue[n - 2].y);
-    expect(gold[n - 1].y).toBeGreaterThan(gold[n - 2].y);
+  // 4…10 are the left column, and 4 is at the TOP of it — get the turn wrong
+  // and 4 sits at the bottom with 10 above it.
+  for (let n = 4; n <= 10; n++) expect(Math.round(blue[n - 1].x)).toBe(xs[0]);
+  for (let n = 5; n <= 10; n++) {
+    expect(blue[n - 1].y).toBeGreaterThan(blue[n - 2].y);
   }
+  expect(blue[3].y).toBeLessThan(blue[2].y); // 4 above 3, the highest hex on the board
 });
 
 test("every digit is turned toward a player, zero included", async ({ page }) => {
