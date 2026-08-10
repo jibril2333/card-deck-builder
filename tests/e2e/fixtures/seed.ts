@@ -57,7 +57,62 @@ const CARDS_SCHEMA = `
     PRIMARY KEY (code, variant)
   );
   CREATE INDEX idx_card_images_code ON card_images(code);
+
+  -- Migrations 12 and 14. Created here with the same shape so the app's
+  -- migration runner hits IF NOT EXISTS and skips, and so the seed below can
+  -- insert into them.
+  CREATE TABLE IF NOT EXISTS card_restrictions (
+    source TEXT NOT NULL,
+    identity TEXT NOT NULL,
+    status TEXT NOT NULL,
+    max_count INTEGER NOT NULL,
+    since_date TEXT,
+    includes_parallel INTEGER NOT NULL DEFAULT 1,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (source, identity)
+  );
+  CREATE INDEX IF NOT EXISTS idx_restrictions_identity
+    ON card_restrictions(identity);
+  CREATE TABLE IF NOT EXISTS banned_pairs (
+    source TEXT NOT NULL,
+    trigger_identity TEXT NOT NULL,
+    banned_identity TEXT NOT NULL,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (source, trigger_identity, banned_identity)
+  );
+  CREATE INDEX IF NOT EXISTS idx_banned_pairs_trigger
+    ON banned_pairs(source, trigger_identity);
+  CREATE INDEX IF NOT EXISTS idx_banned_pairs_banned
+    ON banned_pairs(source, banned_identity);
 `;
+
+/**
+ * Banlist rows for the restrictions page's layout tests.
+ *
+ * Every identity here is DELIBERATELY absent from SEED_CARDS. A restriction on
+ * a fixture card would clamp it in every deck spec that adds copies of it
+ * (`clampQuantityToRestriction` runs on every add), so seeding real ones would
+ * make an unrelated test fail for a reason nobody would look for. Unmatched
+ * identities render as "未在卡库中" placeholder tiles, which is the same box
+ * the layout is measured on.
+ *
+ * Six in one status so a four-up row is a real row with something after it.
+ */
+const SEED_RESTRICTIONS: [string, "banned" | "limited_1" | "limited_2", number][] = [
+  ["ZZ1-001", "banned", 0],
+  ["ZZ1-010", "limited_1", 1],
+  ["ZZ1-011", "limited_1", 1],
+  ["ZZ1-012", "limited_1", 1],
+  ["ZZ1-013", "limited_1", 1],
+  ["ZZ1-014", "limited_1", 1],
+  ["ZZ1-015", "limited_1", 1],
+];
+
+/** One trigger with two partners, mirroring the real Chaosmon: Valdur Arm row. */
+const SEED_PAIRS: [string, string][] = [
+  ["ZZ2-001", "ZZ2-010"],
+  ["ZZ2-001", "ZZ2-011"],
+];
 
 type CardSeed = {
   code: string;
@@ -193,6 +248,20 @@ export function seedDigimonDb(dbPath: string): void {
       }
     });
     insertMany(SEED_CARDS);
+
+    const insertRestriction = db.prepare(
+      `INSERT INTO card_restrictions (source, identity, status, max_count)
+       VALUES ('digimon', ?, ?, ?)`,
+    );
+    for (const [identity, status, max] of SEED_RESTRICTIONS) {
+      insertRestriction.run(identity, status, max);
+    }
+    const insertPair = db.prepare(
+      `INSERT INTO banned_pairs (source, trigger_identity, banned_identity)
+       VALUES ('digimon', ?, ?)`,
+    );
+    for (const [trigger, banned] of SEED_PAIRS) insertPair.run(trigger, banned);
+
     db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   } finally {
     db.close();

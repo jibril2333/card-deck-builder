@@ -204,7 +204,12 @@ function Section({
           {rows.length} 种
         </span>
       </header>
-      <div className="p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+      {/* Four to a row on a phone, like every other card grid in the app — a
+          50-card 制限 section was 25 rows of scrolling at two across. The
+          `sm`/`md` steps that used to hold 3 and 4 are gone rather than kept:
+          going 4 → 3 as the screen gets WIDER is the one thing worse than two
+          across. Desktop (lg/xl) is untouched. */}
+      <div className="p-2 sm:p-3 grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-3">
         {rows.map((r) => (
           <RestrictionCard key={r.identity} row={r} game={game} />
         ))}
@@ -238,26 +243,28 @@ function RestrictionCard({ row, game }: { row: Row; game: string }) {
         )}
         {row.includes_parallel === 0 ? (
           <span
-            className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/70 text-white"
+            className="absolute top-0.5 left-0.5 sm:top-1.5 sm:left-1.5 px-1 sm:px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-medium bg-black/70 text-white"
             title="本条限制不包括异画卡 — 异画各自按标准 4 张上限"
           >
             不含异画
           </span>
         ) : null}
       </div>
-      <div className="px-2 py-1.5 space-y-0.5">
-        <div className="flex items-center gap-1.5">
+      {/* Caption sizes match the phone sizes in globals.css's `.card-grid`
+          rules, so a tile here reads the same as one in search results. */}
+      <div className="px-1 sm:px-2 py-1 sm:py-1.5 space-y-0.5">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           {row.card_color ? (
             <span
               className="w-1.5 h-1.5 rounded-full shrink-0"
               style={{ background: colorHex(row.card_color) }}
             />
           ) : null}
-          <div className="text-[10px] font-mono text-[var(--color-muted-fg)] truncate flex-1">
+          <div className="text-[9px] sm:text-[10px] font-mono text-[var(--color-muted-fg)] truncate flex-1">
             {row.identity}
           </div>
         </div>
-        <div className="text-xs font-medium truncate group-hover:text-[var(--color-accent)]">
+        <div className="text-[10.5px] leading-tight sm:text-xs sm:leading-normal font-medium truncate group-hover:text-[var(--color-accent)]">
           {row.card_name ?? <span className="text-[var(--color-muted-fg)]">未在卡库中</span>}
         </div>
       </div>
@@ -337,14 +344,20 @@ function PairRow({ group, game }: { group: PairGroup; game: string }) {
         <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)] font-semibold mb-1.5">
           A · 触发卡
         </div>
-        <PairCard
-          identity={group.trigger}
-          code={group.trigger_code}
-          name={group.trigger_name}
-          image_url={group.trigger_image_url}
-          color={group.trigger_color}
-          game={game}
-        />
+        {/* On a phone the trigger card has the whole screen width to itself and
+            renders as one enormous card — next to a grid of four-up tiles it
+            reads as a different page. Capped to a tile's width there; from `md`
+            it's back in its own column of the pair row and left alone. */}
+        <div className="w-1/4 md:w-auto">
+          <PairCard
+            identity={group.trigger}
+            code={group.trigger_code}
+            name={group.trigger_name}
+            image_url={group.trigger_image_url}
+            color={group.trigger_color}
+            game={game}
+          />
+        </div>
       </div>
       <div
         aria-hidden
@@ -356,7 +369,10 @@ function PairRow({ group, game }: { group: PairGroup; game: string }) {
         <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)] font-semibold mb-1.5">
           B · 不能与 A 同卡组({group.banned.length})
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {/* Same four-up on a phone. The 3-column step waits for `md`, which is
+            where this list actually becomes the narrow right-hand column of the
+            pair row rather than the full width of the screen. */}
+        <div className="grid grid-cols-4 md:grid-cols-3 gap-1.5 sm:gap-2">
           {group.banned.map((b) => (
             <PairCard
               key={b.identity}

@@ -74,3 +74,57 @@ for (const url of ["/digimon", "/digimon/collection", "/digimon/decks"]) {
     expect(r.overflow).toBe(false);
   });
 }
+
+/**
+ * The banlist is the one card page that doesn't use `.card-grid` — it has its
+ * own column counts because desktop wants bigger tiles there. So it gets its
+ * own check that the phone still shows four across, in both of its grids and
+ * for the lone trigger card that sits outside them.
+ */
+test("banlist: four to a row, trigger card included", async ({ page }) => {
+  await page.goto("/digimon/restrictions");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  const r = await page.evaluate(() => {
+    const rowOf = (el: Element) => {
+      const kids = [...el.children];
+      const tops = kids.map((k) => Math.round(k.getBoundingClientRect().top));
+      return {
+        count: kids.length,
+        perRow: tops.filter((t) => t === tops[0]).length,
+        overflow: kids.some((k) => k.scrollWidth > k.clientWidth + 1),
+      };
+    };
+    // Only the grids that hold card tiles. The pair section's outer layout is
+    // also a grid — A / ⇒ / B in one column on a phone — and counting it as a
+    // tile grid reports "1 per row" for something that is not a row of cards.
+    const grids = [...document.querySelectorAll("section div.grid")]
+      .filter(
+        (g) =>
+          g.children.length > 0 &&
+          [...g.children].every((k) => k.querySelector('[class*="aspect-"]')),
+      )
+      .map(rowOf);
+    // The A-side card is not in a grid; measure it against a B-side tile.
+    const trigger = document
+      .querySelector('section div.grid > *:has([class*="aspect-"])')
+      ?.getBoundingClientRect().width;
+    const label = [...document.querySelectorAll("div")].find(
+      (d) => d.textContent?.trim() === "A · 触发卡",
+    );
+    const triggerTile = label?.nextElementSibling?.getBoundingClientRect().width;
+    return { grids, tile: trigger, triggerTile };
+  });
+
+  expect(r.grids.length).toBeGreaterThan(0);
+  for (const g of r.grids) {
+    // A row holds at most what exists — a 2-card banned-pair list isn't a bug.
+    expect(g.perRow).toBe(Math.min(4, g.count));
+    expect(g.overflow).toBe(false);
+  }
+
+  // The trigger card used to take the full screen width, which read as a
+  // different page sitting under a grid of four-up tiles.
+  expect(r.triggerTile).toBeGreaterThan(0);
+  expect(r.triggerTile).toBeLessThanOrEqual((r.tile ?? 0) + 2);
+});
