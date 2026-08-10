@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import { isGameId } from "@/lib/games";
-import { MemoryGauge } from "@/components/memory-gauge";
+import { MemoryBoard } from "@/components/memory-board";
 
-export const metadata = { title: "记忆条" };
+export const metadata = { title: "内存条" };
 
 /**
- * A standalone memory gauge, for tracking a real game.
+ * The memory gauge, and nothing else. The board covers the viewport — sidebar
+ * included — because it's meant to be put on the table between two players,
+ * and app chrome around it is just something to mis-tap.
  *
  * Digimon-only: Union Arena has no shared resource track, so the nav entry is
  * hidden there and this route 404s (see sidebar-body.tsx).
@@ -22,14 +24,5 @@ export default async function MemoryPage({
   const { game } = await params;
   if (!isGameId(game) || game !== "digimon") notFound();
 
-  return (
-    <main className="w-full mx-auto max-w-[640px] px-4 sm:px-6 py-6">
-      <h1 className="text-2xl font-bold">记忆条</h1>
-      <p className="text-sm text-[var(--color-muted-fg)] mt-1 mb-5">
-        双方共用一条 10–0–10 的记忆条。打牌、进化要花记忆，指示物就往对方那侧推；
-        推到 0 或对方一侧时，把当前动作结算完就换手，对方接手时手上就是自己这侧的点数。
-      </p>
-      <MemoryGauge />
-    </main>
-  );
+  return <MemoryBoard home={`/${game}`} />;
 }

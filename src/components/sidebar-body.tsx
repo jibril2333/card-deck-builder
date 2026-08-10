@@ -23,7 +23,7 @@ const NAV: { id: NavId; label: string; icon: string; sub: string }[] = [
   { id: "decks", label: "我的卡组", icon: "🗂️", sub: "Decks" },
   { id: "collection", label: "已收集", icon: "📦", sub: "Collection" },
   { id: "restrictions", label: "禁制限卡", icon: "🚫", sub: "Banlist" },
-  { id: "memory", label: "记忆条", icon: "🎚️", sub: "Memory" },
+  { id: "memory", label: "内存条", icon: "🎚️", sub: "Memory" },
   { id: "about", label: "游戏知识", icon: "📖", sub: "About" },
 ];
 
