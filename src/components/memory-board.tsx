@@ -10,7 +10,7 @@ import { MEMORY_MAX, clampMemory } from "@/lib/memory-gauge";
  * hexagon per position, the phone laid flat between the two players.
  *
  * ONE counter, not two. A position is a single signed number — positive is
- * 蓝方's side, negative is 橙方's — and each player reads that same hex from
+ * 橙方's side, negative is 蓝方's — and each player reads that same hex from
  * their own chair. Modelling it as two numbers is where every home-made memory
  * tracker goes wrong.
  *
@@ -47,15 +47,15 @@ const COL = 0.75 * W;
 const ROW = H / 2;
 
 /**
- * [column, row] for 蓝方 1…10, in COL/ROW units with the zero hex at the origin
+ * [column, row] for 橙方 1…10, in COL/ROW units with the zero hex at the origin
  * — copied off the reference screenshot position for position.
  *
  * The fold is a double U: 1, 2, 3 climb the middle column, 4 steps out to the
- * top of the left column, and 5…10 come back DOWN it. 橙方 is this list negated,
+ * top of the left column, and 5…10 come back DOWN it. 蓝方 is this list negated,
  * so the figure is point-symmetric about zero and the two 10s land in opposite
  * corners.
  */
-const BLUE_CELLS: [number, number][] = [
+const POS_CELLS: [number, number][] = [
   [0, -2], // 1
   [0, -4], // 2
   [0, -6], // 3
@@ -68,7 +68,7 @@ const BLUE_CELLS: [number, number][] = [
   [-1, 5], // 10
 ];
 
-if (BLUE_CELLS.length !== MEMORY_MAX) {
+if (POS_CELLS.length !== MEMORY_MAX) {
   throw new Error("hex layout and MEMORY_MAX disagree");
 }
 
@@ -77,21 +77,21 @@ type Cell = { value: number; x: number; y: number; fill: string; spin: number };
 const CELLS: Cell[] = [
   // Zero is turned with the rest of them. Left upright it was the only digit on
   // the board reading the "wrong" way for both players at once.
-  { value: 0, x: 0, y: 0, fill: ZERO, spin: -90 },
-  ...BLUE_CELLS.flatMap(([c, r], i): Cell[] => {
+  { value: 0, x: 0, y: 0, fill: ZERO, spin: 90 },
+  ...POS_CELLS.flatMap(([c, r], i): Cell[] => {
     const n = i + 1;
     return [
-      // 蓝方 reads from one side of the phone and 橙方 from the other, so their
-      // digits are turned 180° from each other. Without it one player is always
-      // reading upside down — and an upside-down 6 is a 9.
-      { value: n, x: c * COL, y: r * ROW, fill: BLUE, spin: -90 },
-      { value: -n, x: -c * COL, y: -r * ROW, fill: GOLD, spin: 90 },
+      // The two sides read the phone from opposite chairs, so their digits are
+      // turned 180° from each other. Without it one player is always reading
+      // upside down — and an upside-down 6 is a 9.
+      { value: n, x: c * COL, y: r * ROW, fill: GOLD, spin: 90 },
+      { value: -n, x: -c * COL, y: -r * ROW, fill: BLUE, spin: -90 },
     ];
   }),
 ];
 
 // The figure spans ±7 rows plus half a hex, and ±1 column plus half a width.
-const ROW_SPAN = Math.max(...BLUE_CELLS.map(([, r]) => Math.abs(r)));
+const ROW_SPAN = Math.max(...POS_CELLS.map(([, r]) => Math.abs(r)));
 const VB_W = 2 * COL + W;
 const VB_H = 2 * ROW_SPAN * ROW + H;
 
@@ -111,7 +111,7 @@ function hexPoints(x: number, y: number, scale = 0.97): string {
 }
 
 const cellName = (v: number) =>
-  v === 0 ? "0" : `${v > 0 ? "蓝方" : "橙方"} ${Math.abs(v)}`;
+  v === 0 ? "0" : `${v > 0 ? "橙方" : "蓝方"} ${Math.abs(v)}`;
 
 function load(): number {
   if (typeof window === "undefined") return 0;

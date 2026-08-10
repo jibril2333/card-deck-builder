@@ -73,27 +73,27 @@ test("tapping a hex moves the counter there", async ({ page }) => {
   await open(page);
   await expect(hex(page, "0")).toHaveAttribute("aria-current", "true");
 
-  await hex(page, "橙方 4").click();
-  await expect(hex(page, "橙方 4")).toHaveAttribute("aria-current", "true");
+  await hex(page, "蓝方 4").click();
+  await expect(hex(page, "蓝方 4")).toHaveAttribute("aria-current", "true");
   await expect(hex(page, "0")).not.toHaveAttribute("aria-current", "true");
 
-  // One counter, not two: moving to 橙方 4 leaves nothing marked on 蓝方's side.
-  await expect(hex(page, "蓝方 4")).not.toHaveAttribute("aria-current", "true");
+  // One counter, not two: moving to 蓝方 4 leaves nothing marked on 橙方's side.
+  await expect(hex(page, "橙方 4")).not.toHaveAttribute("aria-current", "true");
 });
 
 test("the board survives a reload", async ({ page }) => {
   await open(page);
-  await hex(page, "蓝方 7").click();
-  await expect(hex(page, "蓝方 7")).toHaveAttribute("aria-current", "true");
+  await hex(page, "橙方 7").click();
+  await expect(hex(page, "橙方 7")).toHaveAttribute("aria-current", "true");
 
   // Not `open()` — that clears storage. This is the actual reload path.
   await page.reload();
-  await expect(hex(page, "蓝方 7")).toHaveAttribute("aria-current", "true");
+  await expect(hex(page, "橙方 7")).toHaveAttribute("aria-current", "true");
 });
 
 test("开局 clears the game", async ({ page }) => {
   await open(page);
-  await hex(page, "蓝方 6").click();
+  await hex(page, "橙方 6").click();
   await page.getByRole("button", { name: "开局" }).click();
   await expect(hex(page, "0")).toHaveAttribute("aria-current", "true");
 });
@@ -109,55 +109,57 @@ test("the honeycomb is folded the way the reference folds it", async ({ page }) 
   await open(page);
 
   const zero = await at(page, "0");
-  const blue = [];
-  const gold = [];
+  // Named for the sign of the position, not the colour — the two swapped once
+  // already and the assertions below are about geometry either way.
+  const pos = [];
+  const neg = [];
   for (let n = 1; n <= 10; n++) {
-    blue.push(await at(page, `蓝方 ${n}`));
-    gold.push(await at(page, `橙方 ${n}`));
+    pos.push(await at(page, `橙方 ${n}`));
+    neg.push(await at(page, `蓝方 ${n}`));
   }
 
   // Exactly three columns, evenly spaced, zero in the middle one.
-  const xs = [...new Set([...blue, ...gold, zero].map((p) => Math.round(p.x)))].sort(
+  const xs = [...new Set([...pos, ...neg, zero].map((p) => Math.round(p.x)))].sort(
     (a, b) => a - b,
   );
   expect(xs).toHaveLength(3);
   expect(xs[1] - xs[0]).toBeCloseTo(xs[2] - xs[1], 0);
   expect(Math.round(zero.x)).toBe(xs[1]);
 
-  // 蓝方 never uses the right column, 橙方 never uses the left.
-  expect(blue.every((p) => Math.round(p.x) <= xs[1])).toBe(true);
-  expect(gold.every((p) => Math.round(p.x) >= xs[1])).toBe(true);
+  // 橙方 never uses the right column, 蓝方 never uses the left.
+  expect(pos.every((p) => Math.round(p.x) <= xs[1])).toBe(true);
+  expect(neg.every((p) => Math.round(p.x) >= xs[1])).toBe(true);
 
-  // Point-symmetric about zero: 蓝方 n mirrors 橙方 n through the 0 hex.
+  // Point-symmetric about zero: 橙方 n mirrors 蓝方 n through the 0 hex.
   for (let i = 0; i < 10; i++) {
-    expect(blue[i].x + gold[i].x).toBeCloseTo(2 * zero.x, 0);
-    expect(blue[i].y + gold[i].y).toBeCloseTo(2 * zero.y, 0);
+    expect(pos[i].x + neg[i].x).toBeCloseTo(2 * zero.x, 0);
+    expect(pos[i].y + neg[i].y).toBeCloseTo(2 * zero.y, 0);
   }
 
   // 1, 2, 3 climb the middle column straight up from 0.
-  for (const n of [1, 2, 3]) expect(Math.round(blue[n - 1].x)).toBe(xs[1]);
-  expect(blue[0].y).toBeLessThan(zero.y);
-  expect(blue[1].y).toBeLessThan(blue[0].y);
-  expect(blue[2].y).toBeLessThan(blue[1].y);
+  for (const n of [1, 2, 3]) expect(Math.round(pos[n - 1].x)).toBe(xs[1]);
+  expect(pos[0].y).toBeLessThan(zero.y);
+  expect(pos[1].y).toBeLessThan(pos[0].y);
+  expect(pos[2].y).toBeLessThan(pos[1].y);
 
   // 4…10 are the left column, and 4 is at the TOP of it — get the turn wrong
   // and 4 sits at the bottom with 10 above it.
-  for (let n = 4; n <= 10; n++) expect(Math.round(blue[n - 1].x)).toBe(xs[0]);
+  for (let n = 4; n <= 10; n++) expect(Math.round(pos[n - 1].x)).toBe(xs[0]);
   for (let n = 5; n <= 10; n++) {
-    expect(blue[n - 1].y).toBeGreaterThan(blue[n - 2].y);
+    expect(pos[n - 1].y).toBeGreaterThan(pos[n - 2].y);
   }
-  expect(blue[3].y).toBeLessThan(blue[2].y); // 4 above 3, the highest hex on the board
+  expect(pos[3].y).toBeLessThan(pos[2].y); // 4 above 3, the highest hex on the board
 });
 
 test("every digit is turned toward a player, zero included", async ({ page }) => {
   await open(page);
   const spin = (name: string) => hex(page, name).locator("text").getAttribute("transform");
 
-  expect(await spin("蓝方 7")).toMatch(/rotate\(-90/);
   expect(await spin("橙方 7")).toMatch(/rotate\(90/);
-  // Zero used to be the one upright digit on the board, reading the wrong way
-  // for both players at once.
-  expect(await spin("0")).toMatch(/rotate\(-90/);
+  expect(await spin("蓝方 7")).toMatch(/rotate\(-90/);
+  // Zero is turned with the rest of them; it used to be the one upright digit
+  // on the board, reading the wrong way for both players at once.
+  expect(await spin("0")).toMatch(/rotate\(90/);
 });
 
 test("the whole honeycomb stays on screen at any usable height", async ({ page }) => {
