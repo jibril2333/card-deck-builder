@@ -29,6 +29,7 @@ import {
 } from "@/lib/deck-formats";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
+import { DECK_TARGET } from "@/lib/deck-legality";
 
 type RawDeckCard = {
   card_type: string;
@@ -395,12 +396,10 @@ export default async function DeckEditPage({
   }
   const colorBreakdown = [...colorMap.entries()].sort((a, b) => b[1] - a[1]);
 
-  // Targets per game
-  const target = loaded.isDigimon
-    ? { main: 50, egg: 5 }
-    : { main: 50, egg: 0 };
+  // Same rule the deck-list tile judges by — see lib/deck-legality.
+  const target = DECK_TARGET;
   const mainOk = main === target.main;
-  const eggOk = loaded.isDigimon ? eggs <= target.egg : true;
+  const eggOk = eggs <= target.egg;
 
   // Export strings
   const exportText = exportDeckText(loaded.exportCards);

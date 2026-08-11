@@ -100,3 +100,36 @@ test("the retired unionarena section is gone", async ({ page }) => {
     await expect(page.getByText("This page could not be found")).toBeVisible();
   }
 });
+
+/**
+ * The deck tile's corner badge is a shortfall warning, not a card counter: it
+ * shows main/egg while the deck is illegal and disappears once it isn't. The
+ * rule itself is unit-tested (tests/deck-legality.test.ts) — building a legal
+ * 50-card deck through the UI to watch a badge vanish would be 50 clicks for
+ * one boolean. This checks the wiring: that the tile reads the real main/egg
+ * split rather than the combined total it used to show.
+ */
+test("deck tile shows main/egg only while the deck is short", async ({ page }) => {
+  await page.goto("/digimon/decks");
+  await page.getByPlaceholder("卡组名").fill(`BADGE ${Date.now()}`);
+  await page.getByRole("button", { name: /创建/ }).click();
+  await page.waitForURL(/\/digimon\/decks\/[a-z0-9-]+/i);
+  const deckUrl = page.url();
+
+  await page.getByRole("link", { name: /🛠 组建/ }).click();
+  // Omnimon is a Digimon (main deck), Yokomon is a Digi-Egg.
+  for (const name of ["Omnimon", "Yokomon"]) {
+    await page.getByPlaceholder("搜卡加入卡组…").fill(name);
+    const add = page.getByLabel(`加入卡组 ${name}`);
+    await add.waitFor();
+    await add.click();
+    await page.waitForTimeout(400);
+  }
+
+  await page.goto("/digimon/decks");
+  const tile = page.locator("a", { hasText: "BADGE" }).first();
+  // 1 main + 1 egg — a combined total would read "2".
+  await expect(tile.locator("span.tabular-nums.font-bold")).toHaveText("1/1");
+
+  await page.goto(deckUrl);
+});

@@ -33,7 +33,11 @@ export default async function DecksPage({
   // user id so the "your decks first" sort just doesn't promote anything.
   const meId = me?.id ?? "";
 
-  const decks = digimon.listDecksWithCover(meId).map((d) => ({
+  // Main/egg split for every deck in ONE query, rather than a count per deck.
+  const rawDecks = digimon.listDecksWithCover(meId);
+  const counts = digimon.deckMainEggCounts(rawDecks.map((d) => d.id));
+
+  const decks = rawDecks.map((d) => ({
     id: d.id,
     name: d.name,
     notes: d.notes,
@@ -46,7 +50,7 @@ export default async function DecksPage({
     mine: me !== null && d.user_id === me.id,
     pinned: d.pinned === 1,
     complete: completedDeckIds.has(d.id),
-    count: digimon.deckCardCount(d.id),
+    counts: counts.get(d.id) ?? { main: 0, egg: 0 },
   }));
 
   // Fetch every deck's card list once and derive both auxiliary tool inputs
@@ -156,7 +160,7 @@ export default async function DecksPage({
                 accent_color: d.accent_color,
                 accent_color2: d.accent_color2,
                 cover_image_url: d.cover_image_url,
-                count: d.count,
+                counts: d.counts,
                 updated_at: d.updated_at,
                 owner_name: d.owner_name,
                 mine: d.mine,

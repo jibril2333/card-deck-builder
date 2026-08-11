@@ -7,6 +7,7 @@ import {
   reorderDecksAction,
   setDeckPinnedAction,
 } from "@/app/[game]/actions";
+import { deckCountBadge, DECK_TARGET } from "@/lib/deck-legality";
 
 export type DeckCardInfo = {
   id: string;
@@ -14,7 +15,7 @@ export type DeckCardInfo = {
   accent_color: string;
   accent_color2: string | null;
   cover_image_url: string | null;
-  count: number;
+  counts: { main: number; egg: number };
   updated_at: string;
   /** Display name of the deck's owner, or null for legacy unowned decks. */
   owner_name: string | null;
@@ -297,9 +298,17 @@ export function DecksGrid({
                     : d.accent_color,
                 }}
               />
-              <span className="absolute top-1.5 left-1.5 px-2 py-0.5 text-xs rounded-md bg-black/75 text-white font-bold tabular-nums">
-                {d.count}
-              </span>
+              {/* Only while the deck is unfinished — see deckCountBadge. A
+                  legal deck says nothing here and gives its artwork the corner
+                  back. */}
+              {deckCountBadge(d.counts) ? (
+                <span
+                  className="absolute top-1.5 left-1.5 px-2 py-0.5 text-xs rounded-md bg-black/75 text-white font-bold tabular-nums"
+                  title={`主卡组 ${d.counts.main} / ${DECK_TARGET.main} · 蛋卡 ${d.counts.egg} / ${DECK_TARGET.egg}`}
+                >
+                  {deckCountBadge(d.counts)}
+                </span>
+              ) : null}
               {!d.mine && d.owner_name ? (
                 <span
                   className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-black/65 text-white font-medium max-w-[80%] truncate"

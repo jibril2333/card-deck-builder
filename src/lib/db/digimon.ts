@@ -934,3 +934,41 @@ export function getExternalPrices(
     ]),
   );
 }
+
+/**
+ * Main-deck and egg-deck counts for many decks at once.
+ *
+ * One query for the whole list: the deck grid used to call `deckCardCount` per
+ * deck, which is 48 round trips to render one page, and it only ever returned
+ * the combined total — the tile could show "53" without saying whether that was
+ * a 50-card deck with 3 eggs or an illegal one.
+ *
+ * A Digi-Egg is `cards.card_type = 'Digi-Egg'`. That column is the canonical
+ * English type (the JP scraper rewrites it through `canonicalJpType`); the
+ * localized wording that may read デジモン lives in `card_translations`, and is
+ * exactly what this must NOT key off.
+ */
+export function deckMainEggCounts(
+  deckIds: string[],
+): Map<string, { main: number; egg: number }> {
+  const out = new Map<string, { main: number; egg: number }>();
+  for (const id of deckIds) out.set(id, { main: 0, egg: 0 });
+  if (deckIds.length === 0) return out;
+
+  for (let i = 0; i < deckIds.length; i += 500) {
+    const chunk = deckIds.slice(i, i + 500);
+    const rows = db()
+      .prepare(
+        `SELECT dc.deck_id,
+                COALESCE(SUM(CASE WHEN c.card_type = 'Digi-Egg' THEN dc.quantity END), 0) AS egg,
+                COALESCE(SUM(CASE WHEN c.card_type = 'Digi-Egg' THEN 0 ELSE dc.quantity END), 0) AS main
+           FROM user.deck_cards dc
+           JOIN cards c ON c.id = dc.card_id
+          WHERE dc.deck_id IN (${chunk.map(() => "?").join(",")})
+          GROUP BY dc.deck_id`,
+      )
+      .all(...chunk) as { deck_id: string; egg: number; main: number }[];
+    for (const r of rows) out.set(r.deck_id, { main: r.main, egg: r.egg });
+  }
+  return out;
+}
