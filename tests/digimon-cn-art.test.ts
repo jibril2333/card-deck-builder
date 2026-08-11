@@ -3,6 +3,7 @@ import {
   splitCnModel,
   comparePrintings,
   groupCnArt,
+  chooseCnTextRows,
 } from "@/lib/scraper/digimon-cn";
 
 // Real rows from dtcgweb-api.digimoncard.cn, trimmed to the two fields that
@@ -132,5 +133,39 @@ describe("groupCnArt", () => {
       { model: "BT1-003", imageCover: "a/BT1-003.png" },
     ]);
     expect([...got.keys()]).toEqual(["BT1-003"]);
+  });
+});
+
+describe("chooseCnTextRows", () => {
+  const r = (model: string, name: string) => ({ model, name });
+
+  it("takes the bare row when there is one", () => {
+    const got = chooseCnTextRows([
+      r("BT12-085_LM06", "别西卜兽X抗体(勘误措辞)"),
+      r("BT12-085", "别西卜兽X抗体"),
+      r("BT12-085_01", "别西卜兽X抗体"),
+    ]);
+    expect(got.get("BT12-085")?.name).toBe("别西卜兽X抗体");
+    expect(got.size).toBe(1);
+  });
+
+  it("falls back to the only printing when the bare row never appears", () => {
+    // The bug this fixes: the CN feed has LM-054 only as LM-054_LM07, so
+    // skipping every suffixed row left the card with no Chinese at all.
+    const got = chooseCnTextRows([r("LM-054_LM07", "跑步机·训练")]);
+    expect(got.get("LM-054")?.name).toBe("跑步机·训练");
+  });
+
+  it("picks the same printing regardless of feed order", () => {
+    const rows = [r("P-197_TSPR", "巴达兽"), r("P-197_01", "巴达兽A"), r("P-197_BT23", "巴达兽B")];
+    const a = chooseCnTextRows(rows).get("P-197")?.model;
+    const b = chooseCnTextRows([...rows].reverse()).get("P-197")?.model;
+    expect(a).toBe(b);
+    expect(a).toBe("P-197_01"); // numbered printings sort first
+  });
+
+  it("keeps cards apart", () => {
+    const got = chooseCnTextRows([r("BT1-001", "滚球兽"), r("BT1-002_01", "菜芽兽")]);
+    expect([...got.keys()].sort()).toEqual(["BT1-001", "BT1-002"]);
   });
 });

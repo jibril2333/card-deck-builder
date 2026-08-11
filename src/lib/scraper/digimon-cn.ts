@@ -309,3 +309,50 @@ export function groupCnArt(
   }
   return out;
 }
+
+/**
+ * Group feed rows by card code and pick the one that supplies that card's TEXT.
+ *
+ * A bare-model row always wins. A suffixed row is a reprint of the same card,
+ * and its text is occasionally re-worded to newer errata — picking that over
+ * the original printing would silently change what a card says, which is not
+ * ours to decide.
+ *
+ * But some cards NEVER appear under their bare code: the CN feed carries
+ * LM-054 only as `LM-054_LM07`, P-197 only as `P-197_TSPR`. Skipping every
+ * suffixed row left those with no Chinese at all — 74 cards, nearly all of the
+ * P and LM promos — and the deck view fell back to English for them. When the
+ * bare row doesn't exist, the reprint IS the only printing we know about, so it
+ * supplies the text.
+ *
+ * Ordering among suffixed candidates is `comparePrintings`, for the same reason
+ * as the artwork: feed order is whatever pagination returned, and text that
+ * changes between scrapes for no reason is worse than either choice.
+ */
+export function chooseCnTextRows<T extends { model: string }>(
+  rows: T[],
+): Map<string, T> {
+  const bare = new Map<string, T>();
+  const fallback = new Map<string, { printing: string; row: T }>();
+
+  for (const r of rows) {
+    const { code, printing } = splitCnModel((r.model ?? "").trim());
+    if (!code) continue;
+    if (printing === null) {
+      // First bare row wins; later duplicates are parallel printings that the
+      // old feed shape reports under the same model.
+      if (!bare.has(code)) bare.set(code, r);
+      continue;
+    }
+    const cur = fallback.get(code);
+    if (!cur || comparePrintings(printing, cur.printing) < 0) {
+      fallback.set(code, { printing, row: r });
+    }
+  }
+
+  const out = new Map<string, T>(bare);
+  for (const [code, { row }] of fallback) {
+    if (!out.has(code)) out.set(code, row);
+  }
+  return out;
+}

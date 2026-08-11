@@ -28,12 +28,12 @@ import {
   UPSERT_TRANSLATION_SQL,
 } from "../src/lib/db/translations-ddl";
 import {
+  chooseCnTextRows,
   cleanEffect,
   cnEvolutionCost,
   groupCnArt,
   splitCnDual,
   splitCnLink,
-  splitCnModel,
   splitCnRequirements,
   type CnArtRow,
 } from "../src/lib/scraper/digimon-cn";
@@ -200,31 +200,38 @@ async function main() {
     `UPDATE cards SET link_dp = COALESCE(@link_dp, link_dp) WHERE code = @code`,
   );
 
-  // Every row's model + image, kept raw and grouped at the end. Grouping can't
-  // happen page by page: a card's printings are scattered across the pagination
-  // and which one becomes `_P1` depends on having seen all of them.
-  const artRows: CnArtRow[] = [];
+  // Nothing is written during the crawl. Both the artwork and the text have to
+  // be decided per CARD, and a card's printings are scattered across the
+  // pagination — which art becomes `_P1`, and which row supplies the text when
+  // the bare code never appears, both need every page in hand first.
+  const feed: CnCard[] = [];
 
   let page = 1;
   let totalPage = 1;
-  let total = 0;
   do {
     const { list, totalPage: tp } = await fetchPage(page);
     totalPage = tp;
+    for (const c of list) {
+      if (clean(c.model) && clean(c.name)) feed.push(c);
+    }
+    if (page % 10 === 0 || page === totalPage) {
+      console.log(`[cn] page ${page}/${totalPage} (${feed.length} rows)`);
+    }
+    page++;
+    await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+  } while (page <= totalPage);
+
+  const artRows: CnArtRow[] = feed.map((c) => ({
+    model: clean(c.model)!,
+    imageCover: clean(c.imageCover),
+  }));
+
+  const textRows = chooseCnTextRows(feed.map((c) => ({ ...c, model: clean(c.model)! })));
+  let total = 0;
+  {
     const tx = db.transaction(() => {
-      for (const c of list) {
-        const model = clean(c.model);
-        const name = clean(c.name);
-        if (!model || !name) continue;
-        artRows.push({ model, imageCover: clean(c.imageCover) });
-
-        // A suffixed model is a PRINTING of a card, not a card. Its text is the
-        // base card's (occasionally with newer errata wording, which isn't ours
-        // to pick), and upserting it wrote thousands of translation rows keyed
-        // to codes that don't exist. Take its picture and move on.
-        const { code, printing } = splitCnModel(model);
-        if (printing !== null) continue;
-
+      for (const [code, c] of textRows) {
+        const name = clean(c.name)!;
         const { main, req } = splitCnRequirements(cleanEffect(c.effect));
         // A card is Dual or Link, never both, and both hide in the same field.
         const dual = splitCnDual(cleanEffect(c.envolutionEffect));
@@ -263,12 +270,8 @@ async function main() {
       }
     });
     tx();
-    if (page % 10 === 0 || page === totalPage) {
-      console.log(`[cn] page ${page}/${totalPage} (${total} upserted)`);
-    }
-    page++;
-    await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
-  } while (page <= totalPage);
+    console.log(`[cn] upserted ${total} translation rows`);
+  }
 
   const imgWritten = writeZhCardImages(db, groupCnArt(artRows));
   const pruned = pruneOrphanTranslations(db);
