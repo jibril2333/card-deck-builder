@@ -6,7 +6,6 @@ import { isGameId, type GameId, colorHex, GAMES } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { splitSetNames } from "@/lib/card-sets";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
-import { CardPoolDrawer, type PoolCard } from "@/components/card-pool-drawer";
 import { DeckCardSearch } from "@/components/deck-card-search";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckHeader } from "@/components/deck-header";
@@ -30,7 +29,6 @@ import {
 } from "@/lib/deck-formats";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
-import * as ua from "@/lib/db/unionarena";
 
 type RawDeckCard = {
   card_type: string;
@@ -239,206 +237,131 @@ export default async function DeckEditPage({
   );
 
   let loaded: Loaded;
-  if (game === "digimon") {
-    const deck = digimon.getDeck(id);
-    if (!deck) notFound();
-    const cards = digimon.getDeckCards(id);
-    const cardLang = cardLangForPage;
-    const tMap = digimon.getDisplayTranslations(
-      cards.map((c) => c.code),
-      cardLang,
-    );
-    const coverCard = deck.cover_card_id
-      ? cards.find((c) => c.id === deck.cover_card_id) ??
-        digimon.getCardById(deck.cover_card_id)
-      : undefined;
-    loaded = {
-      deck: {
-        id: deck.id,
-        name: deck.name,
-        notes: deck.notes,
-        accent_color: deck.accent_color,
-        accent_color2: deck.accent_color2,
-        // Digimon's user.decks has no locked_series/locked_color columns.
-        locked_series: null,
-        locked_color: null,
-        cover_card_id: deck.cover_card_id,
-        cover_variant: deck.cover_variant ?? "",
-        updated_at: deck.updated_at,
-        user_id: deck.user_id,
-      },
-      adjustments: digimon.listDeckAdjustments(id),
-      cards: cards.map((c) => {
-        const t = tMap.get(c.code);
-        return {
-          id: c.id,
-          code: c.code,
-          name: t?.name ?? c.name,
-          sets: splitSetNames(c.set_names),
-          color: c.color,
-          rarity: c.rarity,
-          image_url: t?.image_url ?? c.image_url,
-          quantity: c.quantity,
-          purchased: c.purchased,
-          price: c.price,
-        };
-      }),
-      // Search-target parsing relies on the EN effect wording — always feed
-      // it the raw EN rows; only the rendered target names/art get localized.
-      searchTargets: (() => {
-        const m = computeDeckSearchTargets(
-          cards.map((c) => ({
-            id: c.id,
-            code: c.code,
-            name: c.name,
-            card_type: c.card_type,
-            color: c.color,
-            digi_types: c.digi_types,
-            image_url: c.image_url,
-            main_effect: c.main_effect,
-            inherited_effect: c.inherited_effect,
-            security_effect: c.security_effect,
-          })),
-        );
-        if (tMap.size === 0) return m;
-        for (const groups of m.values()) {
-          for (const g of groups) {
-            g.targets = g.targets.map((tg) => {
-              const t = tMap.get(tg.code);
-              return t
-                ? {
-                    ...tg,
-                    name: t.name ?? tg.name,
-                    image_url: t.image_url ?? tg.image_url,
-                  }
-                : tg;
-            });
-          }
-        }
-        return m;
-      })(),
-      exportCards: cards.map((c) => ({
-        code: c.code,
-        name: c.name,
-        card_type: c.card_type,
-        quantity: c.quantity,
-      })),
-      statsPanels: buildDigimonStats(
-        cards.map((c) => ({
-          card_type: c.card_type,
-          color: c.color,
-          level: c.level,
-          play_cost: c.play_cost,
-          dp: c.dp,
-          digi_types: c.digi_types,
-          quantity: c.quantity,
-        })),
-      ),
-      cover: coverCard
-        ? (() => {
-            // Japanese art: the covers picture the physical (JP) cards, and
-            // it must not shift with each viewer's language setting — the deck
-            // is shown to friends too. getCardImages falls back to English for
-            // cards with no JP art probed yet.
-            const arts = digimon
-              .getCardImages(coverCard.code, "ja")
-              .map((v) => ({ variant: v.variant, image_url: v.image_url }));
-            // Resolve the SAME printing the deck list resolves, so the banner
-            // here and the tile over there never disagree. Note the blank
-            // variant is a real entry in `arts` (the base print) — looking it
-            // up rather than falling straight through to coverCard.image_url
-            // is what keeps the banner Japanese like everything else.
-            const picked = arts.find(
-              (a) => a.variant === (deck.cover_variant ?? ""),
-            );
-            return {
-              image_url: picked?.image_url ?? coverCard.image_url,
-              code: coverCard.code,
-              name: coverCard.name,
-              accent: coverCard.color ? colorHex(coverCard.color) : null,
-              // Digimon `color2` may be empty string for single-color cards.
-              accent2: coverCard.color2 ? colorHex(coverCard.color2) : null,
-              arts,
-            };
-          })()
-        : null,
-      isDigimon: true,
-    };
-  } else {
-    // Heal legacy UA decks: ones built before the lock feature have cards
-    // but NULL locks. If the viewer owns this deck and its cards all share
-    // one series/color, infer + persist the lock now — so the deck shows
-    // its locks and gets the quick-add pool like freshly-built decks. No-op
-    // for non-owners, already-locked decks, empty decks, or mixed decks.
-    if (me) ua.backfillLockFromCards(me.id, id);
-    const deck = ua.getDeck(id);
-    if (!deck) notFound();
-    const cards = ua.getDeckCards(id);
-    const coverCard = deck.cover_card_id
-      ? cards.find((c) => c.id === deck.cover_card_id) ??
-        ua.getCardById(deck.cover_card_id)
-      : undefined;
-    loaded = {
-      deck: {
-        id: deck.id,
-        name: deck.name,
-        notes: deck.notes,
-        accent_color: deck.accent_color,
-        accent_color2: deck.accent_color2,
-        locked_series: deck.locked_series,
-        locked_color: deck.locked_color,
-        cover_card_id: deck.cover_card_id,
-        cover_variant: deck.cover_variant ?? "",
-        updated_at: deck.updated_at,
-        user_id: deck.user_id,
-      },
-      adjustments: ua.listDeckAdjustments(id),
-      cards: cards.map((c) => ({
+  const deck = digimon.getDeck(id);
+  if (!deck) notFound();
+  const cards = digimon.getDeckCards(id);
+  const cardLang = cardLangForPage;
+  const tMap = digimon.getDisplayTranslations(
+    cards.map((c) => c.code),
+    cardLang,
+  );
+  const coverCard = deck.cover_card_id
+    ? cards.find((c) => c.id === deck.cover_card_id) ??
+      digimon.getCardById(deck.cover_card_id)
+    : undefined;
+  loaded = {
+    deck: {
+      id: deck.id,
+      name: deck.name,
+      notes: deck.notes,
+      accent_color: deck.accent_color,
+      accent_color2: deck.accent_color2,
+      // Digimon's user.decks has no locked_series/locked_color columns.
+      locked_series: null,
+      locked_color: null,
+      cover_card_id: deck.cover_card_id,
+      cover_variant: deck.cover_variant ?? "",
+      updated_at: deck.updated_at,
+      user_id: deck.user_id,
+    },
+    adjustments: digimon.listDeckAdjustments(id),
+    cards: cards.map((c) => {
+      const t = tMap.get(c.code);
+      return {
         id: c.id,
         code: c.code,
-        name: c.name,
+        name: t?.name ?? c.name,
+        sets: splitSetNames(c.set_names),
         color: c.color,
         rarity: c.rarity,
-        image_url: c.image_url,
+        image_url: t?.image_url ?? c.image_url,
         quantity: c.quantity,
         purchased: c.purchased,
         price: c.price,
-      })),
-      // UA cards have no trait-search mechanic in our data — no badges.
-      searchTargets: new Map(),
-      exportCards: cards.map((c) => ({
-        code: c.code,
-        name: c.name,
-        card_type: c.card_type,
-        quantity: c.quantity,
-      })),
-      statsPanels: buildUAStats(
+      };
+    }),
+    // Search-target parsing relies on the EN effect wording — always feed
+    // it the raw EN rows; only the rendered target names/art get localized.
+    searchTargets: (() => {
+      const m = computeDeckSearchTargets(
         cards.map((c) => ({
+          id: c.id,
+          code: c.code,
+          name: c.name,
           card_type: c.card_type,
           color: c.color,
-          energy_cost: c.energy_cost,
-          ap_cost: c.ap_cost,
-          bp: c.bp,
-          series: c.series,
-          quantity: c.quantity,
+          digi_types: c.digi_types,
+          image_url: c.image_url,
+          main_effect: c.main_effect,
+          inherited_effect: c.inherited_effect,
+          security_effect: c.security_effect,
         })),
-      ),
-      cover: coverCard
-        ? {
-            image_url: coverCard.image_url,
+      );
+      if (tMap.size === 0) return m;
+      for (const groups of m.values()) {
+        for (const g of groups) {
+          g.targets = g.targets.map((tg) => {
+            const t = tMap.get(tg.code);
+            return t
+              ? {
+                  ...tg,
+                  name: t.name ?? tg.name,
+                  image_url: t.image_url ?? tg.image_url,
+                }
+              : tg;
+          });
+        }
+      }
+      return m;
+    })(),
+    exportCards: cards.map((c) => ({
+      code: c.code,
+      name: c.name,
+      card_type: c.card_type,
+      quantity: c.quantity,
+    })),
+    statsPanels: buildDigimonStats(
+      cards.map((c) => ({
+        card_type: c.card_type,
+        color: c.color,
+        level: c.level,
+        play_cost: c.play_cost,
+        dp: c.dp,
+        digi_types: c.digi_types,
+        quantity: c.quantity,
+      })),
+    ),
+    cover: coverCard
+      ? (() => {
+          // Japanese art: the covers picture the physical (JP) cards, and
+          // it must not shift with each viewer's language setting — the deck
+          // is shown to friends too. getCardImages falls back to English for
+          // cards with no JP art probed yet.
+          const arts = digimon
+            .getCardImages(coverCard.code, "ja")
+            .map((v) => ({ variant: v.variant, image_url: v.image_url }));
+          // Resolve the SAME printing the deck list resolves, so the banner
+          // here and the tile over there never disagree. Note the blank
+          // variant is a real entry in `arts` (the base print) — looking it
+          // up rather than falling straight through to coverCard.image_url
+          // is what keeps the banner Japanese like everything else.
+          const picked = arts.find(
+            (a) => a.variant === (deck.cover_variant ?? ""),
+          );
+          return {
+            image_url: picked?.image_url ?? coverCard.image_url,
             code: coverCard.code,
             name: coverCard.name,
             accent: coverCard.color ? colorHex(coverCard.color) : null,
-            // UA cards have no color2 column — single-color only.
-            accent2: null,
-            // UA keeps each printing as its own card row, so "pick an alt art"
-            // is just picking a different cover card — nothing to choose here.
-            arts: [],
-          }
-        : null,
-      isDigimon: false,
-    };
-  }
+            // Digimon `color2` may be empty string for single-color cards.
+            accent2: coverCard.color2 ? colorHex(coverCard.color2) : null,
+            arts,
+          };
+        })()
+      : null,
+    isDigimon: true,
+  };
+  
 
   // Ownership gate: only the deck's owner can use build / purchase modes.
   // Anyone else (friend viewing) is silently demoted to browse, and the
@@ -449,48 +372,11 @@ export default async function DeckEditPage({
     : "browse";
   // Shared pools, for the sidebar picker. Only the owner can change membership,
   // so someone else's view doesn't need the query at all.
-  const pools =
-    mine && me
-      ? game === "digimon"
-        ? digimon.listGroups(me.id)
-        : ua.listGroups(me.id)
-      : [];
+  const pools = mine && me ? digimon.listGroups(me.id) : [];
   // Purchase mode defaults to "only still-missing cards" — that's the
   // shopping view you actually want when you open it. Showing every card
   // (including ones already bought) is opt-in via ?missing=0.
   const missingOnly = mode === "purchase" && sp.missing !== "0";
-
-  // In-deck card pool (quick-add drawer). Only for a LOCKED UA deck the
-  // owner is building — the pool is every card matching the deck's locked
-  // 作品 + 颜色, which is small enough to browse inline. Digimon decks and
-  // unlocked/empty UA decks get no pool (null) and keep using card search.
-  let cardPool: PoolCard[] | null = null;
-  if (
-    !loaded.isDigimon &&
-    mine &&
-    mode === "build" &&
-    loaded.deck.locked_series &&
-    loaded.deck.locked_color
-  ) {
-    const qtyByCardId = new Map(
-      loaded.cards.map((c) => [c.id, c.quantity] as const),
-    );
-    const { rows } = ua.searchCards({
-      series_list: [loaded.deck.locked_series],
-      colors: [loaded.deck.locked_color],
-      sort_field: "energy_cost",
-      sort_dir: "asc",
-      limit: 1000,
-    });
-    cardPool = rows.map((r) => ({
-      id: r.id,
-      code: r.base_code,
-      name: r.name,
-      image_url: r.image_url,
-      rarity: r.rarity,
-      quantity: qtyByCardId.get(r.id) ?? 0,
-    }));
-  }
 
   const total = loaded.cards.reduce((s, c) => s + c.quantity, 0);
   const eggs = loaded.isDigimon
@@ -646,16 +532,6 @@ export default async function DeckEditPage({
             />
           ) : null}
           </div>
-
-          {cardPool ? (
-            <div className="mt-3">
-              <CardPoolDrawer
-                game={game}
-                deckId={loaded.deck.id}
-                pool={cardPool}
-              />
-            </div>
-          ) : null}
 
           {mode !== "purchase" ? (
             <>

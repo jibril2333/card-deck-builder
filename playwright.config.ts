@@ -4,7 +4,6 @@ import os from "node:os";
 import path from "node:path";
 import {
   seedDigimonDb,
-  seedUADb,
   seedUserDb,
 } from "./tests/e2e/fixtures/seed";
 
@@ -32,8 +31,6 @@ const E2E_DIR = path.join(
 const FIXTURE_PATHS = {
   CDB_DIGIMON_DB: path.join(E2E_DIR, "digimon.db"),
   CDB_DIGIMON_USER_DB: path.join(E2E_DIR, "digimon-user.db"),
-  CDB_UA_DB: path.join(E2E_DIR, "ua.db"),
-  CDB_UA_USER_DB: path.join(E2E_DIR, "ua-user.db"),
   CDB_E2E_DIR: E2E_DIR, // teardown reads this to clean up
 } as const;
 
@@ -49,9 +46,7 @@ for (const [k, v] of Object.entries(FIXTURE_PATHS)) {
 // we can guarantee the DB exists before any HTTP traffic.
 fs.mkdirSync(E2E_DIR, { recursive: true });
 seedDigimonDb(FIXTURE_PATHS.CDB_DIGIMON_DB);
-seedUADb(FIXTURE_PATHS.CDB_UA_DB);
 seedUserDb(FIXTURE_PATHS.CDB_DIGIMON_USER_DB);
-seedUserDb(FIXTURE_PATHS.CDB_UA_USER_DB);
 
 export default defineConfig({
   testDir: "./tests/e2e",

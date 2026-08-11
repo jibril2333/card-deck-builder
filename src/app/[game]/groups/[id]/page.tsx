@@ -10,12 +10,11 @@ import { PoolHeldStepper } from "@/components/pool-held-stepper";
 import { PoolSwap } from "@/components/pool-swap";
 import { requireUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
-import * as ua from "@/lib/db/unionarena";
 
 export const dynamic = "force-dynamic";
 
-function lib(game: GameId) {
-  return game === "digimon" ? digimon : ua;
+function lib(_game: GameId) {
+  return digimon;
 }
 
 /**
@@ -53,15 +52,12 @@ export default async function GroupPage({
       cover_image_url: d.cover_image_url,
     }));
 
-  // Localize names (Digimon) per the language cookie.
+  // Localize names per the language cookie.
   const cardLang = parseCardLang((await cookies()).get(CARD_LANG_COOKIE)?.value);
-  const tMap =
-    game === "digimon"
-      ? digimon.getDisplayTranslations(
-          pool.map((c) => c.code),
-          cardLang,
-        )
-      : new Map();
+  const tMap = digimon.getDisplayTranslations(
+    pool.map((c) => c.code),
+    cardLang,
+  );
 
   const memberDecks = group.decks;
   const deckColor = (d: (typeof memberDecks)[number]) =>

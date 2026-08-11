@@ -70,14 +70,8 @@ export function SidebarBody({
   const active = activeFor(pathname, game);
   const [open, setOpen] = useState(false);
 
-  // Collection is the current user's own — hide it for anon. The memory gauge
-  // is a Digimon rule; UA has no shared resource track and the route 404s
-  // there, so don't advertise it.
-  const base = NAV.filter(
-    (n) =>
-      (loggedIn || n.id !== "collection") &&
-      (game === "digimon" || n.id !== "memory"),
-  );
+  // Collection is the current user's own — hide it for anon.
+  const base = NAV.filter((n) => loggedIn || n.id !== "collection");
   const items = isAdmin ? [...base, ADMIN_NAV] : base;
 
   const brand = (
@@ -91,31 +85,6 @@ export function SidebarBody({
         DCG Deck Builder
       </span>
     </Link>
-  );
-
-  const gameSwitcher = (
-    <div className="flex gap-1 p-0.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)]">
-      {(Object.values(GAMES) as (typeof GAMES)[GameId][]).map((g) => {
-        const isActive = g.id === game;
-        return (
-          <Link
-            key={g.id}
-            href={`/${g.id}`}
-            onClick={() => setOpen(false)}
-            className={cn(
-              "flex-1 px-2 h-8 rounded-md text-sm flex items-center justify-center gap-1.5 transition-colors",
-              isActive
-                ? "font-medium"
-                : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]",
-            )}
-            style={isActive ? { background: `${g.accent}22`, color: g.accent } : undefined}
-          >
-            <span aria-hidden>{g.emoji}</span>
-            <span className="truncate">{g.label}</span>
-          </Link>
-        );
-      })}
-    </div>
   );
 
   const navList = (
@@ -150,7 +119,7 @@ export function SidebarBody({
 
   const footer = (
     <div className="flex flex-col gap-2">
-      {game === "digimon" ? <CardLangSwitcher current={cardLang} /> : null}
+      <CardLangSwitcher current={cardLang} />
       {user ? (
         <UserMenu user={user} />
       ) : (
@@ -170,7 +139,6 @@ export function SidebarBody({
       {/* Desktop: sticky full-height column */}
       <aside className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-[var(--color-border)] bg-[var(--color-card)] px-3 py-4 gap-4">
         <div className="px-1">{brand}</div>
-        {gameSwitcher}
         {/* min-h-0 so this actually shrinks-and-scrolls in a short window
             rather than overflowing the column and hiding the footer. */}
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
@@ -192,7 +160,7 @@ export function SidebarBody({
           </button>
           {brand}
           <div className="ml-auto flex items-center gap-2">
-            {game === "digimon" ? <CardLangSwitcher current={cardLang} /> : null}
+            <CardLangSwitcher current={cardLang} />
           </div>
         </div>
       </div>
@@ -221,8 +189,7 @@ export function SidebarBody({
                 ×
               </button>
             </div>
-            {gameSwitcher}
-            {/* min-h-0: without it a flex child refuses to shrink below its
+                {/* min-h-0: without it a flex child refuses to shrink below its
                 content height and never scrolls. */}
             <div className="flex-1 min-h-0 overflow-y-auto">{navList}</div>
             {footer}

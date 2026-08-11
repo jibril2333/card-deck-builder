@@ -5,7 +5,6 @@ import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { RestrictionBadge } from "@/components/restriction-badge";
 import * as digimon from "@/lib/db/digimon";
-import * as ua from "@/lib/db/unionarena";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +17,8 @@ export const dynamic = "force-dynamic";
  * Card identity = the base print's code. Parallel printings share the
  * restriction (clamping is enforced server-side in `clampQuantityToRestriction`,
  * so the page just shows the base print's thumbnail as a representative). For
- * UA, a `includes_parallel = 0` row gets a small "不含异画" note so users
- * know the alt-arts AREN'T capped by this entry.
+ * A `includes_parallel = 0` row gets a small "不含异画" note so users know
+ * the alt-arts AREN'T capped by this entry.
  */
 export default async function RestrictionsPage({
   params,
@@ -29,12 +28,12 @@ export default async function RestrictionsPage({
   const { game } = await params;
   if (!isGameId(game)) notFound();
 
-  const lib = game === "digimon" ? digimon : ua;
+  const lib = digimon;
   let rows = lib.listRestrictions();
   let pairEdges = lib.listBannedPairs();
 
-  // Digimon: localize the displayed card names per the user's language pick.
-  if (game === "digimon") {
+  // Localize the displayed card names per the user's language pick.
+  {
     const cardLang = parseCardLang(
       (await cookies()).get(CARD_LANG_COOKIE)?.value,
     );

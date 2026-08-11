@@ -14,7 +14,7 @@ const ALLOWED_HOSTS = new Set([
   "digimoncard.com", // JP card art
   "source.windoent.com", // CN card art (official digimoncard.cn CDN)
   "images.digimoncard.io",
-  "www.unionarena-tcg.com",
+  "yugioh-1258002530.file.myqcloud.com", // CN card art (second CDN)
 ]);
 
 export async function GET(req: NextRequest) {

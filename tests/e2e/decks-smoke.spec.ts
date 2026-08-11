@@ -14,12 +14,12 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
-test("home `/` redirects into Digimon and the top-nav shows both games", async ({ page }) => {
+test("home `/` redirects into the card list", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/digimon$/);
-  // Top nav should contain both game labels.
-  await expect(page.getByRole("link", { name: /Digimon/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Union\s*Arena/i })).toBeVisible();
+  // The game switcher went with Union Arena; the section nav is what's left.
+  await expect(page.getByRole("link", { name: "卡牌检索" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "我的卡组" })).toBeVisible();
 });
 
 test("create deck → land on detail page → switch modes → delete", async ({ page }) => {
@@ -80,10 +80,23 @@ test("empty deck list shows the empty-state helper text", async ({ page }) => {
   await expect(page.getByRole("button", { name: /创建/ })).toBeVisible();
 });
 
-test("UA section is reachable via the top-nav switcher", async ({ page }) => {
+/**
+ * Union Arena was removed in Aug 2026. `[game]` survives as a route segment so
+ * shared /digimon/... links keep working, which means the only thing standing
+ * between a stale /unionarena link and a half-rendered page is `isGameId` —
+ * worth a test, since it's one word in one file.
+ *
+ * Asserted on the rendered body rather than the status code: every notFound()
+ * under /[game] answers 200 with the not-found page, because the [game] layout
+ * has already streamed by the time the page resolves. That predates this
+ * change (an unknown deck id and an unknown card code do the same).
+ */
+test("the retired unionarena section is gone", async ({ page }) => {
   await page.goto("/digimon");
-  await page.getByRole("link", { name: /Union\s*Arena/i }).click();
-  await expect(page).toHaveURL(/\/unionarena/);
-  // We seeded one card so the page should render without errors.
-  await expect(page.locator("body")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Union\s*Arena/i })).toHaveCount(0);
+
+  for (const url of ["/unionarena", "/unionarena/decks", "/unionarena/memory"]) {
+    await page.goto(url);
+    await expect(page.getByText("This page could not be found")).toBeVisible();
+  }
 });

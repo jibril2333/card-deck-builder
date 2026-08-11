@@ -7,7 +7,6 @@ import { DecksGrid } from "@/components/decks-grid";
 import { GroupsStrip } from "@/components/groups-strip";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
-import * as ua from "@/lib/db/unionarena";
 
 export const dynamic = "force-dynamic";
 
@@ -28,62 +27,40 @@ export default async function DecksPage({
   // their per-deck purchased counter). Used to render the ✓ next to the deck
   // name. Anon → never a tick.
   const completedDeckIds = me
-    ? game === "digimon"
-      ? digimon.getCompletedDeckIds(me.id)
-      : ua.getCompletedDeckIds(me.id)
+    ? digimon.getCompletedDeckIds(me.id)
     : new Set<string>();
   // Anon users still see ALL decks (they're public reads). Use a sentinel
   // user id so the "your decks first" sort just doesn't promote anything.
   const meId = me?.id ?? "";
 
-  const decks =
-    game === "digimon"
-      ? digimon.listDecksWithCover(meId).map((d) => ({
-          id: d.id,
-          name: d.name,
-          notes: d.notes,
-          accent_color: d.accent_color,
-          accent_color2: d.accent_color2,
-          updated_at: d.updated_at,
-          cover_image_url: d.cover_image_url,
-          owner_id: d.owner_id,
-          owner_name: d.owner_name,
-          mine: me !== null && d.user_id === me.id,
-          pinned: d.pinned === 1,
-          complete: completedDeckIds.has(d.id),
-          count: digimon.deckCardCount(d.id),
-        }))
-      : ua.listDecksWithCover(meId).map((d) => ({
-          id: d.id,
-          name: d.name,
-          notes: d.notes,
-          accent_color: d.accent_color,
-          accent_color2: d.accent_color2,
-          updated_at: d.updated_at,
-          cover_image_url: d.cover_image_url,
-          owner_id: d.owner_id,
-          owner_name: d.owner_name,
-          mine: me !== null && d.user_id === me.id,
-          pinned: d.pinned === 1,
-          complete: completedDeckIds.has(d.id),
-          count: ua.deckCardCount(d.id),
-        }));
+  const decks = digimon.listDecksWithCover(meId).map((d) => ({
+    id: d.id,
+    name: d.name,
+    notes: d.notes,
+    accent_color: d.accent_color,
+    accent_color2: d.accent_color2,
+    updated_at: d.updated_at,
+    cover_image_url: d.cover_image_url,
+    owner_id: d.owner_id,
+    owner_name: d.owner_name,
+    mine: me !== null && d.user_id === me.id,
+    pinned: d.pinned === 1,
+    complete: completedDeckIds.has(d.id),
+    count: digimon.deckCardCount(d.id),
+  }));
 
   // Fetch every deck's card list once and derive both auxiliary tool inputs
   // from the same payload. Two consumers share this:
   //   - 缺卡统计 (mine only, missing cards): purchased<quantity rows
   //   - 卡组对比 (any pair of decks): full card list per deck
   // Loading both eagerly is cheap — typical user has <20 decks × ~50 cards.
-  const lib = game === "digimon" ? digimon : ua;
+  const lib = digimon;
   const cardLang = parseCardLang(
     (await cookies()).get(CARD_LANG_COOKIE)?.value,
   );
   const deckCardLists = decks.map((d) => ({
     meta: d,
-    cards:
-      game === "digimon"
-        ? digimon.overlayDisplay(digimon.getDeckCards(d.id), cardLang)
-        : lib.getDeckCards(d.id),
+    cards: digimon.overlayDisplay(digimon.getDeckCards(d.id), cardLang),
   }));
 
   // Multi-deck missing-cards / shopping-list tool: limited to YOUR own decks,

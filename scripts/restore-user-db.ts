@@ -50,13 +50,13 @@ function parseArgs() {
 
   if (!source || !gameArg) {
     console.error(
-      "usage: restore-user-db --source <backup.db> --game <digimon|unionarena> " +
+      "usage: restore-user-db --source <backup.db> --game <digimon> " +
         "[--force | --merge] [--dry-run]",
     );
     process.exit(2);
   }
   if (!isGameId(gameArg)) {
-    console.error(`bad --game value "${gameArg}" (expected digimon | unionarena)`);
+    console.error(`bad --game value "${gameArg}" (expected digimon)`);
     process.exit(2);
   }
   if (!fs.existsSync(source)) {

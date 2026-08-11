@@ -31,9 +31,6 @@ export const viewport: Viewport = {
  * included — because it's meant to be put on the table between two players,
  * and app chrome around it is just something to mis-tap.
  *
- * Digimon-only: Union Arena has no shared resource track, so the nav entry is
- * hidden there and this route 404s (see sidebar-body.tsx).
- *
  * Entirely client-side — the gauge belongs to the game on the table in front of
  * you, not to an account, so there is nothing here to store on the server or to
  * log in for.

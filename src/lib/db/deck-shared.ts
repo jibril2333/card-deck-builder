@@ -47,7 +47,7 @@ type RepoOptions = {
   /** ORDER BY clause body for `getDeckCards`. Differs by game's most-useful
    *  default sort (Digimon: level, UA: energy_cost). */
   deckCardOrderBy: string;
-  /** Source key in `card_restrictions`, e.g. "digimon" / "unionarena". */
+  /** Source key in `card_restrictions`, e.g. "digimon". */
   restrictionSource: string;
   /** Map a `cards.code` to its restriction identity for deck-limit checks.
    *  - Digimon: identity = code (alt-art lives in card_images table)

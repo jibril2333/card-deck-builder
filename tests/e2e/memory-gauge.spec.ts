@@ -243,17 +243,3 @@ test("the whole honeycomb stays on screen at any usable height", async ({ page }
       .toEqual([]);
   }
 });
-
-test("UA has no memory gauge", async ({ page }) => {
-  await page.goto("/unionarena");
-  await expect(page.getByRole("link", { name: /内存条/ })).toHaveCount(0);
-
-  // Asserted on the rendered body, not the status code: every notFound() under
-  // /[game] currently answers 200 with the not-found page, because the [game]
-  // layout has already streamed by the time the page resolves. That predates
-  // this route (an unknown deck id and an unknown card code do the same) and
-  // isn't this page's to fix — what matters here is that no board renders.
-  await page.goto("/unionarena/memory");
-  await expect(page.getByRole("group", { name: "内存条" })).toHaveCount(0);
-  await expect(page.getByText("This page could not be found")).toBeVisible();
-});

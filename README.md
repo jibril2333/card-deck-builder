@@ -1,6 +1,6 @@
 # Card Deck Builder
 
-数码宝贝卡牌游戏(Digimon Card Game)和 UNION ARENA 的本地卡组构筑工具。卡牌数据存在本地 SQLite,用户数据(卡组、价格、收购状态)独立存放,通过浏览器使用。
+数码宝贝卡牌游戏(Digimon Card Game)的本地卡组构筑工具。卡牌数据存在本地 SQLite,用户数据(卡组、价格、收购状态)独立存放,通过浏览器使用。
 
 ## 主要功能
 
@@ -41,8 +41,6 @@
 ```bash
 CDB_DIGIMON_DB=/path/to/digimon.db
 CDB_DIGIMON_USER_DB=/path/to/digimon-user.db
-CDB_UA_DB=/path/to/unionarena.db
-CDB_UA_USER_DB=/path/to/unionarena-user.db
 ```
 
 默认路径在 `~/Desktop/workspace/<game>-deck-builder/data/<game>.db`。
@@ -79,19 +77,6 @@ npx tsx scripts/scrape-digimon-metadata.ts --missing
 
 # 异画图(从图床探测)
 npx tsx scripts/scrape-digimon-alt-arts.ts
-```
-
-UNION ARENA:
-
-```bash
-# 抓特定卡包
-npx tsx scripts/scrape-ua-metadata.ts --only=EX01BT
-
-# 新卡包(不在 DB 中的)
-npx tsx scripts/scrape-ua-metadata.ts --new=UA30BT
-
-# 全量(~1 小时)
-npx tsx scripts/scrape-ua-metadata.ts
 ```
 
 所有 scraper 在写入前先做 sanity check(姓名 / 类型 / 图 URL 等阈值检查),不通过直接 abort,避免静默写入空数据。
@@ -138,14 +123,11 @@ src/
       connection.ts     # better-sqlite3 connection 缓存 + ATTACH
       migrations.ts     # 版本化迁移(PRAGMA user_version)
       backup.ts         # 每日自动备份
-      deck-shared.ts    # 两游戏共享的 deck repo factory
+      deck-shared.ts    # deck repo factory(原为两游戏共享)
       digimon.ts        # Digimon 专属查询 + 抽 deckRepo
-      unionarena.ts     # UA 专属查询 + 抽 deckRepo
     scraper/
       digimon.ts        # pure HTML parser
-      ua.ts             # pure HTML parser
       sanity.ts         # Digimon 抓取批次 sanity 规则
-      sanity-ua.ts      # UA 抓取批次 sanity 规则
     alt-art.ts          # 异画后缀字符串处理
     games.ts            # GameId 注册 + 默认路径 + env 覆盖
     deck-formats.ts     # 文本格式 import/export

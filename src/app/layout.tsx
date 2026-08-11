@@ -4,7 +4,7 @@ import { NavTracker } from "@/components/nav-tracker";
 
 export const metadata: Metadata = {
   title: "DCG Deck Builder",
-  description: "Search cards and build decks for Digimon & Union Arena",
+  description: "Search cards and build decks for the Digimon Card Game",
 };
 
 export default function RootLayout({

@@ -268,47 +268,6 @@ export function seedDigimonDb(dbPath: string): void {
   }
 }
 
-// Seed a minimal UA fixture so the game switcher works. We don't drive UA
-// scenarios yet — the table just has to exist so the connection layer can run
-// its migrations.
-const UA_CARDS_SCHEMA = `
-  CREATE TABLE cards (
-    id TEXT PRIMARY KEY,
-    code TEXT NOT NULL,
-    name TEXT NOT NULL,
-    series TEXT NOT NULL,
-    color TEXT NOT NULL,
-    rarity TEXT NOT NULL,
-    card_type TEXT NOT NULL,
-    energy_cost INTEGER NOT NULL DEFAULT 0,
-    ap_cost INTEGER NOT NULL DEFAULT 0,
-    bp INTEGER NOT NULL DEFAULT 0,
-    trigger_text TEXT,
-    effect_text TEXT,
-    image_url TEXT,
-    source_url TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    locale TEXT NOT NULL DEFAULT 'jp',
-    source TEXT NOT NULL DEFAULT 'official-jp',
-    name_reading TEXT,
-    UNIQUE (locale, code)
-  );
-`;
-
-export function seedUADb(dbPath: string): void {
-  const db = new Database(dbPath);
-  try {
-    db.exec(UA_CARDS_SCHEMA);
-    db.prepare(
-      `INSERT INTO cards (id, code, name, series, color, rarity, card_type)
-       VALUES ('jp-EX01BT-HTR-2-001', 'EX01BT/HTR-2-001', 'アベンガネ', 'HUNTER×HUNTER', 'Yellow', 'U', 'Character')`,
-    ).run();
-    db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
-  } finally {
-    db.close();
-  }
-}
-
 /**
  * Seed an empty user.db with the post-migration schema (decks / deck_cards /
  * card_prices + indexes). Mirrors what migration #6 produces, so the app

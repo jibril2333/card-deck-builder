@@ -4,14 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isGameId, type GameId, GAMES } from "@/lib/games";
 import * as digimon from "@/lib/db/digimon";
-import * as ua from "@/lib/db/unionarena";
 import { backupBeforeWrite } from "@/lib/db/connection";
 import { parseDeckText } from "@/lib/deck-formats";
 import { stripAltArt } from "@/lib/alt-art";
 import { requireUser } from "@/lib/auth/session";
 
-function lib(game: GameId) {
-  return game === "digimon" ? digimon : ua;
+function lib(_game: GameId) {
+  return digimon;
 }
 
 // ---------- Cache invalidation helpers ----------
@@ -121,40 +120,12 @@ export async function updateDeckMetaAction(formData: FormData) {
         : String(accent2Raw).trim();
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  // UA locks use the same "absent / empty / value" trinary as accent2.
-  // Only forwarded to the UA branch since Digimon's repo signature doesn't
-  // accept these keys (and the DB column doesn't exist).
-  if (game === "unionarena") {
-    const seriesRaw = formData.get("locked_series");
-    const colorRaw = formData.get("locked_color");
-    const locked_series: string | null | undefined =
-      seriesRaw === null
-        ? undefined
-        : String(seriesRaw).trim() === ""
-          ? null
-          : String(seriesRaw).trim();
-    const locked_color: string | null | undefined =
-      colorRaw === null
-        ? undefined
-        : String(colorRaw).trim() === ""
-          ? null
-          : String(colorRaw).trim();
-    ua.updateDeckMeta(me.id, id, {
-      name: name || undefined,
-      notes: notes,
-      accent_color: accent_color || undefined,
-      accent_color2,
-      locked_series,
-      locked_color,
-    });
-  } else {
-    digimon.updateDeckMeta(me.id, id, {
-      name: name || undefined,
-      notes: notes,
-      accent_color: accent_color || undefined,
-      accent_color2,
-    });
-  }
+  digimon.updateDeckMeta(me.id, id, {
+    name: name || undefined,
+    notes: notes,
+    accent_color: accent_color || undefined,
+    accent_color2,
+  });
   bumpDeckAndList(game, id);
 }
 
@@ -607,16 +578,7 @@ export async function importDeckAction(formData: FormData): Promise<{
     | { type: "banned"; code: string; requested: number }
     | { type: "limited"; code: string; requested: number; cap: number }
     | { type: "overlimit"; code: string; requested: number; cap: number }
-    | { type: "pair"; code: string; conflictWith: string }
-    | { type: "wrong_series"; code: string; expected: string; got: string }
-    | { type: "wrong_color"; code: string; expected: string; got: string };
-
-  // UA-only: track the pending series / color lock as we walk the import.
-  // The first valid card "wins" — its series + color become the lock, and
-  // every later card has to match. Mirrors the runtime behavior of
-  // setDeckCardQuantity for a brand-new deck.
-  let pendingSeries: string | null = null;
-  let pendingColor: string | null = null;
+    | { type: "pair"; code: string; conflictWith: string };
 
   const drops: Drop[] = [];
   /** Codes the parser read but the card DB doesn't have, with the requested
@@ -625,16 +587,12 @@ export async function importDeckAction(formData: FormData): Promise<{
   const plan: { cardId: string; qty: number }[] = [];
   const seenIdentities = new Set<string>();
   // Hero candidates for auto-naming / auto-cover when the user didn't
-  // supply a deck title. Currently Digimon-only: Lv 6 (= Mega stage) is the
-  // conventional "headliner" of a Digimon deck. UA has no analogous "level"
-  // concept, so leave the heuristic unimplemented there.
+  // supply a deck title: Lv 6 (= Mega stage) is the conventional "headliner"
+  // of a Digimon deck.
   const heroCandidates: { id: string; name: string; qty: number }[] = [];
 
   for (const [code, qty] of merged) {
-    const card =
-      game === "digimon"
-        ? digimon.getCardByCode(code)
-        : ua.getCardByCode(code);
+    const card = digimon.getCardByCode(code);
     if (!card) {
       missing.push({ code, qty });
       continue;
@@ -658,36 +616,6 @@ export async function importDeckAction(formData: FormData): Promise<{
       }
       if (blockedBy) {
         drops.push({ type: "pair", code, conflictWith: blockedBy });
-        continue;
-      }
-    }
-
-    // UA-only: series + color lock enforcement. First passing card sets
-    // the pendingSeries/pendingColor; subsequent cards must match. Same
-    // semantics as the runtime clamp, just predicted here so we can drop
-    // mismatches into the notes with an explicit reason.
-    if (game === "unionarena") {
-      const uaCard = card as ua.UACard;
-      if (pendingSeries === null) {
-        pendingSeries = uaCard.series;
-      } else if (uaCard.series !== pendingSeries) {
-        drops.push({
-          type: "wrong_series",
-          code,
-          expected: pendingSeries,
-          got: uaCard.series,
-        });
-        continue;
-      }
-      if (pendingColor === null) {
-        pendingColor = uaCard.color;
-      } else if (uaCard.color !== pendingColor) {
-        drops.push({
-          type: "wrong_color",
-          code,
-          expected: pendingColor,
-          got: uaCard.color,
-        });
         continue;
       }
     }
@@ -759,12 +687,6 @@ export async function importDeckAction(formData: FormData): Promise<{
     Drop,
     { type: "pair" }
   >[];
-  const seriesDrops = drops.filter(
-    (d) => d.type === "wrong_series",
-  ) as Extract<Drop, { type: "wrong_series" }>[];
-  const colorDrops = drops.filter(
-    (d) => d.type === "wrong_color",
-  ) as Extract<Drop, { type: "wrong_color" }>[];
   if (missing.length) {
     // These never made it into the deck at all: either the code is a typo, or
     // it's a set our scrapers haven't imported yet. Writing them down means an
@@ -804,20 +726,6 @@ export async function importDeckAction(formData: FormData): Promise<{
         pairDrops
           .map((d) => `  ${d.code}(与 ${d.conflictWith} 互斥)`)
           .join("\n"),
-    );
-  }
-  if (seriesDrops.length) {
-    // All series drops in a single import share the same `expected`
-    // (whatever the first card locked to), so put it in the header.
-    notesParts.push(
-      `不是本作品(已跳过) ${seriesDrops.length} — 锁定作品: ${seriesDrops[0].expected}\n` +
-        seriesDrops.map((d) => `  ${d.code}(${d.got})`).join("\n"),
-    );
-  }
-  if (colorDrops.length) {
-    notesParts.push(
-      `不是本色(已跳过) ${colorDrops.length} — 锁定颜色: ${colorDrops[0].expected}\n` +
-        colorDrops.map((d) => `  ${d.code}(${d.got})`).join("\n"),
     );
   }
   const notes = notesParts.length ? notesParts.join("\n\n") : undefined;
@@ -939,8 +847,7 @@ export async function adjustCollectionByCodeAction(
   if (!Number.isFinite(delta) || delta === 0) {
     return { ok: false, error: "数量必须 ≥ 1" };
   }
-  const card =
-    game === "digimon" ? digimon.getCardByCode(code) : ua.getCardByCode(code);
+  const card = digimon.getCardByCode(code);
   if (!card) {
     return {
       ok: false,
