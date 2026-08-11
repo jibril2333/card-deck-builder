@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import {
   setDeckCardQuantityAction,
   createDeckQuietAction,
 } from "@/app/[game]/actions";
+import { collapseDecks } from "@/lib/collapse-decks";
 
 type DeckEntry = {
   id: string;
@@ -19,6 +20,8 @@ type DeckEntry = {
   total: number;
 };
 
+const COLLAPSE_KEY = "cdb.add-to-deck.expanded";
+
 export function AddToDeck({
   game,
   cardId,
@@ -28,8 +31,34 @@ export function AddToDeck({
   cardId: string;
   decks: DeckEntry[];
 }) {
+  // Starts collapsed so the server HTML and the first client render agree;
+  // the remembered choice arrives in an effect. Remembered at all because
+  // deck-building means opening card after card, and re-expanding every time
+  // is worse than the scrolling this was meant to fix.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(COLLAPSE_KEY) === "1") setExpanded(true);
+    } catch {
+      /* private mode — the toggle still works, it just won't be remembered */
+    }
+  }, []);
+
+  function toggle() {
+    setExpanded((v) => {
+      try {
+        window.localStorage.setItem(COLLAPSE_KEY, v ? "0" : "1");
+      } catch {
+        /* see above */
+      }
+      return !v;
+    });
+  }
+
+  const { shown, hidden, collapsible } = collapseDecks(decks, expanded);
+
   return (
-    <div className="space-y-3">
+    <section aria-label="添加到卡组" className="space-y-3">
       <div className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]">
         添加到卡组
       </div>
@@ -39,20 +68,34 @@ export function AddToDeck({
           还没有卡组，下面新建一个吧。
         </div>
       ) : (
-        <div className="divide-y divide-[var(--color-border)] -mx-3 border-y border-[var(--color-border)]">
-          {decks.map((d) => (
-            <DeckEntryRow
-              key={d.id}
-              game={game}
-              cardId={cardId}
-              deck={d}
-            />
-          ))}
+        <div className="-mx-3 border-y border-[var(--color-border)]">
+          <div className="divide-y divide-[var(--color-border)]">
+            {shown.map((d) => (
+              <DeckEntryRow key={d.id} game={game} cardId={cardId} deck={d} />
+            ))}
+          </div>
+          {collapsible ? (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={expanded}
+              className="w-full h-9 px-3 flex items-center justify-center gap-1.5 text-xs text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:bg-[var(--color-muted)] cursor-pointer border-t border-[var(--color-border)]"
+            >
+              <span aria-hidden className={expanded ? "" : "rotate-180 inline-block"}>
+                ⌃
+              </span>
+              {expanded
+                ? "收起"
+                : hidden === decks.length
+                  ? `展开全部 ${hidden} 个卡组`
+                  : `展开其余 ${hidden} 个卡组`}
+            </button>
+          ) : null}
         </div>
       )}
 
       <NewDeckForm game={game} />
-    </div>
+    </section>
   );
 }
 
