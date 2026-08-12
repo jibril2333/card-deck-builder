@@ -30,18 +30,16 @@ import {
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import { DECK_TARGET } from "@/lib/deck-legality";
+import { tallyColors, tallyLevels, MULTI_COLOR } from "@/lib/deck-tally";
 
 type RawDeckCard = {
   card_type: string;
   color?: string | null;
+  color2?: string | null;
   level?: number | null;
   play_cost?: number | null;
   dp?: number | null;
   digi_types?: string | null;
-  energy_cost?: number | null;
-  ap_cost?: number | null;
-  bp?: number | null;
-  series?: string | null;
   quantity: number;
 };
 
@@ -91,18 +89,15 @@ function buildDigimonStats(cards: RawDeckCard[]): StatPanel[] {
   }
   return [
     { title: "卡片类型", bars: tally(cards, (c) => c.card_type, { sort: "count" }) },
-    {
-      title: "等级",
-      bars: tally(cards, (c) => (c.level != null ? `Lv.${c.level}` : null), {
-        sort: "label-num",
-      }),
-    },
+    // Both of these keep a rule the generic `tally` can't express — empty
+    // rungs, and a card counting for more than one bucket. See lib/deck-tally.
+    { title: "等级", bars: tallyLevels(cards) },
     {
       title: "颜色",
-      bars: tally(cards, (c) => c.color, {
-        sort: "count",
-        color: (l) => colorHexFn(l),
-      }),
+      bars: tallyColors(cards).map((b) => ({
+        ...b,
+        color: b.label === MULTI_COLOR ? undefined : colorHexFn(b.label),
+      })),
     },
     {
       title: "登场费用",
@@ -123,45 +118,6 @@ function buildDigimonStats(cards: RawDeckCard[]): StatPanel[] {
         (c) => (c.dp != null && c.dp > 0 ? c.dp.toLocaleString() : null),
         { sort: "label-num" },
       ),
-    },
-  ];
-}
-
-function buildUAStats(cards: RawDeckCard[]): StatPanel[] {
-  return [
-    { title: "类型", bars: tally(cards, (c) => c.card_type, { sort: "count" }) },
-    {
-      title: "颜色",
-      bars: tally(cards, (c) => c.color, {
-        sort: "count",
-        color: (l) => colorHexFn(l),
-      }),
-    },
-    {
-      title: "Energy",
-      bars: tally(
-        cards,
-        (c) => (c.energy_cost != null ? `${c.energy_cost}` : null),
-        { sort: "label-num" },
-      ),
-    },
-    {
-      title: "AP",
-      bars: tally(cards, (c) => (c.ap_cost != null ? `${c.ap_cost}` : null), {
-        sort: "label-num",
-      }),
-    },
-    {
-      title: "BP",
-      bars: tally(
-        cards,
-        (c) => (c.bp != null && c.bp > 0 ? c.bp.toLocaleString() : null),
-        { sort: "label-num" },
-      ),
-    },
-    {
-      title: "作品 (Series)",
-      bars: tally(cards, (c) => c.series, { sort: "count", limit: 8 }),
     },
   ];
 }
@@ -325,6 +281,7 @@ export default async function DeckEditPage({
       cards.map((c) => ({
         card_type: c.card_type,
         color: c.color,
+        color2: c.color2,
         level: c.level,
         play_cost: c.play_cost,
         dp: c.dp,
@@ -389,12 +346,10 @@ export default async function DeckEditPage({
   const main = total - eggs;
 
   // Color distribution
-  const colorMap = new Map<string, number>();
-  for (const c of loaded.cards) {
-    const k = c.color ?? "Unknown";
-    colorMap.set(k, (colorMap.get(k) ?? 0) + c.quantity);
-  }
-  const colorBreakdown = [...colorMap.entries()].sort((a, b) => b[1] - a[1]);
+  // Fed from the raw rows, not `loaded.cards`: DeckCardData has no `color2`,
+  // and the same tally rendered from two different shapes is how these chips
+  // and the 卡组分布 panel came to disagree in the first place.
+  const colorBreakdown = tallyColors(cards);
 
   // Same rule the deck-list tile judges by — see lib/deck-legality.
   const target = DECK_TARGET;
@@ -561,13 +516,23 @@ export default async function DeckEditPage({
 
                 {colorBreakdown.length ? (
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {colorBreakdown.map(([c, n]) => (
-                      <span key={c} className="chip">
-                        <span
-                          className="chip-dot"
-                          style={{ background: colorHex(c) }}
-                        />
-                        {c} · {n}
+                    {colorBreakdown.map((b) => (
+                      <span
+                        key={b.label}
+                        className="chip"
+                        title={
+                          b.label === MULTI_COLOR
+                            ? "同时带两种颜色的卡,已分别计入各自颜色"
+                            : undefined
+                        }
+                      >
+                        {b.label === MULTI_COLOR ? null : (
+                          <span
+                            className="chip-dot"
+                            style={{ background: colorHex(b.label) }}
+                          />
+                        )}
+                        {b.label} · {b.value}
                       </span>
                     ))}
                   </div>

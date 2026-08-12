@@ -52,7 +52,9 @@ function Panel({ panel }: { panel: StatPanel }) {
                 className="block h-full rounded-full"
                 style={{
                   width: `${(b.value / max) * 100}%`,
-                  minWidth: 3,
+                  // A 3px stub keeps a small-but-real value visible; a zero
+                  // has to draw nothing, or an empty rung looks occupied.
+                  minWidth: b.value > 0 ? 3 : 0,
                   background: b.color ?? "var(--color-accent)",
                 }}
               />
