@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { pAtLeastOne, expectedCount } from "@/lib/probability";
+import { pAtLeastOne, expectedCount, pNone } from "@/lib/probability";
 
 /**
  * Deck playtesting: an opening-hand simulator and a hypergeometric
@@ -187,6 +187,8 @@ export function Playtest({
     .reduce((s, r) => s + r.qty, 0);
 
   const fmt = (p: number) => `${(p * 100).toFixed(1)}%`;
+  /** Extra cards drawn after the opening hand, for the brick-odds row. */
+  const DRAW_STEPS = [0, 1, 2, 3, 4, 5];
   const seenAt = (turn: number) => HAND + turn;
 
   return (
@@ -440,6 +442,9 @@ export function Playtest({
         {levelRows.length ? (
           <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
             <h2 className="font-bold">🎯 起手等级期望</h2>
+            <p className="mt-1 text-[10px] text-[var(--color-muted-fg)] leading-snug">
+              下排是「一张都摸不到」的概率:起手 5 张之后再过 0–5 张牌。
+            </p>
             <div className="mt-3 grid grid-cols-2 lg:grid-cols-1 gap-2">
               {levelRows.map(({ level, qty }) => {
                 const exp = expectedCount(N, qty, HAND);
@@ -460,6 +465,28 @@ export function Playtest({
                     </div>
                     <div className="text-xs text-[var(--color-muted-fg)] tabular-nums">
                       ≥1 张 {fmt(p1)}
+                    </div>
+                    {/* The brick odds, per extra card drawn. Shown as "none"
+                        rather than as the ≥1 figure above it: the difference
+                        between 99.4% and 97.5% reads as nothing, while 0.6%
+                        against 2.5% reads as four times the risk — and it's
+                        the risk you're checking a curve for. */}
+                    <div className="mt-1.5 pt-1.5 border-t border-[var(--color-border)]">
+                      <div className="text-[9px] text-[var(--color-muted-fg)] mb-0.5">
+                        一张都摸不到 (%)
+                      </div>
+                      <div className="grid grid-cols-6 gap-x-0.5 text-center tabular-nums">
+                        {DRAW_STEPS.map((t) => (
+                          <div key={t}>
+                            <div className="text-[9px] text-[var(--color-muted-fg)]">
+                              +{t}
+                            </div>
+                            <div className="text-[10px] font-medium">
+                              {(pNone(N, qty, HAND + t) * 100).toFixed(1)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 );

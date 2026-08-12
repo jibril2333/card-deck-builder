@@ -30,3 +30,20 @@ export function expectedCount(n: number, k: number, seen: number): number {
   if (n <= 0) return 0;
   return (Math.min(seen, n) * k) / n;
 }
+
+/**
+ * P(NOT ONE of `k` target copies is among `seen` cards) — the complement of
+ * `pAtLeastOne`, spelled out because that is the question a curve check asks.
+ *
+ * "97.5% to see a Lv.3" and "2.5% to brick on Lv.3" are the same number, but
+ * only the second one is small enough to compare across levels at a glance:
+ * the difference between 99.4% and 97.5% reads as nothing, while 0.6% versus
+ * 2.5% reads as four times the risk.
+ *
+ * Note the k = 0 case: a level you play none of has probability 1 of not
+ * appearing, not 0. `pAtLeastOne` returns 0 there, so the complement is
+ * already right.
+ */
+export function pNone(n: number, k: number, seen: number): number {
+  return 1 - pAtLeastOne(n, k, seen);
+}
