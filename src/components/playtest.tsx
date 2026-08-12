@@ -350,7 +350,20 @@ export function Playtest({
                   <th className="py-1.5 pr-3">卡名</th>
                   <th className="py-1.5 pr-3 text-right">张数</th>
                   <th className="py-1.5 pr-3 text-right">起手</th>
+                  {/* The middle turns only appear once there's room for them.
+                      Narrow screens keep 起手/T3/T5 — three points is enough to
+                      read a curve — and a wide one gets every turn instead of
+                      spending the width on a wider 卡名 column.
+
+                      A raw pixel breakpoint, not `xl`: Tailwind's breakpoints
+                      measure the VIEWPORT, and 240px of it is the sidebar plus
+                      another 240 the level rail, so `xl` (1280) fires when this
+                      table has only ~780px and the columns crush. 1400 is where
+                      it actually has room. */}
+                  <th className="py-1.5 pr-3 text-right hidden min-[1400px]:table-cell">T1</th>
+                  <th className="py-1.5 pr-3 text-right hidden min-[1400px]:table-cell">T2</th>
                   <th className="py-1.5 pr-3 text-right">T3</th>
+                  <th className="py-1.5 pr-3 text-right hidden min-[1400px]:table-cell">T4</th>
                   <th className="py-1.5 pr-3 text-right">T5</th>
                 </tr>
               </thead>
@@ -425,12 +438,16 @@ export function Playtest({
                     <td className="py-1.5 pr-3 text-right tabular-nums">
                       {fmt(pAtLeastOne(N, r.qty, HAND))}
                     </td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">
-                      {fmt(pAtLeastOne(N, r.qty, seenAt(3)))}
-                    </td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">
-                      {fmt(pAtLeastOne(N, r.qty, seenAt(5)))}
-                    </td>
+                    {[1, 2, 3, 4, 5].map((t) => (
+                      <td
+                        key={t}
+                        className={`py-1.5 pr-3 text-right tabular-nums${
+                          t === 3 || t === 5 ? "" : " hidden min-[1400px]:table-cell"
+                        }`}
+                      >
+                        {fmt(pAtLeastOne(N, r.qty, seenAt(t)))}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

@@ -98,7 +98,10 @@ export default async function RestrictionsPage({
 
   return (
     <>
-      <main className="w-full mx-auto max-w-[1500px] px-4 sm:px-6 py-6">
+      {/* A wall of card tiles — extra width becomes another column, not longer
+          lines, so the cap is only here to stop the tiles growing past the size
+          they are everywhere else in the app. */}
+      <main className="w-full mx-auto max-w-[1800px] px-4 sm:px-6 py-6">
         <header className="mb-5">
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <span aria-hidden>🚫</span>
@@ -208,7 +211,7 @@ function Section({
           `sm`/`md` steps that used to hold 3 and 4 are gone rather than kept:
           going 4 → 3 as the screen gets WIDER is the one thing worse than two
           across. Desktop (lg/xl) is untouched. */}
-      <div className="p-2 sm:p-3 grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1.5 sm:gap-3">
+      <div className="p-2 sm:p-3 grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-1.5 sm:gap-3">
         {rows.map((r) => (
           <RestrictionCard key={r.identity} row={r} game={game} />
         ))}

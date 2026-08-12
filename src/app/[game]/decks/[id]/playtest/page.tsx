@@ -44,7 +44,11 @@ export default async function PlaytestPage({
 
   return (
     <>
-      <main className="w-full mx-auto max-w-[1100px] px-4 sm:px-6 py-6">
+      {/* 1100 was sized for a three-column probability table. The table now
+          shows every turn from `xl` up, and 1600 is what those columns plus the
+          15rem level rail actually need — past that the extra width would go
+          into the 卡名 column, which is stretching, not using. */}
+      <main className="w-full mx-auto max-w-[1600px] px-4 sm:px-6 py-6">
         <BackLink
           fallback={`/${game}/decks/${id}`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
