@@ -296,9 +296,13 @@ body::before {
    it — but only once there is room for two tables.
    
    The rail used to start at `lg` (1024) at 15rem, which meant everything from
-   1024 to 1499 squeezed a 9-column table into 240px and left it scrolling
-   sideways. Below 1500 it goes full width UNDER the main table instead, where
-   it has 700px+ and reads as the table it is.
+   1024 to 1499 squeezed the level table into 240px and left it scrolling
+   sideways. Below the breakpoint it goes full width UNDER the main table
+   instead, where it has 700px+ and reads as the table it is.
+
+   The threshold and the width are both sized to the level table's 11 draw
+   steps: it needs ~38rem, and the main table needs what's left of the 1600px
+   page — which only adds up past ~1700.
 
    A real class rather than Tailwind arbitrary values: `lg:grid-cols-[1fr_15rem]`
    compiles, but adding a second one under an arbitrary variant
@@ -310,8 +314,8 @@ body::before {
   gap: 1rem;
   align-items: start;
 }
-@media (min-width: 1500px) {
+@media (min-width: 1700px) {
   .playtest-cols {
-    grid-template-columns: 1fr 27rem;
+    grid-template-columns: 1fr 38rem;
   }
 }

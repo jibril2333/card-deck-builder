@@ -188,11 +188,11 @@ export function Playtest({
 
   const fmt = (p: number) => `${(p * 100).toFixed(1)}%`;
   /** Extra cards drawn after the opening hand, for the brick-odds columns. */
-  const DRAW_STEPS = [0, 1, 2, 3, 4, 5];
+  const DRAW_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   /**
-   * On a phone all six steps need ~60px each and the table starts scrolling
-   * sideways. Every other one still shows the shape of the decay, and the row
-   * fits.
+   * Eleven steps is a wide table. Below `sm` only the even ones show — the
+   * shape of the decay survives at half the resolution, and the row fits
+   * without scrolling sideways on a phone.
    */
   const STEP_HIDDEN = (t: number) => (t % 2 === 1 ? " hidden sm:table-cell" : "");
   const seenAt = (turn: number) => HAND + turn;
@@ -353,13 +353,14 @@ export function Playtest({
               <thead>
                 <tr className="text-left text-xs text-[var(--color-muted-fg)] border-b border-[var(--color-border)]">
                   <th className="py-1.5 pr-2 w-8"></th>
-                  {/* w-full makes the name column absorb ALL the slack, so
-                      the numeric columns shrink to their content instead of
-                      every column widening evenly — which just moves the page's
-                      empty margin in between the percentages. */}
+                  {/* w-full makes the name column absorb the slack rather than
+                      every column widening evenly. The numeric columns then get
+                      a floor of their own (sm:min-w-[5.5rem]) so they read as a
+                      block instead of a thin strip pushed to the far right —
+                      absorbing ALL of it was the other half of the problem. */}
                   <th className="py-1.5 pr-3 w-full">卡名</th>
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap">张数</th>
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap">起手</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem]">张数</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem]">起手</th>
                   {/* The middle turns only appear once there's room for them.
                       Narrow screens keep 起手/T3/T5 — three points is enough to
                       read a curve — and a wide one gets every turn instead of
@@ -370,11 +371,11 @@ export function Playtest({
                       another 240 the level rail, so `xl` (1280) fires when this
                       table has only ~780px and the columns crush. 1400 is where
                       it actually has room. */}
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap hidden min-[1400px]:table-cell">T1</th>
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap hidden min-[1400px]:table-cell">T2</th>
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap">T3</th>
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap hidden min-[1400px]:table-cell">T4</th>
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap">T5</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem] hidden min-[1400px]:table-cell">T1</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem] hidden min-[1400px]:table-cell">T2</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem]">T3</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem] hidden min-[1400px]:table-cell">T4</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem]">T5</th>
                 </tr>
               </thead>
               <tbody>
@@ -482,7 +483,7 @@ export function Playtest({
                 which is the thing that made it unreadable in the first place.
                 In the 27rem rail the cap never binds. */}
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full max-w-[42rem] text-sm border-collapse">
+              <table className="w-full max-w-[46rem] text-sm border-collapse">
                 <thead>
                   <tr className="text-xs text-[var(--color-muted-fg)]">
                     <th className="py-1 pr-2 text-left font-normal" rowSpan={2}>
