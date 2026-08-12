@@ -154,12 +154,19 @@ export function Playtest({
   // together answered a question nobody asked and overstated the odds for
   // each of them. Tick several rows to get the combined probability, which
   // is what the old grouping was really for.
+  //
+  // Deliberately NOT sorted: `cards` arrives in the deck's own order (the
+  // server hands both pages the same `getDeckCards` result, ordered by level
+  // then code), and re-sorting here by copy count meant the same deck read in
+  // two different orders depending on which page you were looking at. Keeping
+  // the array as given is also the only way the two stay in step — sorting by
+  // "level then code" here instead would be a second copy of a rule that lives
+  // in the query.
   const rows = useMemo(
     () =>
       cards
         .filter((c) => !c.isEgg)
-        .map((c) => ({ key: c.id, card: c, qty: c.quantity }))
-        .sort((a, b) => b.qty - a.qty || a.card.code.localeCompare(b.card.code)),
+        .map((c) => ({ key: c.id, card: c, qty: c.quantity })),
     [cards],
   );
 
