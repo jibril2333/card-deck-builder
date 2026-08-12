@@ -187,8 +187,14 @@ export function Playtest({
     .reduce((s, r) => s + r.qty, 0);
 
   const fmt = (p: number) => `${(p * 100).toFixed(1)}%`;
-  /** Extra cards drawn after the opening hand, for the brick-odds row. */
+  /** Extra cards drawn after the opening hand, for the brick-odds columns. */
   const DRAW_STEPS = [0, 1, 2, 3, 4, 5];
+  /**
+   * On a phone all six steps need ~60px each and the table starts scrolling
+   * sideways. Every other one still shows the shape of the decay, and the row
+   * fits.
+   */
+  const STEP_HIDDEN = (t: number) => (t % 2 === 1 ? " hidden sm:table-cell" : "");
   const seenAt = (turn: number) => HAND + turn;
 
   return (
@@ -312,7 +318,7 @@ export function Playtest({
           name column doesn't need the slack, so the row was mostly empty
           space between them. The level panel fills it and stops being a
           band the reader has to scroll past to reach the table. */}
-      <div className="grid lg:grid-cols-[1fr_15rem] gap-4 items-start">
+      <div className="playtest-cols">
         {/* ── probability table ── */}
         <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
           <h2 className="font-bold">📈 抽到概率</h2>
@@ -347,9 +353,13 @@ export function Playtest({
               <thead>
                 <tr className="text-left text-xs text-[var(--color-muted-fg)] border-b border-[var(--color-border)]">
                   <th className="py-1.5 pr-2 w-8"></th>
-                  <th className="py-1.5 pr-3">卡名</th>
-                  <th className="py-1.5 pr-3 text-right">张数</th>
-                  <th className="py-1.5 pr-3 text-right">起手</th>
+                  {/* w-full makes the name column absorb ALL the slack, so
+                      the numeric columns shrink to their content instead of
+                      every column widening evenly — which just moves the page's
+                      empty margin in between the percentages. */}
+                  <th className="py-1.5 pr-3 w-full">卡名</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap">张数</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap">起手</th>
                   {/* The middle turns only appear once there's room for them.
                       Narrow screens keep 起手/T3/T5 — three points is enough to
                       read a curve — and a wide one gets every turn instead of
@@ -360,11 +370,11 @@ export function Playtest({
                       another 240 the level rail, so `xl` (1280) fires when this
                       table has only ~780px and the columns crush. 1400 is where
                       it actually has room. */}
-                  <th className="py-1.5 pr-3 text-right hidden min-[1400px]:table-cell">T1</th>
-                  <th className="py-1.5 pr-3 text-right hidden min-[1400px]:table-cell">T2</th>
-                  <th className="py-1.5 pr-3 text-right">T3</th>
-                  <th className="py-1.5 pr-3 text-right hidden min-[1400px]:table-cell">T4</th>
-                  <th className="py-1.5 pr-3 text-right">T5</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap hidden min-[1400px]:table-cell">T1</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap hidden min-[1400px]:table-cell">T2</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap">T3</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap hidden min-[1400px]:table-cell">T4</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap">T5</th>
                 </tr>
               </thead>
               <tbody>
@@ -455,59 +465,91 @@ export function Playtest({
           </div>
         </section>
 
-        {/* ── expected Digimon per level in the opening hand ── */}
+        {/* ── per-level draw odds ── */}
         {levelRows.length ? (
           <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-            <h2 className="font-bold">🎯 起手等级期望</h2>
-            <p className="mt-1 text-[10px] text-[var(--color-muted-fg)] leading-snug">
-              下排是「一张都摸不到」的概率:起手 5 张之后再过 0–5 张牌。
+            <h2 className="font-bold">🎯 各等级抽卡概率</h2>
+            <p className="mt-1 text-xs text-[var(--color-muted-fg)] leading-snug">
+              「摸不到」= 起手 5 张之后再过 N 张牌,该等级一张都没见到的概率。
             </p>
-            <div className="mt-3 grid grid-cols-2 lg:grid-cols-1 gap-2">
-              {levelRows.map(({ level, qty }) => {
-                const exp = expectedCount(N, qty, HAND);
-                const p1 = pAtLeastOne(N, qty, HAND);
-                return (
-                  <div
-                    key={level}
-                    className="rounded-md border border-[var(--color-border)] px-3 py-2"
-                  >
-                    <div className="text-xs text-[var(--color-muted-fg)]">
-                      Lv.{level} · 共 {qty} 张
-                    </div>
-                    <div className="text-lg font-bold tabular-nums leading-tight">
-                      {exp.toFixed(2)}
-                      <span className="text-xs font-normal text-[var(--color-muted-fg)] ml-1">
-                        张
-                      </span>
-                    </div>
-                    <div className="text-xs text-[var(--color-muted-fg)] tabular-nums">
-                      ≥1 张 {fmt(p1)}
-                    </div>
-                    {/* The brick odds, per extra card drawn. Shown as "none"
-                        rather than as the ≥1 figure above it: the difference
-                        between 99.4% and 97.5% reads as nothing, while 0.6%
-                        against 2.5% reads as four times the risk — and it's
-                        the risk you're checking a curve for. */}
-                    <div className="mt-1.5 pt-1.5 border-t border-[var(--color-border)]">
-                      <div className="text-[9px] text-[var(--color-muted-fg)] mb-0.5">
-                        一张都摸不到 (%)
-                      </div>
-                      <div className="grid grid-cols-6 gap-x-0.5 text-center tabular-nums">
-                        {DRAW_STEPS.map((t) => (
-                          <div key={t}>
-                            <div className="text-[9px] text-[var(--color-muted-fg)]">
-                              +{t}
-                            </div>
-                            <div className="text-[10px] font-medium">
-                              {(pNone(N, qty, HAND + t) * 100).toFixed(1)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* A real table, not a stack of cards. The cards were four boxes
+                each cramming ten numbers into 240px at 9px type; as rows the
+                same numbers line up in columns, which is the only way to
+                compare Lv.5 against Lv.6 at a glance. */}
+            {/* Capped, not stretched. Below 1500 this table sits full width
+                under the main one, and a 4-row table spread across 1000px puts
+                the whole page's leftover margin back in between its columns —
+                which is the thing that made it unreadable in the first place.
+                In the 27rem rail the cap never binds. */}
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full max-w-[42rem] text-sm border-collapse">
+                <thead>
+                  <tr className="text-xs text-[var(--color-muted-fg)]">
+                    <th className="py-1 pr-2 text-left font-normal" rowSpan={2}>
+                      等级
+                    </th>
+                    <th className="py-1 px-1 text-right font-normal" rowSpan={2}>
+                      张数
+                    </th>
+                    <th className="py-1 px-1 text-right font-normal" rowSpan={2}>
+                      起手
+                      <br />
+                      期望
+                    </th>
+                    <th
+                      className="py-1 pl-3 text-center font-normal border-l border-[var(--color-border)]"
+                      colSpan={DRAW_STEPS.length}
+                    >
+                      摸不到 (%) · 起手后再过
+                    </th>
+                  </tr>
+                  <tr className="text-xs text-[var(--color-muted-fg)] border-b border-[var(--color-border)]">
+                    {DRAW_STEPS.map((t) => (
+                      <th
+                        key={t}
+                        className={`py-1 px-1 text-right font-normal${
+                          t === 0 ? " pl-3 border-l border-[var(--color-border)]" : ""
+                        }${STEP_HIDDEN(t)}`}
+                      >
+                        +{t}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {levelRows.map(({ level, qty }) => (
+                    <tr
+                      key={level}
+                      className="border-b border-[var(--color-border)]/50"
+                    >
+                      <td className="py-1.5 pr-2 font-medium whitespace-nowrap">
+                        Lv.{level}
+                      </td>
+                      <td className="py-1.5 px-1 text-right tabular-nums">
+                        {qty}
+                      </td>
+                      <td className="py-1.5 px-1 text-right tabular-nums font-medium">
+                        {expectedCount(N, qty, HAND).toFixed(2)}
+                      </td>
+                      {/* The complement of the ≥1 figure this panel used to
+                          carry beside it — one of the two was redundant, and
+                          this is the one you compare across levels. */}
+                      {DRAW_STEPS.map((t) => (
+                        <td
+                          key={t}
+                          className={`py-1.5 px-1 text-right tabular-nums${
+                            t === 0
+                              ? " pl-3 border-l border-[var(--color-border)]"
+                              : ""
+                          }${STEP_HIDDEN(t)}`}
+                        >
+                          {(pNone(N, qty, HAND + t) * 100).toFixed(1)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </section>
         ) : null}

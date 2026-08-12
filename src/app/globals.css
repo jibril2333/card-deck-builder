@@ -291,3 +291,27 @@ body::before {
   border: none;
   border-radius: 9999px;
 }
+
+/* Playtest: the per-card probability table with the per-level odds table beside
+   it — but only once there is room for two tables.
+   
+   The rail used to start at `lg` (1024) at 15rem, which meant everything from
+   1024 to 1499 squeezed a 9-column table into 240px and left it scrolling
+   sideways. Below 1500 it goes full width UNDER the main table instead, where
+   it has 700px+ and reads as the table it is.
+
+   A real class rather than Tailwind arbitrary values: `lg:grid-cols-[1fr_15rem]`
+   compiles, but adding a second one under an arbitrary variant
+   (`min-[1500px]:grid-cols-[1fr_27rem]`) silently produced NO rule — the class
+   landed on the element and the CSS never existed. Same family of trouble as
+   the `.card-grid` note above; a plain media query can't be got wrong. */
+.playtest-cols {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+@media (min-width: 1500px) {
+  .playtest-cols {
+    grid-template-columns: 1fr 27rem;
+  }
+}
