@@ -3,6 +3,7 @@ import { isGameId } from "@/lib/games";
 import { isAdmin } from "@/lib/auth/admin";
 import { RefreshCardsPanel } from "@/components/refresh-cards-panel";
 import { RefreshSchedulePanel } from "@/components/refresh-schedule-panel";
+import { RefreshChangesPanel } from "@/components/refresh-changes-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function AdminPage({
       <h1 className="text-lg font-semibold">管理</h1>
       <RefreshCardsPanel />
       <RefreshSchedulePanel />
+      <RefreshChangesPanel />
     </main>
   );
 }

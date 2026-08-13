@@ -1058,6 +1058,39 @@ const MIGRATIONS: Migration[] = [
       db.exec(`UPDATE cards SET source_effect = NULL WHERE source_effect IS NOT NULL`);
     },
   },
+  {
+    id: 33,
+    name: "refresh_changes — what each refresh actually changed",
+    up: (db) => {
+      // A refresh reported "4370 → 4397 cards" and nothing else: you could see
+      // that something happened, never what. Which 27 cards? Did an effect get
+      // reworded upstream? Did the banlist move? All of that was only
+      // recoverable by diffing backups by hand.
+      //
+      // The pipeline is already holding both databases at swap time, so the
+      // diff is nearly free at exactly that moment — see scripts/diff-refresh.ts.
+      //
+      // Lives in the cards DB, and therefore rides along in the work copy: the
+      // copy starts as a snapshot of live, so previous runs' rows are already
+      // there and this run's are appended before the swap.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS refresh_changes (
+          id       INTEGER PRIMARY KEY,
+          run_at   TEXT NOT NULL,   -- groups every row of one refresh
+          kind     TEXT NOT NULL,   -- card_added | card_removed | field_changed | …
+          code     TEXT,            -- card code, or a restriction identity
+          lang     TEXT,            -- translation changes only
+          field    TEXT,
+          before   TEXT,
+          after    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_refresh_changes_run
+          ON refresh_changes(run_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_refresh_changes_code
+          ON refresh_changes(code);
+      `);
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

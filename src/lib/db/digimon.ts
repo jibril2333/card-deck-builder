@@ -972,3 +972,63 @@ export function deckMainEggCounts(
   }
   return out;
 }
+
+export type RefreshChange = {
+  kind: string;
+  code: string | null;
+  lang: string | null;
+  field: string | null;
+  before: string | null;
+  after: string | null;
+};
+
+export type RefreshRun = {
+  run_at: string;
+  total: number;
+  counts: Record<string, number>;
+  /** A sample, newest kinds first — a big run can be thousands of rows and the
+   *  admin page is a summary, not an audit log. The full set is in the table. */
+  sample: RefreshChange[];
+};
+
+/**
+ * Recent refreshes and what each one changed.
+ *
+ * Written by `scripts/diff-refresh.ts` into the work copy just before the swap,
+ * so a run's rows land together with the data they describe.
+ */
+export function listRefreshRuns(limit = 5): RefreshRun[] {
+  const runs = db()
+    .prepare(
+      `SELECT run_at, COUNT(*) AS total FROM refresh_changes
+        GROUP BY run_at ORDER BY run_at DESC LIMIT ?`,
+    )
+    .all(limit) as { run_at: string; total: number }[];
+
+  const byKind = db().prepare(
+    `SELECT kind, COUNT(*) AS n FROM refresh_changes WHERE run_at = ? GROUP BY kind`,
+  );
+  // Restrictions first: a banlist move is the one change that can invalidate a
+  // deck you already built, so it must not fall off the end of the sample.
+  const sample = db().prepare(
+    `SELECT kind, code, lang, field, before, after FROM refresh_changes
+      WHERE run_at = ?
+      ORDER BY CASE
+                 WHEN kind LIKE 'restriction%' THEN 0
+                 WHEN kind LIKE 'pair%' THEN 1
+                 WHEN kind = 'field_changed' THEN 2
+                 WHEN kind = 'translation_changed' THEN 3
+                 ELSE 4
+               END, code
+      LIMIT 40`,
+  );
+
+  return runs.map((r) => ({
+    run_at: r.run_at,
+    total: r.total,
+    counts: Object.fromEntries(
+      (byKind.all(r.run_at) as { kind: string; n: number }[]).map((k) => [k.kind, k.n]),
+    ),
+    sample: sample.all(r.run_at) as RefreshChange[],
+  }));
+}

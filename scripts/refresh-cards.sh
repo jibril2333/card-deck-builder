@@ -109,6 +109,13 @@ log "snapshotting live DB → work copy"
 if ! sqlite3 "$LIVE_DB" ".backup '$WORK_DIR/digimon.db'"; then
   FAILED_STAGE="snapshot"; exit 1
 fi
+# A SECOND snapshot of the same moment, kept untouched as the "before" side of
+# the changelog. Taken here rather than diffing against the live DB later so the
+# comparison never touches a file the container has open, and never lands inside
+# the swap's downtime window.
+if ! sqlite3 "$LIVE_DB" ".backup '$WORK_DIR/before.db'"; then
+  FAILED_STAGE="snapshot"; exit 1
+fi
 # Some scrapers resolve sibling DBs through CDB_DATA_DIR; give them a real one.
 [ -f "$DATA_DIR/digimon-user.db" ] && \
   sqlite3 "$DATA_DIR/digimon-user.db" ".backup '$WORK_DIR/digimon-user.db'"
@@ -177,6 +184,21 @@ if [ "$new_cards" -lt "$old_cards" ]; then
 fi
 sqlite3 "$WORK_DIR/digimon.db" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null
 log "work copy ok ($old_cards → $new_cards cards)"
+
+# ---- 2b. what changed -------------------------------------------------------
+# Written INTO the work copy, so the changelog rides along with the database
+# being swapped in. Never fatal: a refresh that scraped fine must not be thrown
+# away because the bookkeeping failed.
+CHANGES_JSON=""
+if CHANGES_JSON=$(npx tsx scripts/diff-refresh.ts \
+      "$WORK_DIR/before.db" "$WORK_DIR/digimon.db" \
+      --run-at="$STARTED_AT" 2>>"$LOG_FILE" | tail -1); then
+  log "changelog: $CHANGES_JSON"
+else
+  log "changelog FAILED (not fatal — see $LOG_FILE)"
+  CHANGES_JSON=""
+fi
+sqlite3 "$WORK_DIR/digimon.db" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null
 
 # ---- 3. swap (the only downtime) --------------------------------------------
 BACKUP="$DATA_DIR/digimon.db.bak-$(date '+%Y%m%d-%H%M%S')"

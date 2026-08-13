@@ -85,6 +85,21 @@ const CARDS_SCHEMA = `
     ON banned_pairs(source, trigger_identity);
   CREATE INDEX IF NOT EXISTS idx_banned_pairs_banned
     ON banned_pairs(source, banned_identity);
+
+  -- Migration 33. The admin page reads this on load, so a fixture without it
+  -- 500s the whole page rather than showing an empty changelog.
+  CREATE TABLE IF NOT EXISTS refresh_changes (
+    id       INTEGER PRIMARY KEY,
+    run_at   TEXT NOT NULL,
+    kind     TEXT NOT NULL,
+    code     TEXT,
+    lang     TEXT,
+    field    TEXT,
+    before   TEXT,
+    after    TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_refresh_changes_run ON refresh_changes(run_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_refresh_changes_code ON refresh_changes(code);
 `;
 
 /**
@@ -284,6 +299,20 @@ export function seedDigimonDb(dbPath: string): void {
     );
     for (const [code, lang, name, img] of SEED_TRANSLATIONS) {
       insertTranslation.run(code, lang, name, img);
+    }
+
+    // One recorded refresh, so the admin page's changelog has something to show
+    // — including a banlist move, which is the row that must sort to the top.
+    const insertChange = db.prepare(
+      `INSERT INTO refresh_changes (run_at, kind, code, lang, field, before, after)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const c of [
+      ["2026-08-10T04:30:00Z", "card_added", "BT1-001", null, null, null, "Yokomon"],
+      ["2026-08-10T04:30:00Z", "field_changed", "BT1-084", null, "main_effect", "old", "new"],
+      ["2026-08-10T04:30:00Z", "restriction_changed", "BT1-086", null, null, "limited_1", "banned"],
+    ] as const) {
+      insertChange.run(...c);
     }
 
     const insertPair = db.prepare(
