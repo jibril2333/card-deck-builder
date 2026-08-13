@@ -86,9 +86,10 @@ export function RefreshCardsPanel() {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-4">
       <div>
-        <h2 className="text-sm font-semibold">卡牌数据更新</h2>
+        <h2 className="text-sm font-semibold">手动更新</h2>
         <p className="text-xs text-[var(--color-muted-fg)] mt-0.5">
-          每周一 04:30 自动更新；也可以在这里手动触发。
+          立刻跑一次。定时那一份在下面单独设置 —— 这行以前写死「每周一
+          04:30」,时间一旦能改就会变成假话。
         </p>
       </div>
 

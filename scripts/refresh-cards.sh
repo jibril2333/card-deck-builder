@@ -57,6 +57,10 @@ done
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
 # ---- status file (read by the app's admin UI) -------------------------------
+# `trigger` says which of the two paths started this: the scheduler
+# (scripts/refresh-tick.ts, CDB_REFRESH_TRIGGER=auto) or a person pressing the
+# button. They run the same pipeline with different stage sets, and when one of
+# them fails you want to know which one without reading the log.
 STARTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 write_status() { # state, message
   local state="$1" msg="$2"
@@ -66,6 +70,7 @@ write_status() { # state, message
   "state": "$state",
   "message": $(printf '%s' "$msg" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/'),
   "stages": "${STAGES[*]}",
+  "trigger": "${CDB_REFRESH_TRIGGER:-manual}",
   "startedAt": "$STARTED_AT",
   "updatedAt": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 }

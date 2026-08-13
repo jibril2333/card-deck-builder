@@ -31,6 +31,14 @@ const E2E_DIR = path.join(
 const FIXTURE_PATHS = {
   CDB_DIGIMON_DB: path.join(E2E_DIR, "digimon.db"),
   CDB_DIGIMON_USER_DB: path.join(E2E_DIR, "digimon-user.db"),
+  // Not only the databases: the admin routes write plain FILES next to them —
+  // the refresh request, the run status, and the automatic-refresh schedule.
+  // Without this the schedule spec silently rewrote the real
+  // data.nosync/refresh-schedule.json and turned the machine's automatic
+  // refresh off, and a spec that pressed 立即更新 would have dropped a request
+  // file the host agent then acted on. Same failure this file's header
+  // describes for the DBs, one directory up.
+  CDB_DATA_DIR: E2E_DIR,
   CDB_E2E_DIR: E2E_DIR, // teardown reads this to clean up
 } as const;
 
@@ -98,6 +106,13 @@ export default defineConfig({
     // CDB_E2E=1 makes next.config.ts switch distDir to .next/e2e-prod, so the
     // user's long-running prod server on 3001 (using .next/prod) doesn't
     // collide with the build Playwright runs here.
-    env: { ...FIXTURE_PATHS, CDB_E2E: "1" } satisfies Record<string, string>,
+    // The seeded account is an admin here so the admin page and its two
+    // panels are reachable. In production this list comes from .env.deploy and
+    // is empty by default — see lib/auth/admin.ts, which fails closed.
+    env: {
+      ...FIXTURE_PATHS,
+      CDB_E2E: "1",
+      CDB_ADMIN_EMAILS: "e2e@test.local",
+    } satisfies Record<string, string>,
   },
 });
