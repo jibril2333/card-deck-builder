@@ -14,6 +14,7 @@
  */
 
 import Database from "better-sqlite3";
+import { CARD_TRANSLATIONS_DDL } from "../../../src/lib/db/translations-ddl";
 
 const CARDS_SCHEMA = `
   CREATE TABLE cards (
@@ -99,6 +100,12 @@ const CARDS_SCHEMA = `
  * Six in one status so a four-up row is a real row with something after it.
  */
 const SEED_RESTRICTIONS: [string, "banned" | "limited_1" | "limited_2", number][] = [
+  // The one restriction on a card that actually EXISTS in the fixture, so the
+  // banlist has a tile with real art and a real name to localize. BT1-086 is
+  // referenced by no other spec, so its `limited_1` cap can't clamp a deck
+  // some other test is building (see the note below on why the rest are
+  // deliberately unmatched).
+  ["BT1-086", "limited_1", 1],
   ["ZZ1-001", "banned", 0],
   ["ZZ1-010", "limited_1", 1],
   ["ZZ1-011", "limited_1", 1],
@@ -106,6 +113,17 @@ const SEED_RESTRICTIONS: [string, "banned" | "limited_1" | "limited_2", number][
   ["ZZ1-013", "limited_1", 1],
   ["ZZ1-014", "limited_1", 1],
   ["ZZ1-015", "limited_1", 1],
+];
+
+/**
+ * Localized rows for the one restricted card that exists here, so the banlist
+ * and card pages have something to switch languages between. The image hosts
+ * are the real per-language CDNs: the point of the fixture is that they DIFFER,
+ * which is what tells a name-only localization apart from a full one.
+ */
+const SEED_TRANSLATIONS: [string, "ja" | "zh", string, string][] = [
+  ["BT1-086", "ja", "石田ヤマト", "https://digimoncard.com/images/cardlist/card/BT1-086.png"],
+  ["BT1-086", "zh", "石田大和", "https://source.windoent.com/DTCG/BT1-086.png"],
 ];
 
 /** One trigger with two partners, mirroring the real Chaosmon: Valdur Arm row. */
@@ -207,6 +225,9 @@ const SEED_CARDS: CardSeed[] = [
     color: "Blue",
     play_cost: 4,
     rarity: "R",
+    // Needs art: it's the fixture's one restricted card that exists, and the
+    // banlist's language test compares the image it renders per language.
+    image: STUB_IMAGE,
   },
 ];
 
@@ -256,6 +277,15 @@ export function seedDigimonDb(dbPath: string): void {
     for (const [identity, status, max] of SEED_RESTRICTIONS) {
       insertRestriction.run(identity, status, max);
     }
+    db.exec(CARD_TRANSLATIONS_DDL);
+    const insertTranslation = db.prepare(
+      `INSERT INTO card_translations (code, lang, name, image_url)
+       VALUES (?, ?, ?, ?)`,
+    );
+    for (const [code, lang, name, img] of SEED_TRANSLATIONS) {
+      insertTranslation.run(code, lang, name, img);
+    }
+
     const insertPair = db.prepare(
       `INSERT INTO banned_pairs (source, trigger_identity, banned_identity)
        VALUES ('digimon', ?, ?)`,

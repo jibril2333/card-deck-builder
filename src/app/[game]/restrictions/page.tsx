@@ -32,7 +32,13 @@ export default async function RestrictionsPage({
   let rows = lib.listRestrictions();
   let pairEdges = lib.listBannedPairs();
 
-  // Localize the displayed card names per the user's language pick.
+  // Localize the displayed cards per the user's language pick — the artwork as
+  // well as the name. The name alone left a Japanese title over English art,
+  // which is the one combination that isn't a language.
+  //
+  // Each field falls back on its own: a card can have a translated name and no
+  // localized scan (or the reverse), and `?? ` per field keeps the half that
+  // exists instead of dropping both.
   {
     const cardLang = parseCardLang(
       (await cookies()).get(CARD_LANG_COOKIE)?.value,
@@ -45,15 +51,24 @@ export default async function RestrictionsPage({
     if (tMap.size > 0) {
       rows = rows.map((r) => {
         const t = r.card_code ? tMap.get(r.card_code) : undefined;
-        return t?.name ? { ...r, card_name: t.name } : r;
+        if (!t) return r;
+        return {
+          ...r,
+          card_name: t.name ?? r.card_name,
+          card_image_url: t.image_url ?? r.card_image_url,
+        };
       });
-      pairEdges = pairEdges.map((e) => ({
-        ...e,
-        trigger_name:
-          (e.trigger_code && tMap.get(e.trigger_code)?.name) || e.trigger_name,
-        banned_name:
-          (e.banned_code && tMap.get(e.banned_code)?.name) || e.banned_name,
-      }));
+      pairEdges = pairEdges.map((e) => {
+        const a = e.trigger_code ? tMap.get(e.trigger_code) : undefined;
+        const b = e.banned_code ? tMap.get(e.banned_code) : undefined;
+        return {
+          ...e,
+          trigger_name: a?.name ?? e.trigger_name,
+          trigger_image_url: a?.image_url ?? e.trigger_image_url,
+          banned_name: b?.name ?? e.banned_name,
+          banned_image_url: b?.image_url ?? e.banned_image_url,
+        };
+      });
     }
   }
 
