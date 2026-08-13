@@ -57,7 +57,11 @@ export function UserMenu({ user }: { user: User }) {
       </button>
 
       {open ? (
-        <div className="absolute right-0 mt-1 w-56 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg overflow-hidden z-50">
+        // Opens UPWARD. This menu is always the last thing in the sidebar
+        // footer — desktop column and mobile drawer both — so "below the
+        // button" is below the viewport: it used to render 128px tall starting
+        // 12px from the bottom edge, i.e. 116px of it off-screen.
+        <div className="absolute bottom-full right-0 mb-1 w-56 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg overflow-hidden z-50">
           <div className="px-3 py-2 border-b border-[var(--color-border)]">
             <div className="text-sm font-medium truncate">
               {user.display_name}
