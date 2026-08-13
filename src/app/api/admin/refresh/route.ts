@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isAdmin } from "@/lib/auth/admin";
+import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
 
 /**
  * Admin endpoint behind the "更新卡牌数据" button.
@@ -23,8 +24,9 @@ const STATUS_FILE = path.join(DATA_DIR, "refresh-status.json");
 const REQUEST_FILE = path.join(DATA_DIR, "refresh-request");
 const LOCK_DIR = path.join(DATA_DIR, ".refresh.lock");
 
-/** Mirrors `refresh-cards.sh --list`. */
-const STAGES = ["cards", "text", "art", "rulings", "prices", "restrictions"];
+/** Single source shared with the admin panel; kept in step with the shell
+ *  script by tests/refresh-stages.test.ts. */
+const STAGES = REFRESH_STAGE_IDS;
 
 type Status = {
   state: "idle" | "running" | "ok" | "failed";

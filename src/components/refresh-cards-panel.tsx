@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { REFRESH_STAGES } from "@/lib/refresh-stages";
 
 type Status = {
   state: "idle" | "running" | "ok" | "failed";
@@ -11,14 +12,7 @@ type Status = {
   running?: boolean;
 };
 
-const STAGE_LABELS: { id: string; label: string; hint: string }[] = [
-  { id: "cards", label: "新卡", hint: "发现并导入新卡（含新弹）" },
-  { id: "text", label: "中/日文", hint: "翻译文本 + 中文卡面" },
-  { id: "art", label: "异画", hint: "英/日文异画图" },
-  { id: "rulings", label: "裁定", hint: "官方 Q&A" },
-  { id: "prices", label: "价格", hint: "cardrush 市场价（最慢，约 1 小时）" },
-  { id: "restrictions", label: "禁限", hint: "禁限卡表" },
-];
+const STAGE_LABELS = REFRESH_STAGES;
 
 function fmt(iso?: string) {
   if (!iso) return "—";
