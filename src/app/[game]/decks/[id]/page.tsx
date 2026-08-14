@@ -32,6 +32,8 @@ import * as digimon from "@/lib/db/digimon";
 import { DECK_TARGET } from "@/lib/deck-legality";
 import { tallyColors, tallyLevels, MULTI_COLOR } from "@/lib/deck-tally";
 import { DeckRestrictionNotice } from "@/components/deck-restriction-notice";
+import { computeDeckJogress } from "@/lib/jogress";
+import type { JogressView } from "@/components/jogress-badge";
 
 type RawDeckCard = {
   card_type: string;
@@ -149,6 +151,9 @@ type Loaded = {
   statsPanels: StatPanel[];
   /** Digimon only: cardId → per-slot groups of deck cards its search can fetch. */
   searchTargets: Map<string, SearchGroup[]>;
+  /** Digimon only: cardId → its ジョグレス conditions and the pairs in this
+   *  deck that satisfy them. See lib/jogress. */
+  jogress: Map<string, JogressView[]>;
   cover: {
     image_url: string | null;
     code: string;
@@ -207,6 +212,56 @@ export default async function DeckEditPage({
     ? cards.find((c) => c.id === deck.cover_card_id) ??
       digimon.getCardById(deck.cover_card_id)
     : undefined;
+  // ジョグレス: which pairs already in this deck can make each card that DNA
+  // digivolves. Matched against the Japanese rows (that's where the condition
+  // is written — see lib/jogress) but displayed in the page's language.
+  const jaFacts = digimon.getJapaneseFacts(cards.map((c) => c.code));
+  const jogressPairs = computeDeckJogress(
+    cards.map((c) => {
+      const ja = jaFacts.get(c.code);
+      return {
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        card_type: c.card_type,
+        color: c.color,
+        color2: c.color2,
+        level: c.level,
+        quantity: c.quantity,
+        jaName: ja?.name,
+        jaTraits: ja?.traits,
+        jaText: ja?.text,
+        jaEvoReq: ja?.evo_req,
+      };
+    }),
+  );
+  const displayCard = (cardId: string) => {
+    const c = cards.find((x) => x.id === cardId)!;
+    const t = tMap.get(c.code);
+    return {
+      id: c.id,
+      code: c.code,
+      name: t?.name ?? c.name,
+      image_url: t?.image_url ?? c.image_url,
+    };
+  };
+  const jogress = new Map<string, JogressView[]>(
+    [...jogressPairs].map(([cardId, options]) => [
+      cardId,
+      options.map((o) => ({
+        label: o.label,
+        cost: o.cost,
+        parsed: o.parsed,
+        pairs: o.pairs.map(
+          ([a, b]) => [displayCard(a), displayCard(b)] as [
+            ReturnType<typeof displayCard>,
+            ReturnType<typeof displayCard>,
+          ],
+        ),
+      })),
+    ]),
+  );
+
   loaded = {
     deck: {
       id: deck.id,
@@ -272,6 +327,7 @@ export default async function DeckEditPage({
       }
       return m;
     })(),
+    jogress,
     exportCards: cards.map((c) => ({
       code: c.code,
       name: c.name,
@@ -667,6 +723,7 @@ export default async function DeckEditPage({
                       mode={mode}
                       mine={mine}
                       searchTargets={loaded.searchTargets.get(c.id)}
+                      jogress={loaded.jogress.get(c.id)}
                     />
                   ))}
                 </div>

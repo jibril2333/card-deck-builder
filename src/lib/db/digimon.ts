@@ -1146,3 +1146,51 @@ export function deckIssueCounts(deckIds: string[]): Map<string, number> {
   }
   return out;
 }
+
+export type JapaneseFacts = {
+  name: string | null;
+  traits: string | null;
+  evo_req: string | null;
+  /** Effect blocks joined — what a 「X」の記述がある condition searches. */
+  text: string;
+};
+
+/**
+ * The Japanese rows the ジョグレス matcher reads (see lib/jogress.ts).
+ *
+ * Always Japanese, whatever language the page is being shown in: the
+ * requirement is written in Japanese and names its materials in Japanese, so
+ * matching against a localized name would only work for one audience. What
+ * the reader sees is translated separately, from `getDisplayTranslations`.
+ */
+export function getJapaneseFacts(codes: string[]): Map<string, JapaneseFacts> {
+  const out = new Map<string, JapaneseFacts>();
+  const unique = [...new Set(codes)];
+  for (let i = 0; i < unique.length; i += 500) {
+    const chunk = unique.slice(i, i + 500);
+    const rows = db()
+      .prepare(
+        `SELECT code, name, traits, evo_req, effect_main, effect_2, effect_3
+           FROM card_translations
+          WHERE lang = 'ja' AND code IN (${chunk.map(() => "?").join(",")})`,
+      )
+      .all(...chunk) as {
+      code: string;
+      name: string | null;
+      traits: string | null;
+      evo_req: string | null;
+      effect_main: string | null;
+      effect_2: string | null;
+      effect_3: string | null;
+    }[];
+    for (const r of rows) {
+      out.set(r.code, {
+        name: r.name,
+        traits: r.traits,
+        evo_req: r.evo_req,
+        text: [r.effect_main, r.effect_2, r.effect_3].filter(Boolean).join("\n"),
+      });
+    }
+  }
+  return out;
+}

@@ -18,7 +18,11 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { createE2ESession, seedViolatingDeck } from "./fixtures/seed";
+import {
+  createE2ESession,
+  seedJogressDeck,
+  seedViolatingDeck,
+} from "./fixtures/seed";
 
 export default async function globalSetup() {
   const digimonUserDb = process.env.CDB_DIGIMON_USER_DB;
@@ -36,6 +40,7 @@ export default async function globalSetup() {
   // A deck the current banlist disagrees with. Seeded here rather than built
   // by a spec because the app refuses to write one (see seedViolatingDeck).
   seedViolatingDeck(digimonUserDb, userId);
+  seedJogressDeck(digimonUserDb, userId);
 
   // Persist a Playwright storageState file pointing at that session. Fixed
   // path under the project so playwright.config.ts can reference it

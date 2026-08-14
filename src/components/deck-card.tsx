@@ -15,6 +15,7 @@ import { shortSetName } from "@/lib/card-sets";
 import { CardPriceInput } from "@/components/card-price-input";
 import { useCardPreview } from "@/components/card-preview";
 import { SearchTargets } from "@/components/search-targets";
+import { JogressBadge, type JogressView } from "@/components/jogress-badge";
 import type { SearchGroup } from "@/lib/deck-search";
 
 export type DeckCardData = {
@@ -50,6 +51,7 @@ export function DeckCard({
   mode,
   mine,
   searchTargets,
+  jogress,
   violation = false,
 }: {
   game: string;
@@ -64,6 +66,9 @@ export function DeckCard({
   /** Digimon only: per-slot groups of deck cards this card's search effect
    *  can fetch. When present, a 🔍 badge opens a popover listing them. */
   searchTargets?: SearchGroup[];
+  /** Digimon only: this card's ジョグレス conditions, resolved against the
+   *  deck. When present, a 联展 badge opens a popover listing the pairs. */
+  jogress?: JogressView[];
   /** The current banlist disagrees with this card's presence or count. Marked,
    *  never corrected — the notice above the grid says what and why. */
   violation?: boolean;
@@ -162,6 +167,17 @@ export function DeckCard({
       {searchTargets && searchTargets.length > 0 ? (
         <div className="absolute top-8 left-1.5 z-20">
           <SearchTargets game={game} groups={searchTargets} />
+        </div>
+      ) : null}
+      {/* Stacked under the search badge when a card has both — a Digimon that
+          tutors AND DNA digivolves is rare but real (e.g. EX8-029). */}
+      {jogress && jogress.length > 0 ? (
+        <div
+          className={`absolute left-1.5 z-20 ${
+            searchTargets && searchTargets.length > 0 ? "top-[3.75rem]" : "top-8"
+          }`}
+        >
+          <JogressBadge game={game} options={jogress} />
         </div>
       ) : null}
       <Link href={href} className="block relative">

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { SearchGroup } from "@/lib/deck-search";
 
 /**
@@ -90,11 +91,14 @@ export function SearchTargets({
         ) : null}
       </button>
 
-      {open && pos ? (
+      {open && pos && typeof document !== "undefined" ? (
+        // Into <body> and above the hover preview — see jogress-badge for why
+        // neither half of that is optional.
+        createPortal(
         <div
           ref={popRef}
           style={{ position: "fixed", top: pos.top, left: pos.left, width: 248 }}
-          className="z-50 max-h-80 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl p-2"
+          className="z-[60] max-h-80 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl p-2"
           onClick={(e) => e.preventDefault()}
         >
           {groups.map((g, gi) => (
@@ -142,7 +146,9 @@ export function SearchTargets({
               </div>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body,
+        )
       ) : null}
     </>
   );

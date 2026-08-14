@@ -244,6 +244,71 @@ const SEED_CARDS: CardSeed[] = [
     // banlist's language test compares the image it renders per language.
     image: STUB_IMAGE,
   },
+  // ── ジョグレス fixture ─────────────────────────────────────────────────
+  // A DNA-digivolution target and three Lv.6s, one of which fits NEITHER half
+  // of the condition — without that one, "lists the right pair" and "lists
+  // every Lv.6 in the deck" would look identical.
+  //
+  // None of these names ends in -mon, unlike every real Digimon: the
+  // adjustment dropdown's spec searches "mon" and measures how tall the result
+  // list is, so four more matches there would fail a test about a different
+  // feature entirely.
+  {
+    code: "ZZ3-001",
+    name: "Jogress Prime",
+    card_type: "Digimon",
+    color: "Purple",
+    level: 7,
+    play_cost: 12,
+    dp: 13000,
+    rarity: "SR",
+    image: STUB_IMAGE,
+  },
+  {
+    code: "ZZ3-002",
+    name: "Kiiro Six",
+    card_type: "Digimon",
+    color: "Yellow",
+    level: 6,
+    play_cost: 10,
+    dp: 11000,
+    rarity: "R",
+    image: STUB_IMAGE,
+  },
+  {
+    code: "ZZ3-003",
+    name: "Kuro Six",
+    card_type: "Digimon",
+    color: "Black",
+    level: 6,
+    play_cost: 10,
+    dp: 11000,
+    rarity: "R",
+    image: STUB_IMAGE,
+  },
+  {
+    code: "ZZ3-004",
+    name: "Midori Six",
+    card_type: "Digimon",
+    color: "Green",
+    level: 6,
+    play_cost: 10,
+    dp: 11000,
+    rarity: "R",
+    image: STUB_IMAGE,
+  },
+];
+
+/**
+ * The condition itself, which only exists in Japanese (see lib/jogress on why
+ * the parser reads the JP row). Written the way the live data writes it,
+ * trailing rules sentence and all.
+ */
+const SEED_JOGRESS: [string, string][] = [
+  [
+    "ZZ3-001",
+    "〔ジョグレス〕黄Lv.6+黒Lv.6:コスト0 指定のデジモン2体を重ね、アクティブで進化する",
+  ],
 ];
 
 /** Keep this aligned with `TARGET_SCHEMA_VERSION` in `src/lib/db/migrations.ts`.
@@ -299,6 +364,13 @@ export function seedDigimonDb(dbPath: string): void {
     );
     for (const [code, lang, name, img] of SEED_TRANSLATIONS) {
       insertTranslation.run(code, lang, name, img);
+    }
+    const insertJogress = db.prepare(
+      `INSERT INTO card_translations (code, lang, name, evo_req)
+       VALUES (?, 'ja', ?, ?)`,
+    );
+    for (const [code, req] of SEED_JOGRESS) {
+      insertJogress.run(code, `${code}（日本語）`, req);
     }
 
     // One recorded refresh, so the admin page's changelog has something to show
@@ -472,6 +544,39 @@ export function seedViolatingDeck(dbPath: string, userId: string): void {
     db.prepare(
       `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)`,
     ).run(LEGACY_DECK.id, LEGACY_DECK.code, LEGACY_DECK.quantity);
+  } finally {
+    db.close();
+  }
+}
+
+/** A deck holding the ジョグレス target and every Lv.6 in the fixture. */
+export const JOGRESS_DECK = {
+  id: "e2e-jogress-deck",
+  name: "联展测试",
+  target: "ZZ3-001",
+  /** The two that satisfy 黄Lv.6+黒Lv.6, and the one that satisfies neither. */
+  yellow: "ZZ3-002",
+  black: "ZZ3-003",
+  green: "ZZ3-004",
+} as const;
+
+export function seedJogressDeck(dbPath: string, userId: string): void {
+  const db = new Database(dbPath);
+  try {
+    db.prepare(
+      `INSERT INTO decks (id, name, user_id, sort_order) VALUES (?, ?, ?, 1)`,
+    ).run(JOGRESS_DECK.id, JOGRESS_DECK.name, userId);
+    const add = db.prepare(
+      `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, 1)`,
+    );
+    for (const code of [
+      JOGRESS_DECK.target,
+      JOGRESS_DECK.yellow,
+      JOGRESS_DECK.black,
+      JOGRESS_DECK.green,
+    ]) {
+      add.run(JOGRESS_DECK.id, code);
+    }
   } finally {
     db.close();
   }
