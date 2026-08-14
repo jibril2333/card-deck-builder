@@ -364,23 +364,45 @@ function SearchField({
 }) {
   const [local, setLocal] = useState(value);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Reset local when the committed value changes externally (URL navigation).
-  const [lastValueProp, setLastValueProp] = useState(value);
-  if (lastValueProp !== value) {
-    setLastValueProp(value);
-    setLocal(value);
-  }
+  /** The last value WE sent to the URL. See the sync block below. */
+  const committedRef = useRef(value);
 
   // Keep the box in sync while an IME composes, but don't navigate on the
   // romaji — see `useComposition`.
   const ime = useComposition((final) => schedule(final));
 
+  /**
+   * Adopt the URL's value — but only when it came from somewhere else.
+   *
+   * `value` is `searchParams.get(key)`, so it also comes back to us as the
+   * echo of our own debounced navigation, several hundred milliseconds later.
+   * Adopting THAT overwrites everything typed while the request was in flight:
+   * you pause after 暴龙, the search fires, you carry on typing, and the box
+   * snaps back to 暴龙. Worse with an IME — reassigning a controlled input's
+   * value mid-composition makes the browser throw the composing text away, so
+   * the characters vanish as you type them.
+   *
+   * So: ignore the echo, and never touch the box mid-composition. A genuinely
+   * external change (Back button, "清空全部") still lands — during composition
+   * it's simply deferred, because `composing` is state and ending the
+   * composition re-renders us right back here.
+   */
+  const [lastValueProp, setLastValueProp] = useState(value);
+  if (lastValueProp !== value && !ime.composingRef.current) {
+    setLastValueProp(value);
+    if (value !== committedRef.current) setLocal(value);
+  }
+
+  function commit(v: string) {
+    committedRef.current = v;
+    onCommit(v);
+  }
+
   function schedule(v: string) {
     setLocal(v);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (ime.composingRef.current) return;
-    debounceRef.current = setTimeout(() => onCommit(v.trim()), 300);
+    debounceRef.current = setTimeout(() => commit(v.trim()), 300);
   }
 
   return (
@@ -401,7 +423,7 @@ function SearchField({
             if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
               if (debounceRef.current) clearTimeout(debounceRef.current);
-              onCommit(local.trim());
+              commit(local.trim());
             }
           }}
           className="h-8 text-xs pr-7"
@@ -416,7 +438,7 @@ function SearchField({
             onClick={() => {
               setLocal("");
               if (debounceRef.current) clearTimeout(debounceRef.current);
-              onCommit("");
+              commit("");
             }}
             className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-fg)] text-xs cursor-pointer flex items-center justify-center"
             aria-label="清空"
