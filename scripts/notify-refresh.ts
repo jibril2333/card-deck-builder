@@ -9,15 +9,16 @@
  * away because a notification didn't send, so every error path here logs and
  * exits 0.
  *
- * Configuration lives in `.env.ntfy` (host-only, gitignored — the token is a
- * credential and this repo is public):
+ * Configuration comes from `data.nosync/ntfy.json`, written by the admin page
+ * (server / topic / token). Environment variables override it, which is how
+ * the tests point it at a stand-in server:
  *
- *   CDB_NTFY_URL=http://127.0.0.1:8093/dcg
+ *   CDB_NTFY_URL=https://ntfy.example.com/dcg   # topic may be on the URL
  *   CDB_NTFY_TOKEN=tk_…
- *   CDB_PUBLIC_URL=https://deck.raynefall.dev   # optional, for the tap target
+ *   CDB_PUBLIC_URL=https://deck.raynefall.dev   # optional, the tap target
  *
- * Unset URL or token = the feature is off and this is a no-op. Deliberately
- * quiet: a machine that hasn't been given a token shouldn't log an error every
+ * Nothing configured = the feature is off and this is a no-op. Deliberately
+ * quiet: a machine that was never given a token shouldn't log an error every
  * Monday at 04:30.
  */
 
@@ -26,66 +27,56 @@ import path from "node:path";
 import {
   buildFailureNotification,
   buildRefreshNotification,
+  sendNtfy,
   type Notification,
   type RefreshSummary,
 } from "../src/lib/refresh-notify";
+import {
+  EMPTY_NTFY,
+  ntfyReady,
+  parseNtfyConfig,
+  type NtfyConfig,
+} from "../src/lib/ntfy-config";
 
 const ROOT = process.env.CDB_PROJECT_DIR ?? path.resolve(__dirname, "..");
+const DATA_DIR = process.env.CDB_DATA_DIR ?? path.join(ROOT, "data.nosync");
 
-/** Read .env.ntfy into the environment. Not dotenv: three keys, no quoting
- *  rules worth importing a dependency for. */
-function loadEnvFile() {
-  const file = path.join(ROOT, ".env.ntfy");
-  if (!fs.existsSync(file)) return;
-  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-    if (!m) continue;
-    const value = m[2].trim().replace(/^["'](.*)["']$/, "$1");
-    if (!(m[1] in process.env)) process.env[m[1]] = value;
+/**
+ * The admin page's settings, unless the environment says otherwise.
+ *
+ * The env override exists for tests and for a one-off `CDB_NTFY_URL=… npx tsx
+ * scripts/notify-refresh.ts …` by hand; the file is what the scheduled run
+ * actually uses.
+ */
+function loadConfig(): NtfyConfig {
+  if (process.env.CDB_NTFY_URL && process.env.CDB_NTFY_TOKEN) {
+    return parseNtfyConfig({
+      enabled: true,
+      url: process.env.CDB_NTFY_URL,
+      topic: process.env.CDB_NTFY_TOPIC ?? "",
+      token: process.env.CDB_NTFY_TOKEN,
+    });
+  }
+  try {
+    return parseNtfyConfig(
+      JSON.parse(fs.readFileSync(path.join(DATA_DIR, "ntfy.json"), "utf8")),
+    );
+  } catch {
+    return EMPTY_NTFY;
   }
 }
 
 async function send(note: Notification): Promise<void> {
-  const url = process.env.CDB_NTFY_URL;
-  const token = process.env.CDB_NTFY_TOKEN;
-  if (!url || !token) {
-    console.error("[ntfy] not configured (CDB_NTFY_URL / CDB_NTFY_TOKEN) — skipping");
+  const cfg = loadConfig();
+  if (!ntfyReady(cfg)) {
+    console.error("[ntfy] not configured — skipping (管理页 → 更新通知)");
     return;
   }
-  // Published as JSON to the server ROOT rather than as headers on the topic
-  // URL: the title is Chinese, and HTTP header values are latin-1, so the
-  // header form would need percent-encoding that the phone then shows raw.
-  const u = new URL(url);
-  const topic = u.pathname.replace(/^\/+|\/+$/g, "");
-  if (!topic) {
-    console.error(`[ntfy] no topic in CDB_NTFY_URL (${url}) — skipping`);
-    return;
-  }
-  u.pathname = "/";
-  const res = await fetch(u, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      topic,
-      title: note.title,
-      message: note.body,
-      priority: note.priority,
-      tags: note.tags,
-      click: note.click,
-    }),
-  });
-  if (!res.ok) {
-    console.error(`[ntfy] ${res.status} ${res.statusText}: ${(await res.text()).slice(0, 200)}`);
-    return;
-  }
-  console.error(`[ntfy] sent: ${note.title}`);
+  const r = await sendNtfy(cfg, note);
+  console.error(r.ok ? `[ntfy] sent: ${note.title}` : `[ntfy] ${r.error}`);
 }
 
 async function main() {
-  loadEnvFile();
   const adminUrl = `${process.env.CDB_PUBLIC_URL ?? "https://deck.raynefall.dev"}/digimon/admin`;
   const [kind, arg, a, b] = process.argv.slice(2);
 

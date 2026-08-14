@@ -137,12 +137,19 @@ describe("notify-refresh.ts", () => {
     const port = (server.address() as { port: number }).port;
 
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "cdb-ntfy-"));
+    // Written the way the admin page writes it — the file IS the interface
+    // between the container and this host script.
     fs.writeFileSync(
-      path.join(dir, ".env.ntfy"),
-      `CDB_NTFY_URL=http://127.0.0.1:${port}/dcg\nCDB_NTFY_TOKEN=tk_test\n`,
+      path.join(dir, "ntfy.json"),
+      JSON.stringify({
+        enabled: true,
+        url: `http://127.0.0.1:${port}`,
+        topic: "dcg",
+        token: "tk_test",
+      }),
     );
 
-    const stderr = await notify(args, { CDB_PROJECT_DIR: dir, ...env });
+    const stderr = await notify(args, { CDB_DATA_DIR: dir, ...env });
     // Node's fetch keeps the connection alive, and `close()` waits for open
     // sockets — without this the server never finishes closing and the test
     // sits there until the suite times out.
@@ -184,7 +191,7 @@ describe("notify-refresh.ts", () => {
   it("stays quiet, and exits 0, when no token is configured", async () => {
     const quiet = fs.mkdtempSync(path.join(os.tmpdir(), "cdb-ntfy-none-"));
     const out = await notify(["ok", JSON.stringify({ total: 5, cardsAdded: 5 })], {
-      CDB_PROJECT_DIR: quiet,
+      CDB_DATA_DIR: quiet,
       CDB_NTFY_URL: "",
       CDB_NTFY_TOKEN: "",
     });
@@ -197,12 +204,12 @@ describe("notify-refresh.ts", () => {
     // runs. A dead ntfy must not turn that into a failed run.
     const quiet = fs.mkdtempSync(path.join(os.tmpdir(), "cdb-ntfy-dead-"));
     fs.writeFileSync(
-      path.join(quiet, ".env.ntfy"),
+      path.join(quiet, "ntfy.json"),
       // Port 1 — nothing listens there.
-      "CDB_NTFY_URL=http://127.0.0.1:1/dcg\nCDB_NTFY_TOKEN=tk_test\n",
+      JSON.stringify({ enabled: true, url: "http://127.0.0.1:1", topic: "dcg", token: "tk_test" }),
     );
     // notify() asserts exit 0 itself, by not throwing.
-    const out = await notify(["failed", "text-ja", "1"], { CDB_PROJECT_DIR: quiet });
+    const out = await notify(["failed", "text-ja", "1"], { CDB_DATA_DIR: quiet });
     expect(out).toMatch(/ntfy/);
     fs.rmSync(quiet, { recursive: true, force: true });
   });

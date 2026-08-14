@@ -136,9 +136,8 @@ UI) and `data.nosync/refresh.log`.
 
 ### Push notifications (ntfy)
 
-`scripts/refresh-cards.sh` pushes to the ntfy instance already running on this
-Mac (container `ntfy`, `127.0.0.1:8093`, public `https://ntfy.raynefall.dev`)
-at the end of a run — topic **`dcg`**. Two cases, and only two:
+`scripts/refresh-cards.sh` pushes to ntfy at the end of a run. Two cases, and
+only two:
 
 - **The data changed.** A banlist move raises the priority and leads the title,
   because it's the only change that can make a deck you already built illegal.
@@ -147,24 +146,27 @@ at the end of a run — topic **`dcg`**. Two cases, and only two:
 - **The run failed.** Max priority. This is the case where silence is the
   actual problem: the data just quietly stops being current.
 
-Config is `.env.ntfy` in the project root — host-only and gitignored, because
-the token is a credential and this repo is public:
+**Configured in the app** — 管理页 → 更新通知 (server / topic / token). The page
+writes `data.nosync/ntfy.json` (mode 0600, holds a credential) and the HOST
+script reads it: the same app-writes-a-file, host-reads-it arrangement the
+schedule uses, because this container is internet-facing and doesn't get to run
+things on the machine. `CDB_NTFY_URL` + `CDB_NTFY_TOKEN` in the environment
+override the file, which is how the tests point it at a stand-in server.
 
-```
-CDB_NTFY_URL=http://127.0.0.1:8093/dcg
-CDB_NTFY_TOKEN=tk_…
-CDB_PUBLIC_URL=https://deck.raynefall.dev   # optional; the notification's tap target
-```
+Nothing configured = the feature is off, silently. Notification failures can
+never fail a refresh: by the time one is sent, a validated database has already
+been swapped in, and throwing that away over a missed push would be absurd.
+See `scripts/notify-refresh.ts`; the message is built (and tested) in
+`src/lib/refresh-notify.ts`, the settings shape in `src/lib/ntfy-config.ts`.
 
-**Unset token = the feature is off**, silently. Notification failures can never
-fail a refresh: by the time one is sent, a validated database has already been
-swapped in, and throwing that away over a missed push would be absurd. See
-`scripts/notify-refresh.ts`; the message itself is built (and tested) in
-`src/lib/refresh-notify.ts`.
+The token is write-only across the HTTP boundary: `GET /api/admin/ntfy` returns
+whether one is set and a few characters of it, never the value, and saving with
+the field blank keeps the stored one.
 
-The ntfy server runs `auth-default-access: deny-all`, so the topic needs a
-write-only user. Creating it is a one-time manual step (it involves a password
-and a token, so it isn't something an agent should be doing for you):
+An ntfy server with `auth-default-access: deny-all` (the usual setup) needs a
+write-only user for the topic. One-time, on whichever machine runs ntfy — it
+involves a password and a token, so it isn't something an agent should be doing
+for you:
 
 ```
 docker exec -e NTFY_PASSWORD="$(openssl rand -base64 24)" ntfy \
@@ -172,6 +174,10 @@ docker exec -e NTFY_PASSWORD="$(openssl rand -base64 24)" ntfy \
 docker exec ntfy ntfy access card-deck-builder dcg write
 docker exec ntfy ntfy token add --expires=never --label="cdb refresh" card-deck-builder
 ```
+
+Note the ntfy container running on THIS Mac (`127.0.0.1:8093`) is not
+necessarily the one behind `ntfy.raynefall.dev` — that server was moved to
+another machine. Point the settings at the real one.
 
 ### ⚠️ NEVER write the SQLite DBs while the container is running
 

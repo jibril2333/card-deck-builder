@@ -11,6 +11,8 @@
  * "no news" notification is how people learn to swipe the channel away.
  */
 
+import { ntfyReady, type NtfyConfig } from "./ntfy-config";
+
 /** The JSON summary `diff-refresh.ts` prints on its last stdout line. */
 export type RefreshSummary = {
   runAt?: string;
@@ -104,5 +106,64 @@ export function buildFailureNotification(
     priority: 5,
     tags: ["warning"],
     click: opts.adminUrl,
+  };
+}
+
+/**
+ * Publish one notification.
+ *
+ * Posted as JSON to the server root rather than as headers on the topic URL:
+ * the titles are Chinese, HTTP header values are latin-1, and the header form
+ * would arrive on the phone percent-encoded.
+ *
+ * Returns a reason instead of throwing — every caller (the refresh script, the
+ * admin page's test button) wants to report the failure, not be derailed by it.
+ */
+export async function sendNtfy(
+  cfg: NtfyConfig,
+  note: Notification,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!ntfyReady(cfg)) return { ok: false, error: "ntfy 还没配置好" };
+  let res: Response;
+  try {
+    res = await fetch(cfg.url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${cfg.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        topic: cfg.topic,
+        title: note.title,
+        message: note.body,
+        priority: note.priority,
+        tags: note.tags,
+        click: note.click,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 200);
+    // 401/403 is the common one and means the token can't publish to this
+    // topic — say which topic, since that's usually the actual mistake.
+    return {
+      ok: false,
+      error: `${res.status} ${res.statusText}${detail ? ` — ${detail}` : ""}`,
+    };
+  }
+  return { ok: true };
+}
+
+/** The "does this work" push behind the admin panel's test button. */
+export function buildTestNotification(adminUrl: string): Notification {
+  return {
+    title: "测试通知",
+    body: "看到这条就说明 ntfy 配好了 —— 卡表有更新或者更新失败时会走同一条路。",
+    priority: 3,
+    tags: ["white_check_mark"],
+    click: adminUrl,
   };
 }

@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/auth/admin";
 import { RefreshCardsPanel } from "@/components/refresh-cards-panel";
 import { RefreshSchedulePanel } from "@/components/refresh-schedule-panel";
 import { RefreshChangesPanel } from "@/components/refresh-changes-panel";
+import { NtfyPanel } from "@/components/ntfy-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function AdminPage({
       <RefreshCardsPanel />
       <RefreshSchedulePanel />
       <RefreshChangesPanel />
+      <NtfyPanel />
     </main>
   );
 }
