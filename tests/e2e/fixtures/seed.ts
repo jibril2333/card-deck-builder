@@ -444,3 +444,35 @@ export function createE2ESession(dbPath: string): {
     db.close();
   }
 }
+
+/**
+ * A deck that the CURRENT banlist disagrees with: 4× BT1-086, which
+ * `SEED_RESTRICTIONS` caps at 1.
+ *
+ * It has to be written straight into the DB, because the app cannot produce
+ * one: `clampQuantityToRestriction` caps quantities as they are written, so
+ * adding this card through the UI would stop at 1. That's the whole situation
+ * the notice exists for — the deck was legal when it was built, and a later
+ * banlist refresh moved the card underneath it.
+ */
+export const LEGACY_DECK = {
+  id: "e2e-legacy-deck",
+  name: "禁限提醒测试",
+  code: "BT1-086",
+  quantity: 4,
+  max: 1,
+} as const;
+
+export function seedViolatingDeck(dbPath: string, userId: string): void {
+  const db = new Database(dbPath);
+  try {
+    db.prepare(
+      `INSERT INTO decks (id, name, user_id, sort_order) VALUES (?, ?, ?, 0)`,
+    ).run(LEGACY_DECK.id, LEGACY_DECK.name, userId);
+    db.prepare(
+      `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)`,
+    ).run(LEGACY_DECK.id, LEGACY_DECK.code, LEGACY_DECK.quantity);
+  } finally {
+    db.close();
+  }
+}

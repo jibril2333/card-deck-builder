@@ -31,6 +31,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import { DECK_TARGET } from "@/lib/deck-legality";
 import { tallyColors, tallyLevels, MULTI_COLOR } from "@/lib/deck-tally";
+import { DeckRestrictionNotice } from "@/components/deck-restriction-notice";
 
 type RawDeckCard = {
   card_type: string;
@@ -336,6 +337,10 @@ export default async function DeckEditPage({
   // (including ones already bought) is opt-in via ?missing=0.
   const missingOnly = mode === "purchase" && sp.missing !== "0";
 
+  // Reported, never applied — see DeckRestrictionNotice.
+  const restrictionIssues = digimon.deckRestrictionIssues(loaded.deck.id);
+  const issueByCardId = new Map(restrictionIssues.map((i) => [i.card_id, i]));
+
   const total = loaded.cards.reduce((s, c) => s + c.quantity, 0);
   const eggs = loaded.isDigimon
     ? digimon
@@ -514,6 +519,8 @@ export default async function DeckEditPage({
                   ) : null}
                 </div>
 
+                <DeckRestrictionNotice issues={restrictionIssues} />
+
                 {colorBreakdown.length ? (
                   <div className="flex flex-wrap items-center gap-1.5">
                     {colorBreakdown.map((b) => (
@@ -655,6 +662,7 @@ export default async function DeckEditPage({
                       game={game}
                       deckId={loaded.deck.id}
                       card={c}
+                      violation={issueByCardId.has(c.id)}
                       isCover={c.id === loaded.deck.cover_card_id}
                       mode={mode}
                       mine={mine}

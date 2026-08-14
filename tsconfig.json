@@ -42,7 +42,9 @@
     ".next.nosync/prod/types/**/*.ts",
     ".next.nosync/prod/dev/types/**/*.ts",
     ".next.nosync/dev/types/**/*.ts",
-    ".next.nosync/dev/dev/types/**/*.ts"
+    ".next.nosync/dev/dev/types/**/*.ts",
+    ".next.nosync/e2e-prod/types/**/*.ts",
+    ".next.nosync/e2e-prod/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -16,6 +16,8 @@ export type DeckCardInfo = {
   accent_color2: string | null;
   cover_image_url: string | null;
   counts: { main: number; egg: number };
+  /** How many cards in it the current banlist disagrees with. */
+  issues: number;
   updated_at: string;
   /** Display name of the deck's owner, or null for legacy unowned decks. */
   owner_name: string | null;
@@ -309,7 +311,15 @@ export function DecksGrid({
                   {deckCountBadge(d.counts)}
                 </span>
               ) : null}
-              {!d.mine && d.owner_name ? (
+              {d.issues > 0 ? (
+                <span
+                  className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-red-600 text-white font-medium"
+                  title={`${d.issues} 张卡违反现行禁限表 —— 打开卡组查看,系统不会自动改`}
+                >
+                  禁限 {d.issues}
+                </span>
+              ) : null}
+              {!d.mine && d.owner_name && d.issues === 0 ? (
                 <span
                   className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-black/65 text-white font-medium max-w-[80%] truncate"
                   title={`所有者:${d.owner_name}`}

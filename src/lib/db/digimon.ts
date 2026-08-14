@@ -1032,3 +1032,117 @@ export function listRefreshRuns(limit = 5): RefreshRun[] {
     sample: sample.all(r.run_at) as RefreshChange[],
   }));
 }
+
+export type DeckRestrictionIssue =
+  | {
+      kind: "over_limit";
+      card_id: string;
+      code: string;
+      name: string;
+      quantity: number;
+      max_count: number;
+      status: string;
+    }
+  | {
+      kind: "pair";
+      card_id: string;
+      code: string;
+      name: string;
+      /** The card whose presence outlaws this one. */
+      with_code: string;
+      with_name: string;
+    };
+
+/**
+ * Which cards in a deck the CURRENT banlist disagrees with.
+ *
+ * Read-only, and reported rather than corrected. `clampQuantityToRestriction`
+ * already caps quantities as they're written, but it only runs on a write — a
+ * deck built before a banlist move keeps its four copies, silently, until
+ * someone touches that card. This is what makes that visible; it never edits
+ * the deck, because throwing away three copies of a card is the owner's call.
+ *
+ * Digimon's identity is the card code itself (alt-art printings live in
+ * `card_images`, not as separate `cards` rows — 4404 rows, 4404 distinct
+ * codes), so a row-by-row comparison is the whole check.
+ */
+export function deckRestrictionIssues(deckId: string): DeckRestrictionIssue[] {
+  const over = db()
+    .prepare(
+      `SELECT dc.card_id, c.code, c.name, dc.quantity, r.max_count, r.status
+         FROM user.deck_cards dc
+         JOIN cards c ON c.id = dc.card_id
+         JOIN card_restrictions r
+           ON r.source = 'digimon' AND r.identity = c.code
+        WHERE dc.deck_id = ? AND dc.quantity > r.max_count
+        ORDER BY r.max_count, c.code`,
+    )
+    .all(deckId) as Omit<
+    Extract<DeckRestrictionIssue, { kind: "over_limit" }>,
+    "kind"
+  >[];
+
+  // Both halves of a banned pair present in the same deck. Reported against
+  // the BANNED card rather than the trigger: the trigger is legal on its own,
+  // and it's the other one you'd take out.
+  const pairs = db()
+    .prepare(
+      `SELECT cb.id AS card_id, cb.code, cb.name,
+              ca.code AS with_code, ca.name AS with_name
+         FROM banned_pairs p
+         JOIN cards ca ON ca.code = p.trigger_identity
+         JOIN cards cb ON cb.code = p.banned_identity
+         JOIN user.deck_cards da ON da.deck_id = ? AND da.card_id = ca.id
+         JOIN user.deck_cards dbc ON dbc.deck_id = da.deck_id AND dbc.card_id = cb.id
+        WHERE p.source = 'digimon'
+        ORDER BY cb.code`,
+    )
+    .all(deckId) as Omit<Extract<DeckRestrictionIssue, { kind: "pair" }>, "kind">[];
+
+  return [
+    ...over.map((o) => ({ kind: "over_limit" as const, ...o })),
+    ...pairs.map((p) => ({ kind: "pair" as const, ...p })),
+  ];
+}
+
+/**
+ * How many issues each of many decks has, in one query.
+ *
+ * The deck list renders 48 tiles; asking per deck would be 48 round trips to
+ * decide whether to draw a dot.
+ */
+export function deckIssueCounts(deckIds: string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  if (deckIds.length === 0) return out;
+  for (const id of deckIds) out.set(id, 0);
+
+  for (let i = 0; i < deckIds.length; i += 400) {
+    const chunk = deckIds.slice(i, i + 400);
+    const ph = chunk.map(() => "?").join(",");
+    const rows = db()
+      .prepare(
+        `SELECT deck_id, SUM(n) AS n FROM (
+           SELECT dc.deck_id, COUNT(*) AS n
+             FROM user.deck_cards dc
+             JOIN cards c ON c.id = dc.card_id
+             JOIN card_restrictions r
+               ON r.source = 'digimon' AND r.identity = c.code
+            WHERE dc.deck_id IN (${ph}) AND dc.quantity > r.max_count
+            GROUP BY dc.deck_id
+           UNION ALL
+           SELECT da.deck_id, COUNT(*) AS n
+             FROM banned_pairs p
+             JOIN cards ca ON ca.code = p.trigger_identity
+             JOIN cards cb ON cb.code = p.banned_identity
+             JOIN user.deck_cards da ON da.card_id = ca.id
+             JOIN user.deck_cards dbc
+               ON dbc.deck_id = da.deck_id AND dbc.card_id = cb.id
+            WHERE p.source = 'digimon' AND da.deck_id IN (${ph})
+            GROUP BY da.deck_id
+         ) GROUP BY deck_id`,
+      )
+      .all(...chunk, ...chunk) as { deck_id: string; n: number }[];
+    for (const r of rows) out.set(r.deck_id, r.n);
+  }
+  return out;
+}

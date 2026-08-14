@@ -18,7 +18,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { createE2ESession } from "./fixtures/seed";
+import { createE2ESession, seedViolatingDeck } from "./fixtures/seed";
 
 export default async function globalSetup() {
   const digimonUserDb = process.env.CDB_DIGIMON_USER_DB;
@@ -31,7 +31,11 @@ export default async function globalSetup() {
 
   // Auth lives in the digimon user.db (see auth/repo.ts → authDb()). Seed a
   // pre-authenticated session there.
-  const { sessionToken, expiresAt } = createE2ESession(digimonUserDb);
+  const { userId, sessionToken, expiresAt } = createE2ESession(digimonUserDb);
+
+  // A deck the current banlist disagrees with. Seeded here rather than built
+  // by a spec because the app refuses to write one (see seedViolatingDeck).
+  seedViolatingDeck(digimonUserDb, userId);
 
   // Persist a Playwright storageState file pointing at that session. Fixed
   // path under the project so playwright.config.ts can reference it

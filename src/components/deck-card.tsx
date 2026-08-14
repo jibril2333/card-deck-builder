@@ -50,6 +50,7 @@ export function DeckCard({
   mode,
   mine,
   searchTargets,
+  violation = false,
 }: {
   game: string;
   deckId: string;
@@ -63,6 +64,9 @@ export function DeckCard({
   /** Digimon only: per-slot groups of deck cards this card's search effect
    *  can fetch. When present, a 🔍 badge opens a popover listing them. */
   searchTargets?: SearchGroup[];
+  /** The current banlist disagrees with this card's presence or count. Marked,
+   *  never corrected — the notice above the grid says what and why. */
+  violation?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -173,7 +177,7 @@ export function DeckCard({
           {mode === "purchase" ? (
             <PurchaseQtyBadge owned={owned} want={want} done={done} />
           ) : (
-            <WantQtyBadge want={want} />
+            <WantQtyBadge want={want} violation={violation} />
           )}
 
           {card.rarity ? <RarityBadge rarity={card.rarity} /> : null}
@@ -297,9 +301,16 @@ function CardImage({
   );
 }
 
-function WantQtyBadge({ want }: { want: number }) {
+function WantQtyBadge({ want, violation }: { want: number; violation?: boolean }) {
   return (
-    <span className="absolute top-1.5 left-1.5 px-2 py-0.5 text-xs rounded-md bg-black/75 text-white font-bold tabular-nums">
+    <span
+      // Red when the current banlist disagrees with this count. The count is
+      // left exactly as it is — the notice above the grid explains it.
+      title={violation ? "违反现行禁限表" : undefined}
+      className={`absolute top-1.5 left-1.5 px-2 py-0.5 text-xs rounded-md font-bold tabular-nums ${
+        violation ? "bg-red-600 text-white" : "bg-black/75 text-white"
+      }`}
+    >
       ×{want}
     </span>
   );

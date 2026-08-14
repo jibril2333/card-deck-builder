@@ -36,6 +36,9 @@ export default async function DecksPage({
   // Main/egg split for every deck in ONE query, rather than a count per deck.
   const rawDecks = digimon.listDecksWithCover(meId);
   const counts = digimon.deckMainEggCounts(rawDecks.map((d) => d.id));
+  // Which decks the current banlist disagrees with. One query for the whole
+  // list; the tile only needs the number.
+  const issues = digimon.deckIssueCounts(rawDecks.map((d) => d.id));
 
   const decks = rawDecks.map((d) => ({
     id: d.id,
@@ -51,6 +54,7 @@ export default async function DecksPage({
     pinned: d.pinned === 1,
     complete: completedDeckIds.has(d.id),
     counts: counts.get(d.id) ?? { main: 0, egg: 0 },
+    issues: issues.get(d.id) ?? 0,
   }));
 
   // Fetch every deck's card list once and derive both auxiliary tool inputs
@@ -161,6 +165,7 @@ export default async function DecksPage({
                 accent_color2: d.accent_color2,
                 cover_image_url: d.cover_image_url,
                 counts: d.counts,
+                issues: d.issues,
                 updated_at: d.updated_at,
                 owner_name: d.owner_name,
                 mine: d.mine,
