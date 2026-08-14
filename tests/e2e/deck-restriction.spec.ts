@@ -45,8 +45,12 @@ test("marks the affected deck in the deck list", async ({ page }) => {
 
   const tile = page.getByRole("link", { name: new RegExp(LEGACY_DECK.name) });
   await expect(tile).toBeVisible();
-  await expect(tile).toContainText("禁限 1");
+  await expect(tile.getByRole("img", { name: "不符合禁限表" })).toBeVisible();
 
-  // Only that one. If every tile carried the badge it would mean nothing.
-  await expect(page.getByText(/^禁限 \d+$/)).toHaveCount(1);
+  // Only that one. If every tile carried the dot it would mean nothing.
+  await expect(page.getByRole("img", { name: "不符合禁限表" })).toHaveCount(1);
+
+  // The other dot is a different problem and reads differently: this deck is
+  // 4 cards long, so it is also unfinished.
+  await expect(tile.getByRole("img", { name: "缺卡" })).toBeVisible();
 });

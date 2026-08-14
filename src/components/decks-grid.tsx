@@ -7,7 +7,34 @@ import {
   reorderDecksAction,
   setDeckPinnedAction,
 } from "@/app/[game]/actions";
-import { deckCountBadge, DECK_TARGET } from "@/lib/deck-legality";
+import { deckCountBadge, deckIsComplete, DECK_TARGET } from "@/lib/deck-legality";
+
+/**
+ * The deck-name status dots.
+ *
+ * Two different kinds of "not ready", so two colours rather than one warning
+ * sign: red is a rules problem (the banlist disagrees with this deck), yellow
+ * is just unfinished (it isn't 50 + ≤5 yet). A deck can be both, and then it
+ * shows both — collapsing them would hide the one that takes work to fix.
+ */
+function StatusDot({
+  color,
+  label,
+  title,
+}: {
+  color: string;
+  label: string;
+  title: string;
+}) {
+  return (
+    <span
+      className={`shrink-0 w-2 h-2 rounded-full ${color}`}
+      title={title}
+      aria-label={label}
+      role="img"
+    />
+  );
+}
 
 export type DeckCardInfo = {
   id: string;
@@ -311,15 +338,10 @@ export function DecksGrid({
                   {deckCountBadge(d.counts)}
                 </span>
               ) : null}
-              {d.issues > 0 ? (
-                <span
-                  className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-red-600 text-white font-medium"
-                  title={`${d.issues} 张卡违反现行禁限表 —— 打开卡组查看,系统不会自动改`}
-                >
-                  禁限 {d.issues}
-                </span>
-              ) : null}
-              {!d.mine && d.owner_name && d.issues === 0 ? (
+              {/* The banlist warning lives on the deck NAME (see StatusDot),
+                  not up here — a corner badge had to fight the owner badge for
+                  the same spot, and one of them lost. */}
+              {!d.mine && d.owner_name ? (
                 <span
                   className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-black/65 text-white font-medium max-w-[80%] truncate"
                   title={`所有者:${d.owner_name}`}
@@ -337,6 +359,20 @@ export function DecksGrid({
               </div>
               <div className="card-name flex items-center gap-1 text-xs font-medium group-hover:text-[var(--color-accent)] min-w-0">
                 <span className="truncate">{d.name}</span>
+                {d.issues > 0 ? (
+                  <StatusDot
+                    color="bg-red-500"
+                    label="不符合禁限表"
+                    title={`${d.issues} 张卡违反现行禁限表 —— 打开卡组查看,系统不会自动改`}
+                  />
+                ) : null}
+                {!deckIsComplete(d.counts) ? (
+                  <StatusDot
+                    color="bg-amber-400"
+                    label="缺卡"
+                    title={`还没配齐:主卡组 ${d.counts.main} / ${DECK_TARGET.main} · 蛋卡 ${d.counts.egg} / ${DECK_TARGET.egg}`}
+                  />
+                ) : null}
                 {d.mine && d.complete ? (
                   <span
                     className="shrink-0 text-green-600 dark:text-green-400 font-bold"
