@@ -96,13 +96,24 @@ export type JogressCard = {
   jaEvoReq?: string | null;
 };
 
+/**
+ * Two deck cards that satisfy a condition.
+ *
+ * `short` means the pair is the same card twice and the deck holds only one
+ * copy — the combination is real (nothing stops two copies of a card meeting
+ * on the field), the deck just can't field it yet. Reported rather than
+ * hidden: "WarGreymon from two MetalGreymon, you're one copy short" is a
+ * deck-building answer; silence looks like the tool missed it.
+ */
+export type JogressPair = { a: string; b: string; short: boolean };
+
 /** One condition, resolved against a particular deck. */
 export type JogressOption = {
   /** Chinese rendering of the condition, e.g. "黄Lv.6 ＋ 黑Lv.6". */
   label: string;
   cost: number | null;
-  /** Deck card ids, `[a, b]`, unordered. */
-  pairs: [string, string][];
+  /** Deck card ids, unordered. */
+  pairs: JogressPair[];
   /** True when the text was understood well enough to match against. */
   parsed: boolean;
   raw: string;
@@ -261,7 +272,10 @@ export function describeCondition(cond: JogressCondition): string {
  * could in principle be legal, but it reads as a bug every time and would
  * push the genuine pairs down the list.
  *
- * The same card fills both halves only when the deck holds at least 2 copies.
+ * One card CAN fill both halves — that's two copies of it on the field, and
+ * it's how e.g. EX12-017 WarGreymon comes down off two MetalGreymon, which
+ * are Red/Black and so satisfy 赤/黄 and 黒/紫 at once. A deck holding a
+ * single copy still gets told (see `short`).
  */
 export function computeDeckJogress(
   cards: JogressCard[],
@@ -275,21 +289,24 @@ export function computeDeckJogress(
 
     const options: JogressOption[] = conditions.map((cond) => {
       const [sa, sb] = cond.sides;
-      const pairs: [string, string][] = [];
+      const pairs: JogressPair[] = [];
       if (sa.parsed && sb.parsed) {
         const pool = digimon.filter((c) => c.id !== target.id);
         for (let i = 0; i < pool.length; i++) {
           for (let j = i; j < pool.length; j++) {
             const a = pool[i];
             const b = pool[j];
-            // Both halves from one card means two copies of it on the field.
-            if (i === j && a.quantity < 2) continue;
             const ok =
               (matchesSide(a, sa) && matchesSide(b, sb)) ||
               (matchesSide(a, sb) && matchesSide(b, sa));
-            if (ok) pairs.push([a.id, b.id]);
+            // Both halves off one card means two copies of it on the field,
+            // which takes two copies in the deck.
+            if (ok) pairs.push({ a: a.id, b: b.id, short: i === j && a.quantity < 2 });
           }
         }
+        // Pairs the deck can actually field first; the "one copy short" ones
+        // are a shopping note, not an answer to "what can I do now".
+        pairs.sort((x, y) => Number(x.short) - Number(y.short));
       }
       return {
         label: describeCondition(cond),

@@ -16,8 +16,9 @@ export type JogressView = {
   /** The condition in Chinese, e.g. "黄 Lv.6 ＋ 黑 Lv.6". */
   label: string;
   cost: number | null;
-  /** Pairs of deck cards that satisfy it. Empty = the deck can't make it. */
-  pairs: [JogressPairCard, JogressPairCard][];
+  /** Pairs of deck cards that satisfy it. Empty = the deck can't make it.
+   *  `short` = the same card twice with only one copy in the deck. */
+  pairs: { a: JogressPairCard; b: JogressPairCard; short: boolean }[];
   /** False when the requirement text couldn't be read — then `label` is the
    *  card's own Japanese wording and no pairs are claimed. */
   parsed: boolean;
@@ -47,7 +48,12 @@ export function JogressBadge({
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const popRef = useRef<HTMLDivElement | null>(null);
 
-  const total = options.reduce((n, o) => n + o.pairs.length, 0);
+  // The count is what the deck can field TODAY, so a "one copy short" pair
+  // doesn't inflate it — it still gets listed, saying what's missing.
+  const total = options.reduce(
+    (n, o) => n + o.pairs.filter((p) => !p.short).length,
+    0,
+  );
   const none = total === 0;
 
   useEffect(() => {
@@ -147,16 +153,24 @@ export function JogressBadge({
                 </div>
               ) : (
                 <div className="flex flex-col gap-1">
-                  {o.pairs.map(([a, b], pi) => (
-                    <div
-                      key={pi}
-                      className="flex items-center gap-1 p-1 rounded hover:bg-[var(--color-muted)]"
-                    >
-                      <PairCard game={game} card={a} />
-                      <span className="shrink-0 text-[var(--color-muted-fg)] text-xs">
-                        ＋
-                      </span>
-                      <PairCard game={game} card={b} />
+                  {o.pairs.map((p, pi) => (
+                    <div key={pi}>
+                      <div
+                        className={`flex items-center gap-1 p-1 rounded hover:bg-[var(--color-muted)] ${
+                          p.short ? "opacity-60" : ""
+                        }`}
+                      >
+                        <PairCard game={game} card={p.a} />
+                        <span className="shrink-0 text-[var(--color-muted-fg)] text-xs">
+                          ＋
+                        </span>
+                        <PairCard game={game} card={p.b} />
+                      </div>
+                      {p.short ? (
+                        <div className="px-1 pb-1 text-[10px] text-amber-600 dark:text-amber-400">
+                          同一张卡的两只 —— 卡组里只有 1 张,再加 1 张才凑得出
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
