@@ -191,7 +191,7 @@ describe("computeDeckJogress", () => {
   it("finds the pair the deck can actually assemble", () => {
     const m = computeDeckJogress(deck());
     const [opt] = m.get("chaos")!;
-    expect(opt.pairs).toEqual([{ a: "y6", b: "b6", short: false }]);
+    expect(opt.pairs).toEqual([["y6", "b6"]]);
     expect(opt.label).toBe("黄 Lv.6 ＋ 黑 Lv.6");
     expect(opt.cost).toBe(0);
   });
@@ -210,10 +210,7 @@ describe("computeDeckJogress", () => {
     expect(opt.parsed).toBe(true);
   });
 
-  it("flags a self-pair the deck holds only one copy of, instead of dropping it", () => {
-    // The real case this came from: EX12-017 WarGreymon off two MetalGreymon,
-    // in a deck with one MetalGreymon. The combination exists; the deck is a
-    // copy short, and being told that is the useful part.
+  it("pairs a card with a second copy of itself only when the deck holds two", () => {
     const two: JogressCard[] = [
       card({
         id: "t",
@@ -222,31 +219,9 @@ describe("computeDeckJogress", () => {
       }),
       card({ id: "solo", color: "Yellow", level: 6, quantity: 1 }),
     ];
-    expect(computeDeckJogress(two).get("t")![0].pairs).toEqual([
-      { a: "solo", b: "solo", short: true },
-    ]);
+    expect(computeDeckJogress(two).get("t")![0].pairs).toEqual([]);
     two[1] = card({ id: "solo", color: "Yellow", level: 6, quantity: 2 });
-    expect(computeDeckJogress(two).get("t")![0].pairs).toEqual([
-      { a: "solo", b: "solo", short: false },
-    ]);
-  });
-
-  it("puts the pairs the deck can actually field first", () => {
-    const cards: JogressCard[] = [
-      card({
-        id: "war",
-        level: 6,
-        jaEvoReq: "〔ジョグレス〕赤/黄Lv.5+黒/紫Lv.5:コスト0",
-      }),
-      // Red/Black, so it satisfies BOTH halves on its own — but there's one.
-      card({ id: "metal", color: "Red", color2: "Black", level: 5, quantity: 1 }),
-      card({ id: "were", color: "Blue", color2: "Purple", level: 5, quantity: 3 }),
-    ];
-    const [opt] = computeDeckJogress(cards).get("war")!;
-    expect(opt.pairs).toEqual([
-      { a: "metal", b: "were", short: false },
-      { a: "metal", b: "metal", short: true },
-    ]);
+    expect(computeDeckJogress(two).get("t")![0].pairs).toEqual([["solo", "solo"]]);
   });
 
   it("never offers the card itself as its own material", () => {
@@ -268,9 +243,7 @@ describe("computeDeckJogress", () => {
     // The deck order must not decide whether a pair is found.
     const cards = deck();
     const reversed = [cards[0], cards[2], cards[1], cards[3], cards[4]];
-    expect(computeDeckJogress(reversed).get("chaos")![0].pairs).toEqual([
-      { a: "b6", b: "y6", short: false },
-    ]);
+    expect(computeDeckJogress(reversed).get("chaos")![0].pairs).toEqual([["b6", "y6"]]);
   });
 
   it("keeps a card's two conditions apart", () => {
@@ -288,10 +261,8 @@ describe("computeDeckJogress", () => {
     ];
     const opts = computeDeckJogress(cards).get("bolt")!;
     expect(opts).toHaveLength(2);
-    expect(opts[0].pairs).toEqual([{ a: "p6", b: "g6", short: false }]);
-    expect(opts[1].pairs).toEqual([
-      { a: "piemon", b: "vamdemon", short: false },
-    ]);
+    expect(opts[0].pairs).toEqual([["p6", "g6"]]);
+    expect(opts[1].pairs).toEqual([["piemon", "vamdemon"]]);
   });
 
   it("claims no pairs for a condition it couldn't read", () => {

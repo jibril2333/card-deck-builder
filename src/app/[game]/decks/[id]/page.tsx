@@ -252,11 +252,12 @@ export default async function DeckEditPage({
         label: o.label,
         cost: o.cost,
         parsed: o.parsed,
-        pairs: o.pairs.map((p) => ({
-          a: displayCard(p.a),
-          b: displayCard(p.b),
-          short: p.short,
-        })),
+        pairs: o.pairs.map(
+          ([a, b]) => [displayCard(a), displayCard(b)] as [
+            ReturnType<typeof displayCard>,
+            ReturnType<typeof displayCard>,
+          ],
+        ),
       })),
     ]),
   );
