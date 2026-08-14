@@ -134,6 +134,45 @@ is not enough — accounts go to friends, and a refresh restarts the container.
 Progress/results land in `data.nosync/refresh-status.json` (read by the admin
 UI) and `data.nosync/refresh.log`.
 
+### Push notifications (ntfy)
+
+`scripts/refresh-cards.sh` pushes to the ntfy instance already running on this
+Mac (container `ntfy`, `127.0.0.1:8093`, public `https://ntfy.raynefall.dev`)
+at the end of a run — topic **`dcg`**. Two cases, and only two:
+
+- **The data changed.** A banlist move raises the priority and leads the title,
+  because it's the only change that can make a deck you already built illegal.
+  A run that changed nothing sends nothing — that's most weeks, and a weekly
+  "no news" push is how a channel gets muted.
+- **The run failed.** Max priority. This is the case where silence is the
+  actual problem: the data just quietly stops being current.
+
+Config is `.env.ntfy` in the project root — host-only and gitignored, because
+the token is a credential and this repo is public:
+
+```
+CDB_NTFY_URL=http://127.0.0.1:8093/dcg
+CDB_NTFY_TOKEN=tk_…
+CDB_PUBLIC_URL=https://deck.raynefall.dev   # optional; the notification's tap target
+```
+
+**Unset token = the feature is off**, silently. Notification failures can never
+fail a refresh: by the time one is sent, a validated database has already been
+swapped in, and throwing that away over a missed push would be absurd. See
+`scripts/notify-refresh.ts`; the message itself is built (and tested) in
+`src/lib/refresh-notify.ts`.
+
+The ntfy server runs `auth-default-access: deny-all`, so the topic needs a
+write-only user. Creating it is a one-time manual step (it involves a password
+and a token, so it isn't something an agent should be doing for you):
+
+```
+docker exec -e NTFY_PASSWORD="$(openssl rand -base64 24)" ntfy \
+  ntfy user add --role=user card-deck-builder
+docker exec ntfy ntfy access card-deck-builder dcg write
+docker exec ntfy ntfy token add --expires=never --label="cdb refresh" card-deck-builder
+```
+
 ### ⚠️ NEVER write the SQLite DBs while the container is running
 
 The prod container mounts `data.nosync/*.db` via a Docker **bind mount** (macOS

@@ -85,6 +85,15 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   exit 3
 fi
 
+# ---- phone notification -----------------------------------------------------
+# Off unless .env.ntfy exists (see scripts/notify-refresh.ts). Always tolerant:
+# a refresh that scraped, validated and swapped cleanly must not report failure
+# because a push didn't go out, so this can only ever add a line to the log.
+notify() {
+  npx tsx "$PROJECT_DIR/scripts/notify-refresh.ts" "$@" >>"$LOG_FILE" 2>&1 || \
+    log "notify failed (not fatal — see $LOG_FILE)"
+}
+
 FAILED_STAGE=""
 cleanup() {
   local rc=$?
@@ -93,6 +102,9 @@ cleanup() {
   if [ $rc -ne 0 ]; then
     write_status "failed" "${FAILED_STAGE:-refresh} failed (exit $rc); live database untouched"
     log "FAILED (exit $rc)"
+    # A refresh nobody hears about stops being current in silence — this is
+    # the case most worth a push, more than any successful run.
+    notify failed "${FAILED_STAGE:-refresh}" "$rc"
   fi
 }
 trap cleanup EXIT
@@ -251,4 +263,9 @@ done
 
 write_status "ok" "$old_cards → $new_cards cards"
 log "=== refresh done ($old_cards → $new_cards cards) ==="
+# Sent last, after the new database is live and verified — the notification
+# says what CHANGED, and until the swap held, nothing had. A run that changed
+# nothing sends nothing (see lib/refresh-notify).
+[ -z "$CHANGES_JSON" ] && CHANGES_JSON='{}'   # changelog failed → nothing to report
+notify ok "$CHANGES_JSON" "$old_cards" "$new_cards"
 exit 0
