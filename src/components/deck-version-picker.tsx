@@ -57,14 +57,26 @@ export function DeckVersionPicker({
     });
   }
 
-  const label = (o: VersionOption) =>
-    `${o.code}${o.name_en ? ` · ${o.name_en}` : ""}`;
+  // A <select> is as wide as its widest option, so the closed control was
+  // paying for "Extra Booster DIGITAL WORLD SHAMBALA" while displaying
+  // "EX-12". The product-type prefix is the same handful of words on every
+  // pack and identifies nothing.
+  const label = (o: VersionOption) => {
+    const name = (o.name_en ?? "").replace(
+      /^(Advanced |Extra |Theme )?(Booster|Starter Deck|Limited Card Pack|Limited Pack|Card Set)\s*/i,
+      "",
+    );
+    return `${o.code}${name ? ` · ${name}` : ""}`;
+  };
+  const newest = options[0]?.code;
 
+  // Read-only view: non-owners, and your own decks while locked. A deck with
+  // no version says nothing rather than showing an empty control.
   if (!editable) {
     if (!version) return null;
     return (
       <span
-        className="px-2 py-0.5 text-xs rounded-full bg-[var(--color-muted)] text-[var(--color-muted-fg)] border border-[var(--color-border)]"
+        className="chip"
         title="这份卡表是按这个卡包的环境组的"
       >
         版本 {version}
@@ -73,24 +85,29 @@ export function DeckVersionPicker({
   }
 
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-xs text-[var(--color-muted-fg)]">版本</span>
       <select
         aria-label="卡组版本"
         value={value}
         disabled={pending}
         onChange={(e) => save(e.target.value)}
-        title="这份卡表是按哪个卡包的环境组的"
-        className="h-6 max-w-[13rem] rounded-full border border-[var(--color-border)] bg-[var(--color-muted)] px-2 text-xs cursor-pointer disabled:opacity-60"
+        title={
+          `这份卡表是按哪个卡包的环境组的。列表是官方全部卡包,最新的是 ${newest ?? "—"}` +
+          (auto ? `;「跟随卡表」= ${auto},按这副卡组里最新的那张卡算出来的` : "")
+        }
+        className="h-6 max-w-[14rem] rounded-full border border-[var(--color-border)] bg-[var(--color-card)] px-2 text-xs cursor-pointer disabled:opacity-60 hover:bg-[var(--color-muted)]"
       >
-        <option value="">版本 未设置</option>
-        {/* Same as picking the newest pack in the list, but says WHY that's
-            the answer — it's what the cards themselves imply. */}
+        <option value="">未设置</option>
+        {/* Not "the newest pack" — the newest pack THIS DECK needs. Spelled
+            out because the old wording ("按最新的卡") read as a claim about
+            the game rather than about the deck in front of you. */}
         {auto && auto !== value ? (
-          <option value={auto}>按最新的卡 → {auto}</option>
+          <option value={auto}>跟随卡表 → {auto}</option>
         ) : null}
         {options.map((o) => (
           <option key={o.code} value={o.code}>
-            版本 {label(o)}
+            {label(o)}
           </option>
         ))}
       </select>

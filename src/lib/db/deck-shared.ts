@@ -690,6 +690,14 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
    * Filtered to the caller's own decks; we don't want users adding cards to
    * a friend's deck.
    */
+  /**
+   * Every deck of this user, with how many copies of one card each holds.
+   *
+   * Ordered by CREATION time, not by last edit. Sorting by `updated_at` meant
+   * that adding a copy re-sorted the list under the reader's finger: the deck
+   * you just clicked jumped to the top, and the next deck you meant to click
+   * had moved. Creation order is stable while you work through a card.
+   */
   function listDecksWithCardQty(
     currentUserId: string,
     cardId: string,
@@ -701,7 +709,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
                 COALESCE((SELECT SUM(quantity) FROM user.deck_cards WHERE deck_id = d.id), 0) AS total
          FROM user.decks d
          WHERE d.user_id = ?
-         ORDER BY d.updated_at DESC`,
+         ORDER BY d.created_at DESC, d.id`,
       )
       .all(cardId, currentUserId) as DeckWithCardQty<TDeck>[];
   }

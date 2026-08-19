@@ -39,6 +39,7 @@ import {
   cardsNewerThan,
   deckVersionOf,
 } from "@/lib/deck-version";
+import { DeckVersionPicker } from "@/components/deck-version-picker";
 import type { VersionOption } from "@/components/deck-version-picker";
 import type { JogressView } from "@/components/jogress-badge";
 
@@ -510,9 +511,6 @@ export default async function DeckEditPage({
             cover={loaded.cover}
             mine={mine}
             editable={canEdit}
-            versionOptions={loaded.versionOptions}
-            autoVersion={loaded.autoVersion}
-            newerThanVersion={loaded.newerThanVersion}
           />
 
           {/* mode switcher — only show build/purchase tabs if this deck is mine */}
@@ -624,6 +622,22 @@ export default async function DeckEditPage({
                     </span>
                   ) : null}
                 </div>
+
+                {/* Sits with the counts rather than up in the banner: the
+                    version is a FACT about the list, the same kind as
+                    "主卡组 50 / 50", and next to the deck's name it read as
+                    part of its title. */}
+                {loaded.versionOptions.length ? (
+                  <DeckVersionPicker
+                    game={game}
+                    deckId={loaded.deck.id}
+                    version={loaded.deck.version}
+                    options={loaded.versionOptions}
+                    auto={loaded.autoVersion}
+                    newer={loaded.newerThanVersion}
+                    editable={canEdit}
+                  />
+                ) : null}
 
                 <DeckRestrictionNotice issues={restrictionIssues} />
 

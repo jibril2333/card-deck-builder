@@ -21,7 +21,7 @@ test("offers the version the cards imply, and remembers what you pick", async ({
   // Nothing has been claimed about this deck yet.
   await expect(sel).toHaveValue("");
   // The deck holds BT1-086, so the shortcut names BT-01.
-  await expect(sel.locator("option", { hasText: "按最新的卡" })).toHaveText(
+  await expect(sel.locator("option", { hasText: "跟随卡表" })).toHaveText(
     /BT-01/,
   );
 

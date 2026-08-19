@@ -24,16 +24,19 @@ describe("collapseDecks", () => {
     expect(r.hidden).toBe(6);
   });
 
-  it("shows everything when expanded, holders first", () => {
+  it("shows everything when expanded, in the caller's order", () => {
+    // Deliberately NOT holders-first. Sorting them up meant that adding a copy
+    // promoted that deck to the top of the list, moving the row out from under
+    // the pointer that just clicked it.
     const r = collapseDecks(decks([0, 2, 0, 0, 0, 0, 1, 0]), true);
-    expect(r.shown.map((d) => d.id)).toEqual([1, 6, 0, 2, 3, 4, 5, 7]);
+    expect(r.shown.map((d) => d.id)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(r.hidden).toBe(0);
   });
 
   it("ignores `expanded` when there is nothing to fold", () => {
     const short = decks([0, 3, 0]);
-    expect(collapseDecks(short, false).shown.map((d) => d.id)).toEqual([1, 0, 2]);
-    expect(collapseDecks(short, true).shown.map((d) => d.id)).toEqual([1, 0, 2]);
+    expect(collapseDecks(short, false).shown.map((d) => d.id)).toEqual([0, 1, 2]);
+    expect(collapseDecks(short, true).shown.map((d) => d.id)).toEqual([0, 1, 2]);
   });
 
   it("handles an empty list", () => {
