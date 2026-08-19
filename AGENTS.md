@@ -179,6 +179,22 @@ Note the ntfy container running on THIS Mac (`127.0.0.1:8093`) is not
 necessarily the one behind `ntfy.raynefall.dev` — that server was moved to
 another machine. Point the settings at the real one.
 
+### ⚠️ A migration that touches `user.*` must be idempotent
+
+`PRAGMA user_version` lives on the **cards** database, but several migrations
+alter the **attached user** database (`user.decks`, `user.deck_cards`, …).
+`scripts/migrate.ts` runs inside a refresh against the WORK COPY: a copy of the
+cards DB *and* a copy of the user DB. So such a migration applies its ALTER to
+a file that is then thrown away, while its version stamp rides into production
+on the cards DB that gets swapped in. The live user DB never gets the change,
+and the version gate skips it forever.
+
+That happened with migration 35 (`decks.version`) — the app then threw
+"no such column: version" against a database whose schema version said it was
+current. 36 re-issues it. When you hit this: **add a new migration id** with a
+`hasColumn` guard rather than editing the old one, since already-correct
+databases must no-op.
+
 ### ⚠️ NEVER write the SQLite DBs while the container is running
 
 The prod container mounts `data.nosync/*.db` via a Docker **bind mount** (macOS

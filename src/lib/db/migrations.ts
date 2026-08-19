@@ -1131,6 +1131,33 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 36,
+    name: "decks.version, again — 35 was applied to a database we threw away",
+    up: (db) => {
+      // Not a mistake in 35; a hole in how the refresh migrates.
+      //
+      // `PRAGMA user_version` lives on the CARDS database, but migrations like
+      // 35 alter the ATTACHED user database. scripts/migrate.ts runs inside a
+      // refresh against the WORK COPY — a copy of the cards DB plus a copy of
+      // the user DB — so 35 added the column to a throwaway file and stamped
+      // 35 onto the cards copy. That copy is what gets swapped into
+      // production. The live user database never saw the ALTER, and the
+      // version gate then skipped it for good: `updateDeckMeta` failed with
+      // "no such column: version" on a database the schema claimed was
+      // current.
+      //
+      // Re-issuing it under a new id is the fix that works on every database
+      // at once — already-correct ones no-op on the hasColumn guard.
+      //
+      // The general rule this leaves behind: a migration that touches `user.*`
+      // must be idempotent, because a refresh can make its version stamp land
+      // without its effect. See AGENTS.md.
+      if (!hasColumn(db, "user.decks", "version")) {
+        db.exec("ALTER TABLE user.decks ADD COLUMN version TEXT DEFAULT NULL");
+      }
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(
