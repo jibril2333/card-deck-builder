@@ -1158,6 +1158,24 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 37,
+    name: "decks.locked — a deck you've finished changing",
+    up: (db) => {
+      // A tournament list you've registered, or a build you're happy with:
+      // the risk isn't malice, it's a mis-tap on a phone lying on the table
+      // between games. Enforced in the repo layer, not just hidden in the UI —
+      // see `assertUnlocked` in db/deck-shared.ts.
+      //
+      // Idempotent, per the rule above: this alters the ATTACHED user DB while
+      // the version stamp lives on the cards DB.
+      if (!hasColumn(db, "user.decks", "locked")) {
+        db.exec(
+          "ALTER TABLE user.decks ADD COLUMN locked INTEGER NOT NULL DEFAULT 0",
+        );
+      }
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

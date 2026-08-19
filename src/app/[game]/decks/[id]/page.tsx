@@ -10,6 +10,7 @@ import { DeckCardSearch } from "@/components/deck-card-search";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckHeader } from "@/components/deck-header";
 import { DeckDeleteButton } from "@/components/deck-delete-button";
+import { DeckLockButton } from "@/components/deck-lock-button";
 import { DeckPoolPicker } from "@/components/deck-pool-picker";
 import { DeckExportMenu } from "@/components/deck-export-menu";
 import {
@@ -149,6 +150,8 @@ type Loaded = {
     cover_variant: string;
     /** Pack this list is built for, e.g. 'BT-26'. See lib/deck-version. */
     version: string | null;
+    /** Closed to edits — every write path refuses. */
+    locked: boolean;
     updated_at: string;
     user_id: string | null;
   };
@@ -295,6 +298,7 @@ export default async function DeckEditPage({
       cover_card_id: deck.cover_card_id,
       cover_variant: deck.cover_variant ?? "",
       version: deck.version ?? null,
+      locked: !!deck.locked,
       updated_at: deck.updated_at,
       user_id: deck.user_id,
     },
@@ -419,7 +423,12 @@ export default async function DeckEditPage({
   // Anyone else (friend viewing) is silently demoted to browse, and the
   // mode-switcher tabs hide the disallowed options.
   const mine = me !== null && loaded.deck.user_id === me.id;
-  const mode: "browse" | "build" | "purchase" = mine
+  // A locked deck is your deck that you've closed: still yours (the lock
+  // button, the export menu and the pool picker stay), but every editing
+  // affordance goes away and build/purchase demote to browse — the same
+  // demotion a friend's deck gets, for a different reason.
+  const canEdit = mine && !loaded.deck.locked;
+  const mode: "browse" | "build" | "purchase" = canEdit
     ? requestedMode
     : "browse";
   // Shared pools, for the sidebar picker. Only the owner can change membership,
@@ -500,6 +509,7 @@ export default async function DeckEditPage({
             deck={loaded.deck}
             cover={loaded.cover}
             mine={mine}
+            editable={canEdit}
             versionOptions={loaded.versionOptions}
             autoVersion={loaded.autoVersion}
             newerThanVersion={loaded.newerThanVersion}
@@ -520,7 +530,7 @@ export default async function DeckEditPage({
             >
               👁 浏览
             </Link>
-            {mine ? (
+            {canEdit ? (
               <>
                 <Link
                   href={`/${game}/decks/${loaded.deck.id}?mode=build`}
@@ -761,7 +771,7 @@ export default async function DeckEditPage({
                       violation={issueByCardId.has(c.id)}
                       isCover={c.id === loaded.deck.cover_card_id}
                       mode={mode}
-                      mine={mine}
+                      mine={canEdit}
                       searchTargets={loaded.searchTargets.get(c.id)}
                       jogress={loaded.jogress.get(c.id)}
                     />
@@ -773,7 +783,7 @@ export default async function DeckEditPage({
 
           {/* Owner-only scratch list of swaps under consideration. Sits below
               the deck itself and feeds into nothing else. */}
-          {mine ? (
+          {canEdit ? (
             <DeckAdjustments
               game={game}
               deckId={loaded.deck.id}
@@ -814,11 +824,22 @@ export default async function DeckEditPage({
               of click-to-edit fields, and this is the one action there is no
               undo for. */}
           {mine ? (
-            <DeckDeleteButton
-              game={game}
-              deckId={loaded.deck.id}
-              deckName={loaded.deck.name}
-            />
+            <div className="flex items-center gap-2 flex-wrap">
+              <DeckLockButton
+                game={game}
+                deckId={loaded.deck.id}
+                locked={loaded.deck.locked}
+              />
+              {/* Deleting a locked deck means unlocking it first — the button
+                  isn't here to be argued with. */}
+              {canEdit ? (
+                <DeckDeleteButton
+                  game={game}
+                  deckId={loaded.deck.id}
+                  deckName={loaded.deck.name}
+                />
+              ) : null}
+            </div>
           ) : null}
         </aside>
       </main>

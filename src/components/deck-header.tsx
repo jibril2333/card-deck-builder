@@ -53,6 +53,7 @@ export function DeckHeader({
   deck,
   cover,
   mine,
+  editable,
   versionOptions,
   autoVersion,
   newerThanVersion,
@@ -60,7 +61,12 @@ export function DeckHeader({
   game: string;
   deck: DeckLite;
   cover: Cover | null;
+  /** Ownership. Decides whether this reads as someone else's deck. */
   mine: boolean;
+  /** Yours AND open — a locked deck is `mine` but not `editable`. Keeping the
+   *  two apart is what stops a locked deck being labelled 只读, which would
+   *  say it belongs to somebody else. */
+  editable: boolean;
   /** Every pack, newest first. Empty until the `sets` refresh stage has run. */
   versionOptions: VersionOption[];
   autoVersion: string | null;
@@ -72,7 +78,7 @@ export function DeckHeader({
     ? `linear-gradient(135deg, ${deck.accent_color}55, ${deck.accent_color2}55)`
     : `linear-gradient(135deg, ${deck.accent_color}33, transparent)`;
 
-  const canPickArt = mine && !!cover && cover.arts.length > 1;
+  const canPickArt = editable && !!cover && cover.arts.length > 1;
 
   return (
     <div className="mb-3">
@@ -126,7 +132,7 @@ export function DeckHeader({
                 src={cover.image_url}
                 alt={cover.name}
                 referrerPolicy="no-referrer"
-                title={mine ? "封面来自卡组里点了 ★ 的那张卡" : undefined}
+                title={editable ? "封面来自卡组里点了 ★ 的那张卡" : undefined}
                 className="h-20 sm:h-28 aspect-[5/7] object-cover rounded-md shadow-lg border-2 border-white/80 shrink-0"
               />
             )
@@ -134,7 +140,7 @@ export function DeckHeader({
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <DeckName game={game} deck={deck} editable={mine} />
+              <DeckName game={game} deck={deck} editable={editable} />
               {versionOptions.length ? (
                 <DeckVersionPicker
                   game={game}
@@ -143,8 +149,16 @@ export function DeckHeader({
                   options={versionOptions}
                   auto={autoVersion}
                   newer={newerThanVersion}
-                  editable={mine}
+                  editable={editable}
                 />
+              ) : null}
+              {mine && !editable ? (
+                <span
+                  className="px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
+                  title="这副卡组已锁定 —— 在下方解锁后才能改"
+                >
+                  🔒 已锁定
+                </span>
               ) : null}
               {!mine ? (
                 <span
@@ -156,11 +170,11 @@ export function DeckHeader({
               ) : null}
             </div>
             <div className="mt-1 min-h-[2.5rem]">
-              <DeckNotes game={game} deck={deck} editable={mine} />
+              <DeckNotes game={game} deck={deck} editable={editable} />
             </div>
           </div>
 
-          {mine ? (
+          {editable ? (
             <div className="shrink-0 self-end">
               <DeckAccentPicker
                 game={game}

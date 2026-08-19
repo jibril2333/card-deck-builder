@@ -137,6 +137,24 @@ export async function updateDeckMetaAction(formData: FormData) {
  * one-control component and sending the whole meta payload from it would make
  * every version change also a chance to clobber the name.
  */
+/**
+ * Close a deck to edits, or open it again.
+ *
+ * The lock is enforced in the repo layer (every write path throws
+ * `DeckLockedError`), so this action only has to flip the flag — the UI hiding
+ * the edit controls is a courtesy, not the mechanism.
+ */
+export async function setDeckLockedAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const id = String(formData.get("id"));
+  const locked = String(formData.get("locked")) === "1";
+  if (!isGameId(game)) throw new Error("invalid game");
+  backupBeforeWrite(game);
+  digimon.setDeckLocked(me.id, id, locked);
+  bumpDeckAndList(game, id);
+}
+
 export async function setDeckVersionAction(formData: FormData) {
   const me = await requireUser();
   const game = String(formData.get("game"));

@@ -60,6 +60,7 @@ export default async function CardPage({
         accent_color2: d.accent_color2,
         card_qty: d.card_qty,
         total: d.total,
+        locked: !!d.locked,
       }))
     : [];
   // Art in the reader's language. getCardImages never interleaves languages:
@@ -402,6 +403,8 @@ function DigimonDetail({
     accent_color2: string | null;
     card_qty: number;
     total: number;
+    /** Closed to edits — listed with a 🔒 and no controls. */
+    locked: boolean;
   }[];
   variants: digimon.CardImageVariant[];
   defaultVariant?: string;

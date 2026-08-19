@@ -581,8 +581,10 @@ export const VERSION_DECK = {
   id: "e2e-version-deck",
   name: "版本测试",
   version: "ZZ-03",
-  /** Newer than the recorded version — the two copies that should be counted. */
-  newerCode: "BT1-084",
+  /** Newer than the recorded version — the two copies that should be counted.
+   *  Deliberately NOT BT1-084: add-to-deck-collapse.spec opens that card and
+   *  asserts no deck holds it yet. */
+  newerCode: "BT1-085",
   newerCount: 2,
   newerSet: "BT-01",
 } as const;

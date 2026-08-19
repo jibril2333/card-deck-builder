@@ -45,6 +45,8 @@ export type DeckCardInfo = {
   counts: { main: number; egg: number };
   /** How many cards in it the current banlist disagrees with. */
   issues: number;
+  /** Closed to edits. */
+  locked: boolean;
   updated_at: string;
   /** Display name of the deck's owner, or null for legacy unowned decks. */
   owner_name: string | null;
@@ -359,6 +361,15 @@ export function DecksGrid({
               </div>
               <div className="card-name flex items-center gap-1 text-xs font-medium group-hover:text-[var(--color-accent)] min-w-0">
                 <span className="truncate">{d.name}</span>
+                {d.locked ? (
+                  <span
+                    className="shrink-0 text-[10px]"
+                    title="已锁定 —— 改不了,直到在卡组页解锁"
+                    aria-label="已锁定"
+                  >
+                    🔒
+                  </span>
+                ) : null}
                 {d.issues > 0 ? (
                   <StatusDot
                     color="bg-red-500"

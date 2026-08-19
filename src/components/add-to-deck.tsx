@@ -18,6 +18,8 @@ type DeckEntry = {
   accent_color2: string | null;
   card_qty: number;
   total: number;
+  /** Closed to edits. Shown, but with no controls — see DeckEntryRow. */
+  locked: boolean;
 };
 
 const COLLAPSE_KEY = "cdb.add-to-deck.expanded";
@@ -153,8 +155,40 @@ function DeckEntryRow({
     });
   }
 
+  // A locked deck is listed rather than filtered out: a deck that silently
+  // isn't in this list reads as a bug, and "why can't I add to it" is exactly
+  // the question the lock icon answers. The server refuses these writes too,
+  // so this is presentation, not protection.
+  if (deck.locked) {
+    return (
+      <div
+        role="group"
+        aria-label={deck.name}
+        className="flex items-center gap-2 px-3 py-2 opacity-60"
+        title="这副卡组已锁定 —— 在卡组页解锁后才能改"
+      >
+        <span
+          aria-hidden
+          className="w-1.5 h-8 rounded-full shrink-0"
+          style={{ background: deck.accent_color }}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">{deck.name}</div>
+          <div className="text-[10px] text-[var(--color-muted-fg)] tabular-nums">
+            已有 <b className="text-[var(--color-fg)]">{qty}</b> 张 · 卡组共 {total} 张
+          </div>
+        </div>
+        <span className="shrink-0 text-xs text-[var(--color-muted-fg)]">🔒 已锁定</span>
+      </div>
+    );
+  }
+
   return (
     <div
+      // Named so the deck's own controls are one addressable group — a screen
+      // reader otherwise reads a bare ＋ with no idea which deck it adds to.
+      role="group"
+      aria-label={deck.name}
       className={`flex items-center gap-2 px-3 py-2 ${
         pending ? "opacity-90" : ""
       } ${qty > 0 ? "bg-[var(--color-accent)]/5" : ""}`}

@@ -1,5 +1,5 @@
 import { getDB } from "./connection";
-import { createDeckRepo, OwnershipError } from "./deck-shared";
+import { createDeckRepo, DeckLockedError, OwnershipError } from "./deck-shared";
 import { splitTerms } from "@/lib/search-terms";
 import type { CardTranslation } from "./translations-ddl";
 import type { CardRuling } from "./rulings-ddl";
@@ -70,6 +70,8 @@ export type DigimonDeck = {
   /** Pack this list is built for, e.g. 'BT-26'. NULL = never set.
    *  See lib/deck-version — it's a label, nothing enforces it. */
   version: string | null;
+  /** 1 = closed to edits. Enforced in the repo, not just the UI. */
+  locked: number;
   created_at: string;
   updated_at: string;
   user_id: string | null;
@@ -581,6 +583,8 @@ export const {
   listDecksWithCover,
   reorderDecks,
   setDeckPinned,
+  setDeckLocked,
+  isDeckLocked,
   setDeckCoverVariant,
   listDeckAdjustments,
   addDeckAdjustment,
@@ -661,6 +665,9 @@ export function updateDeckMeta(
     version?: string | null;
   },
 ): void {
+  // Name, notes, colours and version are all "the deck", so a lock covers
+  // them too — see assertUnlocked in deck-shared.
+  if (isDeckLocked(id)) throw new DeckLockedError(id);
   const sets: string[] = [];
   const params: unknown[] = [];
   if (patch.name !== undefined) {

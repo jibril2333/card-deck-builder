@@ -113,6 +113,20 @@ export class OwnershipError extends Error {
   }
 }
 
+/**
+ * Thrown by every write path when the deck is locked.
+ *
+ * Its own type rather than an OwnershipError so callers can tell "not yours"
+ * (a 404-ish condition, don't explain) apart from "yours, but you closed it"
+ * (worth saying out loud, with the way to undo it).
+ */
+export class DeckLockedError extends Error {
+  constructor(public readonly deckId: string) {
+    super(`deck ${deckId} is locked`);
+    this.name = "DeckLockedError";
+  }
+}
+
 export function createDeckRepo<TCard, TDeck extends DeckCommon>(
   opts: RepoOptions,
 ) {
@@ -123,6 +137,26 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
   const seedColor = !!opts.firstCardSeed?.color;
   /** Has *any* first-card behavior — gates expensive pre-write SELECTs. */
   const hasAnyFirstCardSeed = seedAccent || seedSeries || seedColor;
+
+  /**
+   * Is this deck closed to edits?
+   *
+   * Checked in the repo rather than in the Server Actions because there are
+   * two dozen write paths and they don't all go through the deck page: the
+   * card page's 加入卡组 widget, the group/pool reconciler and the purchase
+   * tracker all reach deck_cards by other routes. One gate here covers every
+   * one of them, the same way `clampQuantityToRestriction` does.
+   */
+  function isDeckLocked(deckId: string): boolean {
+    const r = db()
+      .prepare(`SELECT locked FROM user.decks WHERE id = ?`)
+      .get(deckId) as { locked?: number } | undefined;
+    return !!r?.locked;
+  }
+
+  function assertUnlocked(deckId: string): void {
+    if (isDeckLocked(deckId)) throw new DeckLockedError(deckId);
+  }
 
   /**
    * Look up the official banlist / restricted-list cap for the card the
@@ -409,6 +443,25 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
    * `updated_at` is deliberately NOT bumped — it means "last edited the deck's
    * cards", and the deck list surfaces it as such.
    */
+  /**
+   * Close a deck to edits, or open it again.
+   *
+   * The one write that works ON a locked deck — otherwise there'd be no way
+   * back. Ownership is checked the same way everything else here checks it.
+   */
+  function setDeckLocked(
+    currentUserId: string,
+    deckId: string,
+    locked: boolean,
+  ): void {
+    const r = db()
+      .prepare(
+        `UPDATE user.decks SET locked = ? WHERE id = ? AND user_id = ?`,
+      )
+      .run(locked ? 1 : 0, deckId, currentUserId);
+    if (r.changes === 0) throw new OwnershipError(deckId);
+  }
+
   function setDeckPinned(
     currentUserId: string,
     deckId: string,
@@ -433,6 +486,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     deckId: string,
     variant: string,
   ): void {
+    assertUnlocked(deckId);
     const r = db()
       .prepare(
         `UPDATE user.decks SET cover_variant = ?, updated_at = CURRENT_TIMESTAMP
@@ -546,6 +600,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     cardId: string | null,
     mode: "auto" | "force" = "auto",
   ): void {
+    assertUnlocked(deckId);
     if (cardId === null) {
       const r = db()
         .prepare(
@@ -819,6 +874,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     cardId: string,
     kind: "add" | "remove",
   ): void {
+    assertUnlocked(deckId);
     const owns = db()
       .prepare(`SELECT 1 FROM user.decks WHERE id = ? AND user_id = ?`)
       .get(deckId, currentUserId);
@@ -849,7 +905,9 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
       .prepare(
         `UPDATE user.deck_adjustments SET quantity = ?
           WHERE id = ?
-            AND deck_id IN (SELECT id FROM user.decks WHERE user_id = ?)`,
+            AND deck_id IN (
+                  SELECT id FROM user.decks WHERE user_id = ? AND locked = 0
+                )`,
       )
       .run(q, id, currentUserId);
   }
@@ -863,7 +921,9 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
       .prepare(
         `DELETE FROM user.deck_adjustments
           WHERE id = ?
-            AND deck_id IN (SELECT id FROM user.decks WHERE user_id = ?)`,
+            AND deck_id IN (
+                  SELECT id FROM user.decks WHERE user_id = ? AND locked = 0
+                )`,
       )
       .run(id, currentUserId);
   }
@@ -877,12 +937,17 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
       .prepare(
         `UPDATE user.deck_adjustments SET note = ?
           WHERE id = ?
-            AND deck_id IN (SELECT id FROM user.decks WHERE user_id = ?)`,
+            AND deck_id IN (
+                  SELECT id FROM user.decks WHERE user_id = ? AND locked = 0
+                )`,
       )
       .run(note.trim() || null, id, currentUserId);
   }
 
   function deleteDeck(currentUserId: string, id: string): void {
+    // Deleting isn't editing, but it's the one thing a lock most obviously
+    // has to stop — unlock first, deliberately.
+    assertUnlocked(id);
     const r = db()
       .prepare(`DELETE FROM user.decks WHERE id = ? AND user_id = ?`)
       .run(id, currentUserId);
@@ -895,6 +960,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     cardId: string,
     quantity: number,
   ): void {
+    assertUnlocked(deckId);
     // Silent clamp against the official restrictions table. If the user
     // asks for "4 of a banned card", we record 0; their UI's optimistic
     // update then snaps back to 0 on the next refresh.
@@ -1063,12 +1129,16 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     }
   }
 
+  /** Locked too: 已购 is stored on the deck's own row, and "any change" was
+   *  the point. Pool levelling skips locked decks rather than failing — see
+   *  reconcilePoolCard. */
   function setDeckCardPurchased(
     currentUserId: string,
     deckId: string,
     cardId: string,
     purchased: number,
   ): void {
+    assertUnlocked(deckId);
     const owned = db()
       .prepare(`SELECT 1 FROM user.decks WHERE id = ? AND user_id = ?`)
       .get(deckId, currentUserId);
@@ -1092,6 +1162,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     cardId: string,
     delta: number,
   ): number {
+    assertUnlocked(deckId);
     const cur =
       (
         db()
@@ -1111,6 +1182,7 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     cardId: string,
     delta: number,
   ): number {
+    assertUnlocked(deckId);
     const cur =
       (
         db()
@@ -1554,8 +1626,11 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     const tx = db().transaction(() => {
       db()
         .prepare(
+          // Locked peers are skipped, not refused: one closed deck in a pool
+          // must not stop the others from being levelled.
           `UPDATE user.deck_cards SET purchased = MIN(quantity, ?)
-           WHERE card_id = ? AND deck_id IN (${placeholders})`,
+           WHERE card_id = ? AND deck_id IN (${placeholders})
+             AND deck_id IN (SELECT id FROM user.decks WHERE locked = 0)`,
         )
         .run(Math.max(0, owned), cardId, ...deckIds);
       db()
@@ -1591,7 +1666,8 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
         db()
           .prepare(
             `UPDATE user.deck_cards SET purchased = MIN(quantity, ?)
-             WHERE card_id = ? AND deck_id IN (${placeholders})`,
+             WHERE card_id = ? AND deck_id IN (${placeholders})
+               AND deck_id IN (SELECT id FROM user.decks WHERE locked = 0)`,
           )
           .run(c.owned, c.card_id, ...members);
       }
@@ -1610,6 +1686,8 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
     listDecksWithCover,
     reorderDecks,
     setDeckPinned,
+    setDeckLocked,
+    isDeckLocked,
     setDeckCoverVariant,
     listDeckAdjustments,
     addDeckAdjustment,

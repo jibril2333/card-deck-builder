@@ -55,6 +55,7 @@ export default async function DecksPage({
     complete: completedDeckIds.has(d.id),
     counts: counts.get(d.id) ?? { main: 0, egg: 0 },
     issues: issues.get(d.id) ?? 0,
+    locked: !!d.locked,
   }));
 
   // Fetch every deck's card list once and derive both auxiliary tool inputs
@@ -166,6 +167,7 @@ export default async function DecksPage({
                 cover_image_url: d.cover_image_url,
                 counts: d.counts,
                 issues: d.issues,
+                locked: d.locked,
                 updated_at: d.updated_at,
                 owner_name: d.owner_name,
                 mine: d.mine,
