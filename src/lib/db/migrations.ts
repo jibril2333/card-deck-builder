@@ -1091,6 +1091,46 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: 34,
+    name: "card_sets — the product list, in the order Bandai releases it",
+    up: (db) => {
+      // Which pack is NEWER is not derivable from anything we already store.
+      // Card codes sort within a series (BT25 < BT26) and not at all across
+      // them — BT-25, AD-01, EX-11 and BT-24 came out in that order, and no
+      // amount of string comparison finds it. `imported_at` is not it either:
+      // everything from the first bulk import shares one timestamp.
+      //
+      // digimoncard.com's card list has the answer as data: its 収録弾
+      // dropdown is the official product list, newest first. We store its
+      // order — see scripts/scrape-digimon-sets.ts.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS card_sets (
+          code          TEXT PRIMARY KEY,  -- 'BT-26', 'EX-12', 'LM-05'
+          category      TEXT,              -- the site's own id, e.g. '503040'
+          name_ja       TEXT NOT NULL,
+          -- Bigger = newer. Derived from the dropdown's position, so it stays
+          -- correct as packs are added without anyone maintaining a list.
+          release_order INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_card_sets_order
+          ON card_sets(release_order DESC);
+      `);
+    },
+  },
+  {
+    id: 35,
+    name: "decks.version — which pack this list is built for",
+    up: (db) => {
+      // A pack code from card_sets, or NULL for "never set". Deliberately not
+      // a foreign key: the cards DB and the user DB are separate files, and a
+      // deck's recorded version must survive a card-DB swap that has not yet
+      // scraped that pack.
+      if (!hasColumn(db, "user.decks", "version")) {
+        db.exec("ALTER TABLE user.decks ADD COLUMN version TEXT DEFAULT NULL");
+      }
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

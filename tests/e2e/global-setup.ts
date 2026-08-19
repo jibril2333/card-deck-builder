@@ -21,6 +21,7 @@ import path from "node:path";
 import {
   createE2ESession,
   seedJogressDeck,
+  seedVersionDeck,
   seedViolatingDeck,
 } from "./fixtures/seed";
 
@@ -40,6 +41,8 @@ export default async function globalSetup() {
   // A deck the current banlist disagrees with. Seeded here rather than built
   // by a spec because the app refuses to write one (see seedViolatingDeck).
   seedViolatingDeck(digimonUserDb, userId);
+  // A deck already labelled BT-01 that holds a ZZ-03 card — see seedVersionDeck.
+  seedVersionDeck(digimonUserDb, userId);
   seedJogressDeck(digimonUserDb, userId);
 
   // Persist a Playwright storageState file pointing at that session. Fixed

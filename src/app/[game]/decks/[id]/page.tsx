@@ -33,6 +33,12 @@ import { DECK_TARGET } from "@/lib/deck-legality";
 import { tallyColors, tallyLevels, MULTI_COLOR } from "@/lib/deck-tally";
 import { DeckRestrictionNotice } from "@/components/deck-restriction-notice";
 import { computeDeckJogress } from "@/lib/jogress";
+import {
+  buildSetOrder,
+  cardsNewerThan,
+  deckVersionOf,
+} from "@/lib/deck-version";
+import type { VersionOption } from "@/components/deck-version-picker";
 import type { JogressView } from "@/components/jogress-badge";
 
 type RawDeckCard = {
@@ -141,9 +147,17 @@ type Loaded = {
     cover_card_id: string | null;
     /** Which printing of the cover card to show ('' = base art). */
     cover_variant: string;
+    /** Pack this list is built for, e.g. 'BT-26'. See lib/deck-version. */
+    version: string | null;
     updated_at: string;
     user_id: string | null;
   };
+  /** Every pack, newest first — the version picker's vocabulary. */
+  versionOptions: VersionOption[];
+  /** What the deck's own cards imply the version should be. */
+  autoVersion: string | null;
+  /** Cards needing a pack newer than the recorded version. */
+  newerThanVersion: number;
   cards: DeckCardData[];
   /** Considered swaps — display only; excluded from every other computation. */
   adjustments: Adjustment[];
@@ -262,6 +276,12 @@ export default async function DeckEditPage({
     ]),
   );
 
+  // Pack order comes from the official product list (the `sets` refresh
+  // stage). Empty on a database that predates it — the picker then renders
+  // nothing rather than offering a vocabulary of one.
+  const cardSets = digimon.listCardSets();
+  const setOrder = buildSetOrder(cardSets);
+
   loaded = {
     deck: {
       id: deck.id,
@@ -274,9 +294,26 @@ export default async function DeckEditPage({
       locked_color: null,
       cover_card_id: deck.cover_card_id,
       cover_variant: deck.cover_variant ?? "",
+      version: deck.version ?? null,
       updated_at: deck.updated_at,
       user_id: deck.user_id,
     },
+    versionOptions: cardSets.map((s) => ({
+      code: s.code,
+      name_ja: s.name_ja,
+      name_en: s.name_en,
+    })),
+    autoVersion: deckVersionOf(cards, setOrder),
+    // Counted in COPIES, not distinct cards — "3 张" is what a player counts,
+    // and it's the number they'd have to take out.
+    newerThanVersion: (() => {
+      const newer = new Set(
+        cardsNewerThan(deck.version ?? null, cards, setOrder).map((c) => c.code),
+      );
+      return cards
+        .filter((c) => newer.has(c.code))
+        .reduce((n, c) => n + c.quantity, 0);
+    })(),
     adjustments: digimon.listDeckAdjustments(id),
     cards: cards.map((c) => {
       const t = tMap.get(c.code);
@@ -463,6 +500,9 @@ export default async function DeckEditPage({
             deck={loaded.deck}
             cover={loaded.cover}
             mine={mine}
+            versionOptions={loaded.versionOptions}
+            autoVersion={loaded.autoVersion}
+            newerThanVersion={loaded.newerThanVersion}
           />
 
           {/* mode switcher — only show build/purchase tabs if this deck is mine */}

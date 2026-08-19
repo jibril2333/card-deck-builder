@@ -67,6 +67,9 @@ export type DigimonDeck = {
   /** Which printing of the cover card to show: '' = base art, else a
    *  `card_images.variant` key such as '_P1'. */
   cover_variant: string;
+  /** Pack this list is built for, e.g. 'BT-26'. NULL = never set.
+   *  See lib/deck-version — it's a label, nothing enforces it. */
+  version: string | null;
   created_at: string;
   updated_at: string;
   user_id: string | null;
@@ -654,6 +657,8 @@ export function updateDeckMeta(
     notes?: string | null;
     accent_color?: string;
     accent_color2?: string | null;
+    /** Pack code from `card_sets`, or null to clear. See lib/deck-version. */
+    version?: string | null;
   },
 ): void {
   const sets: string[] = [];
@@ -673,6 +678,10 @@ export function updateDeckMeta(
   if (patch.accent_color2 !== undefined) {
     sets.push("accent_color2 = ?");
     params.push(patch.accent_color2);
+  }
+  if (patch.version !== undefined) {
+    sets.push("version = ?");
+    params.push(patch.version);
   }
   if (sets.length === 0) return;
   sets.push("updated_at = CURRENT_TIMESTAMP");
@@ -997,6 +1006,51 @@ export type RefreshRun = {
  * Written by `scripts/diff-refresh.ts` into the work copy just before the swap,
  * so a run's rows land together with the data they describe.
  */
+/**
+ * Every pack, newest first — the vocabulary for `decks.version`.
+ *
+ * `name_en` is pulled out of our own `set_names` when we have it: the JP site
+ * is where the ORDER comes from, but "Booster TIMELESS BONDS" reads better in
+ * a dropdown than ブースターパック TIMELESS BONDS for someone playing in
+ * Chinese or English.
+ */
+export function listCardSets(): {
+  code: string;
+  name_ja: string;
+  name_en: string | null;
+  release_order: number;
+}[] {
+  const sets = db()
+    .prepare(
+      `SELECT code, name_ja, release_order FROM card_sets ORDER BY release_order DESC`,
+    )
+    .all() as { code: string; name_ja: string; release_order: number }[];
+  if (sets.length === 0) return [];
+
+  // One pass over the distinct product titles, matched back by bracket code.
+  const en = new Map<string, string>();
+  for (const r of db()
+    .prepare(
+      `SELECT DISTINCT set_names FROM cards WHERE set_names LIKE '%[%]%'`,
+    )
+    .all() as { set_names: string }[]) {
+    for (const part of r.set_names.split(/\s*;\s*/)) {
+      const m = part.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
+      if (!m) continue;
+      const key = m[2].toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (!en.has(key)) en.set(key, m[1].trim());
+    }
+  }
+  const norm = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return sets.map((s) => {
+    const k = norm(s.code);
+    // "BT26" vs "BT026" vs "LM1"/"LM01" — try the padded and unpadded forms.
+    const m = k.match(/^([A-Z]+)0*(\d+)$/);
+    const alt = m ? `${m[1]}${m[2].padStart(2, "0")}` : k;
+    return { ...s, name_en: en.get(k) ?? en.get(alt) ?? null };
+  });
+}
+
 export function listRefreshRuns(limit = 5): RefreshRun[] {
   const runs = db()
     .prepare(

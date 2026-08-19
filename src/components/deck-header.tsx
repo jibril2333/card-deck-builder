@@ -6,6 +6,10 @@ import { updateDeckMetaAction } from "@/app/[game]/actions";
 import { CoverVariantPicker } from "@/components/cover-variant-picker";
 import { DeckAccentPicker } from "@/components/deck-accent-picker";
 import { InlineText, type SaveStatus } from "@/components/inline-text";
+import {
+  DeckVersionPicker,
+  type VersionOption,
+} from "@/components/deck-version-picker";
 
 type DeckLite = {
   id: string;
@@ -14,6 +18,7 @@ type DeckLite = {
   accent_color: string;
   accent_color2: string | null;
   cover_variant: string | null;
+  version: string | null;
 };
 
 type Cover = {
@@ -48,11 +53,18 @@ export function DeckHeader({
   deck,
   cover,
   mine,
+  versionOptions,
+  autoVersion,
+  newerThanVersion,
 }: {
   game: string;
   deck: DeckLite;
   cover: Cover | null;
   mine: boolean;
+  /** Every pack, newest first. Empty until the `sets` refresh stage has run. */
+  versionOptions: VersionOption[];
+  autoVersion: string | null;
+  newerThanVersion: number;
 }) {
   const [arts, setArts] = useState(false);
 
@@ -123,6 +135,17 @@ export function DeckHeader({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <DeckName game={game} deck={deck} editable={mine} />
+              {versionOptions.length ? (
+                <DeckVersionPicker
+                  game={game}
+                  deckId={deck.id}
+                  version={deck.version}
+                  options={versionOptions}
+                  auto={autoVersion}
+                  newer={newerThanVersion}
+                  editable={mine}
+                />
+              ) : null}
               {!mine ? (
                 <span
                   className="px-2 py-0.5 text-xs rounded-full bg-[var(--color-muted)] text-[var(--color-muted-fg)] border border-[var(--color-border)]"

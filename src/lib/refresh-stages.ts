@@ -20,6 +20,7 @@ export type RefreshStage = {
 /** Order matches `refresh-cards.sh`'s ALL_STAGES, which is also run order. */
 export const REFRESH_STAGES: RefreshStage[] = [
   { id: "cards", label: "新卡", hint: "发现并导入新卡（含新弹）" },
+  { id: "sets", label: "卡包", hint: "官方卡包列表与发售顺序（卡组版本用）" },
   { id: "text", label: "中/日文", hint: "翻译文本 + 中文卡面" },
   { id: "art", label: "异画", hint: "英/日文异画图" },
   { id: "keywords", label: "关键词", hint: "官方规则里的关键词表" },

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isGameId, type GameId, GAMES } from "@/lib/games";
 import * as digimon from "@/lib/db/digimon";
+import { buildSetOrder, deckVersionOf } from "@/lib/deck-version";
 import { backupBeforeWrite } from "@/lib/db/connection";
 import { parseDeckText } from "@/lib/deck-formats";
 import { stripAltArt } from "@/lib/alt-art";
@@ -126,6 +127,24 @@ export async function updateDeckMetaAction(formData: FormData) {
     accent_color: accent_color || undefined,
     accent_color2,
   });
+  bumpDeckAndList(game, id);
+}
+
+/**
+ * Set (or clear) the pack this deck is built for.
+ *
+ * Its own action rather than a field on updateDeckMeta's form: the picker is a
+ * one-control component and sending the whole meta payload from it would make
+ * every version change also a chance to clobber the name.
+ */
+export async function setDeckVersionAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const id = String(formData.get("id"));
+  const raw = String(formData.get("version") ?? "").trim();
+  if (!isGameId(game)) throw new Error("invalid game");
+  backupBeforeWrite(game);
+  digimon.updateDeckMeta(me.id, id, { version: raw || null });
   bumpDeckAndList(game, id);
 }
 
@@ -761,6 +780,26 @@ export async function importDeckAction(formData: FormData): Promise<{
   // would render blank).
   if (hero) {
     l.setDeckCover(me.id, deckId, hero.id);
+  }
+
+  // Date the list by its own contents: the newest pack any card in it needs.
+  // An imported list is a snapshot of somebody's deck at a moment in the
+  // format, and that moment is recoverable from the cards themselves — asking
+  // the importer to pick it from a dropdown would be asking them to restate
+  // what they just pasted. Best-effort: a card pool with no `card_sets` rows
+  // yet (the `sets` refresh stage never run) leaves it unset.
+  try {
+    const order = buildSetOrder(digimon.listCardSets());
+    const version = deckVersionOf(
+      plan
+        .map((w) => digimon.getCardById(w.cardId))
+        .filter((c): c is NonNullable<typeof c> => !!c),
+      order,
+    );
+    if (version) digimon.updateDeckMeta(me.id, deckId, { version });
+  } catch (err) {
+    // Never lose an import over the label.
+    console.error("[import] version detection failed:", err);
   }
 
   bumpDeckList(game);

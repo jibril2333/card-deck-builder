@@ -17,7 +17,8 @@
 #   scripts/refresh-cards.sh cards text art
 #   scripts/refresh-cards.sh --list       # show available stages
 #
-# Stages: cards (sync-cards) · text (zh+ja translations) · art (en+ja alt arts)
+# Stages: cards (sync-cards) · sets (official pack list + release order)
+#         text (zh+ja translations) · art (en+ja alt arts)
 #         keywords (official keyword vocabulary) · rulings · prices · restrictions
 #
 # Exit codes: 0 ok · 1 failure (live DB untouched or rolled back) · 2 bad usage
@@ -38,7 +39,7 @@ LOCK_DIR="$DATA_DIR/.refresh.lock"
 STATUS_FILE="$DATA_DIR/refresh-status.json"
 LOG_FILE="$DATA_DIR/refresh.log"
 
-ALL_STAGES=(cards text art keywords rulings prices restrictions)
+ALL_STAGES=(cards sets text art keywords rulings prices restrictions)
 
 if [ "${1:-}" = "--list" ]; then
   printf '%s\n' "${ALL_STAGES[@]}"
@@ -161,6 +162,9 @@ TSX="npx tsx"
 for stage in "${STAGES[@]}"; do
   case "$stage" in
     cards)   run cards        $TSX scripts/sync-cards.ts || exit 1 ;;
+    sets)    # The pack dropdown off digimoncard.com — the only source that
+             # says which pack is NEWER, which is what dates a deck.
+             run sets         $TSX scripts/scrape-digimon-sets.ts || exit 1 ;;
     text)    # Official EN first: digimoncard.io (the `cards` stage) is a
              # community mirror and gets structure wrong — most visibly it has
              # no notion of a Dual card's second face and dumps it into

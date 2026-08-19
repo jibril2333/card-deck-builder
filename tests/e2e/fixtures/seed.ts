@@ -141,6 +141,24 @@ const SEED_TRANSLATIONS: [string, "ja" | "zh", string, string][] = [
   ["BT1-086", "zh", "石田大和", "https://source.windoent.com/DTCG/BT1-086.png"],
 ];
 
+/**
+ * Two packs, so a deck can be dated (see lib/deck-version).
+ *
+ * The release order here is deliberately the REVERSE of the codes' string
+ * sort: the invented ZZ-03 is the OLD one and BT-01 the newest. That's the
+ * only arrangement these two codes can express that tells the two orderings
+ * apart — with BT-01 old and ZZ-03 new, sorting by code gives the same answer
+ * as sorting by release, and the fixture would agree with a version picker
+ * that had the whole idea wrong.
+ *
+ * (In the real data the distinction is BT-25 → AD-01 → EX-11 → BT-24, where
+ * no string comparison finds the order at all.)
+ */
+const SEED_SETS: [string, string, number][] = [
+  ["ZZ-03", "テストブースター【ZZ-03】", 1],
+  ["BT-01", "ブースターパック NEW EVOLUTION【BT-01】", 90],
+];
+
 /** One trigger with two partners, mirroring the real Chaosmon: Valdur Arm row. */
 const SEED_PAIRS: [string, string][] = [
   ["ZZ2-001", "ZZ2-010"],
@@ -350,6 +368,20 @@ export function seedDigimonDb(dbPath: string): void {
     });
     insertMany(SEED_CARDS);
 
+    // card_sets arrives with migration 34; the fixture stamps user_version at 6
+    // and lets the app migrate, but the rows have to exist before the first
+    // request — same reason the translations DDL is run here by hand.
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS card_sets (
+        code TEXT PRIMARY KEY, category TEXT, name_ja TEXT NOT NULL,
+        release_order INTEGER NOT NULL
+      )`);
+    const insertSet = db.prepare(
+      `INSERT INTO card_sets (code, category, name_ja, release_order)
+       VALUES (?, 'e2e', ?, ?)`,
+    );
+    for (const [code, name, order] of SEED_SETS) insertSet.run(code, name, order);
+
     const insertRestriction = db.prepare(
       `INSERT INTO card_restrictions (source, identity, status, max_count)
        VALUES ('digimon', ?, ?, ?)`,
@@ -534,6 +566,42 @@ export const LEGACY_DECK = {
   quantity: 4,
   max: 1,
 } as const;
+
+/**
+ * A deck whose contents have outrun its label: it says ZZ-03 (the fixture's
+ * older pack) and holds two cards from BT-01 (the newer one).
+ *
+ * Seeded rather than built through the UI because the interesting state is the
+ * COMBINATION of a recorded version and a newer card, and the app only ever
+ * writes a version that already covers everything — you reach this by adding a
+ * card to an old deck, which is what happens to a real deck the week a pack
+ * drops.
+ */
+export const VERSION_DECK = {
+  id: "e2e-version-deck",
+  name: "版本测试",
+  version: "ZZ-03",
+  /** Newer than the recorded version — the two copies that should be counted. */
+  newerCode: "BT1-084",
+  newerCount: 2,
+  newerSet: "BT-01",
+} as const;
+
+export function seedVersionDeck(dbPath: string, userId: string): void {
+  const db = new Database(dbPath);
+  try {
+    db.prepare(
+      `INSERT INTO decks (id, name, user_id, sort_order, version) VALUES (?, ?, ?, 0, ?)`,
+    ).run(VERSION_DECK.id, VERSION_DECK.name, userId, VERSION_DECK.version);
+    const card = db.prepare(
+      `INSERT INTO deck_cards (deck_id, card_id, quantity) VALUES (?, ?, ?)`,
+    );
+    card.run(VERSION_DECK.id, VERSION_DECK.newerCode, VERSION_DECK.newerCount);
+    card.run(VERSION_DECK.id, "ZZ3-001", 1);
+  } finally {
+    db.close();
+  }
+}
 
 export function seedViolatingDeck(dbPath: string, userId: string): void {
   const db = new Database(dbPath);
