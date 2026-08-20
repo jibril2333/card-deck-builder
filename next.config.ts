@@ -8,8 +8,8 @@ const baseConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
   typedRoutes: false,
   // Minimal-footprint build output for the Docker image (see Dockerfile).
-  // Purely additive — `next start` (the native/LaunchAgent flow) is
-  // unaffected and keeps working exactly as before.
+  // Purely additive — a plain `next start` (what `npm start` does in dev and
+  // in CI) is unaffected and keeps working exactly as before.
   output: "standalone",
   // Build-trace collection (deployment packaging metadata; unused by local
   // `next start`) walks the whole project and OOMs on the huge .nosync dirs

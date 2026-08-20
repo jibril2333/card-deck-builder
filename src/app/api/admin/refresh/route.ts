@@ -12,9 +12,15 @@ import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
  * The container deliberately has NO access to the Docker socket: it is
  * internet-facing through the tunnel, and a refresh has to stop/start the
  * container itself, so app-level RCE would otherwise mean host compromise.
- * POST therefore only drops a request file into the shared data volume; a
- * launchd WatchPaths agent on the HOST (com.rei.cdb-refresh-watch →
- * scripts/refresh-on-request.sh) notices it and runs the pipeline.
+ * POST therefore only drops a request file into the shared data volume. What
+ * picks it up depends on where this is deployed, and the app deliberately
+ * doesn't know which:
+ *   · on the Mac, a launchd WatchPaths agent (com.rei.cdb-refresh-watch →
+ *     scripts/refresh-on-request.sh), because there the swap needs to stop the
+ *     container and only the host can do that;
+ *   · in the image, scripts/refresh-daemon.ts inside this very container,
+ *     which is what makes a pulled image self-sufficient.
+ * Either way this route writes a file and returns. See AGENTS.md.
  */
 export const dynamic = "force-dynamic";
 

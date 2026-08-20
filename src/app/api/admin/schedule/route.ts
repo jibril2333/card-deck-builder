@@ -7,8 +7,9 @@ import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
 /**
  * The automatic refresh's schedule.
  *
- * The app only writes a JSON file into the shared data volume; the host's
- * `scripts/refresh-tick.ts` reads it. Same reason the manual button drops a
+ * The app only writes a JSON file into the shared data volume; the clock that
+ * reads it is either the host's `scripts/refresh-tick.ts` (Mac) or
+ * `scripts/refresh-daemon.ts` inside the container (the published image). Same reason the manual button drops a
  * request file instead of running anything: this container is internet-facing
  * through the tunnel and has no business editing a launchd plist or calling
  * `launchctl`.

@@ -24,9 +24,11 @@ function fmt(iso?: string) {
 /**
  * Admin-only card-data refresh control.
  *
- * Clicking doesn't run anything in this process: it POSTs a request that a
- * host-side launchd agent picks up (the container has no Docker access on
- * purpose). So the UI polls for status rather than awaiting a result.
+ * Clicking doesn't run anything in this process: it POSTs a request, and
+ * whatever is watching the data directory picks it up — a launchd agent on the
+ * Mac, the in-container daemon in the published image (the container has no
+ * Docker access on purpose, either way). So the UI polls for status rather
+ * than awaiting a result.
  */
 export function RefreshCardsPanel() {
   const [status, setStatus] = useState<Status | null>(null);
