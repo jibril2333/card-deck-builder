@@ -104,3 +104,18 @@ test("refuses a file that isn't one of ours", async ({ page }) => {
   ).toHaveCount(0);
   fs.rmSync(file, { force: true });
 });
+
+test("unauthenticated requests are 401, not 500", async ({ browser }) => {
+  // requireUser() throws a plain Error for Server Actions to surface; in a
+  // route handler an uncaught throw is a 500, which is what these two returned
+  // when they first shipped. "Log in" and "the server broke" are different
+  // answers and only one of them is true.
+  const anon = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
+  expect((await anon.request.get("/api/account/export")).status()).toBe(401);
+  expect(
+    (await anon.request.post("/api/account/import", { data: {} })).status(),
+  ).toBe(401);
+  await anon.close();
+});

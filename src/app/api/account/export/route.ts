@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/session";
 import { exportUserData } from "@/lib/db/user-transfer";
 
 /**
@@ -12,7 +12,12 @@ import { exportUserData } from "@/lib/db/user-transfer";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const me = await requireUser();
+  // getCurrentUser + an explicit 401, not requireUser: that one throws a
+  // plain Error for Server Actions to surface, and an uncaught throw in a
+  // route handler is a 500. An unauthenticated GET should say "log in", not
+  // "the server broke".
+  const me = await getCurrentUser();
+  if (!me) return Response.json({ ok: false, error: "请先登录" }, { status: 401 });
   const data = exportUserData(me.id, `exported by ${me.display_name}`);
   const stamp = new Date().toISOString().slice(0, 10);
   return new Response(JSON.stringify(data, null, 2), {
