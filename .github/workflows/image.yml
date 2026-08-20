@@ -12,11 +12,15 @@ name: Build image (GHCR)
 # NAS never executes anything from this repo — it pulls an image. The blast
 # radius stays inside GitHub's runner.
 #
-# NOT on `push` on purpose: pushing to GHCR publishes a package under the
-# owner's account, and that's a decision to take deliberately rather than as a
-# side effect of a commit. Flip `on:` to include push once you want it
-# automatic.
+# Runs on every push to main, so the NAS deployment tracks the repo the same
+# way the Mac one does. Documentation-only commits are skipped: the image
+# wouldn't differ, and a QEMU cross-build costs a quarter of an hour.
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - ".gitignore"
   workflow_dispatch:
     inputs:
       tag:

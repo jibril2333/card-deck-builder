@@ -32,6 +32,11 @@ services:
     image: ghcr.io/jibril2333/card-deck-builder:latest
     container_name: card-deck-builder
     restart: unless-stopped
+    labels:
+      # Watchtower only touches containers carrying this label (it runs with
+      # --label-enable below), so nothing else on the NAS can be restarted by
+      # a registry poll.
+      com.centurylinklabs.watchtower.enable: "true"
     # Must match the owner of CDB_DATA_DIR on the NAS, or every write (deck
     # edits, refreshes) fails silently — the image's built-in nextjs user
     # (1001) would only be able to read. TrueNAS apps commonly run as 568:568
@@ -61,3 +66,22 @@ services:
       retries: 3
     volumes:
       - ${CDB_DATA_DIR:?set CDB_DATA_DIR to the dataset holding the SQLite files}:/app/data.nosync
+
+  # Takes a new build without anything reaching into the NAS from outside.
+  #
+  # The alternative — a GitHub Actions self-hosted runner on the NAS — was
+  # rejected on purpose: this repo is public, and a runner executes whatever a
+  # workflow says on the machine that holds your storage. Here the traffic is
+  # outbound only: watchtower asks GHCR whether the digest moved, and if it
+  # did, pulls and recreates the one container carrying the label above.
+  #
+  # It needs the Docker socket, which is a real privilege — but it is NAS
+  # admin tooling, not the internet-facing app. The app itself still has no
+  # socket, which is the property that matters.
+  watchtower:
+    image: containrrr/watchtower
+    container_name: cdb-watchtower
+    restart: unless-stopped
+    command: --label-enable --cleanup --interval ${CDB_WATCH_INTERVAL:-300}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
