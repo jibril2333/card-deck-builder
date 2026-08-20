@@ -159,13 +159,16 @@ jobs:
       - name: Are the secrets there?
         id: check
         run: |
-          if [ -n "${{ secrets.TS_OAUTH_CLIENT_ID }}" ] \
+          # Either credential works: an OAuth client (doesn't expire, but not
+          # offered on every plan) or a tagged, reusable, ephemeral auth key
+          # (any plan, expires after at most 90 days).
+          if { [ -n "${{ secrets.TS_OAUTH_CLIENT_ID }}" ] || [ -n "${{ secrets.TS_AUTHKEY }}" ]; } \
              && [ -n "${{ secrets.NAS_WATCHTOWER_TOKEN }}" ] \
              && [ -n "${{ vars.NAS_HOST }}" ]; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "NAS 推送未配置(缺 TS_OAUTH_CLIENT_ID / NAS_WATCHTOWER_TOKEN / vars.NAS_HOST)。"
+            echo "NAS 推送未配置(缺 TS_AUTHKEY 或 TS_OAUTH_CLIENT_ID / NAS_WATCHTOWER_TOKEN / vars.NAS_HOST)。"
             echo "镜像已经推到 GHCR,NAS 会在下一次轮询时自己拉。"
           fi
 
@@ -173,6 +176,9 @@ jobs:
         if: steps.check.outputs.ok == 'true'
         uses: tailscale/github-action@v4
         with:
+          # Whichever of the two is configured; the action prefers the authkey
+          # when it's non-empty.
+          authkey: ${{ secrets.TS_AUTHKEY }}
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
