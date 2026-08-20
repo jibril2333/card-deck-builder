@@ -1,0 +1,53 @@
+# Running the app on the TrueNAS box.
+#
+# Differs from docker-compose.yml in one decisive way: it does NOT build. The
+# image comes from GHCR, built for linux/amd64 by .github/workflows/image.yml
+# on GitHub's runners. Nothing in this repo executes on the NAS — it pulls a
+# finished image, which is the whole reason this arrangement is safer than
+# putting a second self-hosted runner on the machine that holds your storage.
+#
+# Usage on the NAS (TrueNAS SCALE ≥ 24.10 has Docker natively; in the UI this
+# goes in Apps → Discover → Custom App → "Install via YAML"):
+#
+#   CDB_DATA_DIR=/mnt/<pool>/<dataset>/card-deck-builder \
+#   CDB_UID=<owner uid> CDB_GID=<owner gid> \
+#     docker compose -f docker-compose.nas.yml up -d
+#
+#   docker compose -f docker-compose.nas.yml pull && \
+#   docker compose -f docker-compose.nas.yml up -d      # take a new build
+#
+# ⚠️ CDB_DATA_DIR MUST be a local ZFS dataset. Never an NFS/SMB share, and
+# never a path that lives on another machine: SQLite coordinates writers with
+# POSIX locks, and network filesystems do not implement them faithfully. That
+# is the same class of bug as the macOS bind-mount corruption recorded in
+# AGENTS.md, except a network share loses the argument outright.
+services:
+  app:
+    image: ghcr.io/jibril2333/card-deck-builder:latest
+    container_name: card-deck-builder
+    restart: unless-stopped
+    # Must match the owner of CDB_DATA_DIR on the NAS, or every write (deck
+    # edits, refreshes) fails silently — the image's built-in nextjs user
+    # (1001) would only be able to read. TrueNAS apps commonly run as 568:568
+    # (`apps`); check with `ls -n` on the dataset before setting this.
+    user: "${CDB_UID:-568}:${CDB_GID:-568}"
+    ports:
+      - "${CDB_PORT:-3001}:3001"
+    environment:
+      CDB_ADMIN_EMAILS: "${CDB_ADMIN_EMAILS:-}"
+    healthcheck:
+      # No curl/wget in node:22-bookworm-slim; /api/health reads a row from
+      # BOTH SQLite files, so this reports unhealthy on DB corruption too.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    volumes:
+      - ${CDB_DATA_DIR:?set CDB_DATA_DIR to the dataset holding the SQLite files}:/app/data.nosync

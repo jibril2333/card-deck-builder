@@ -1,0 +1,76 @@
+name: Build image (GHCR)
+
+# Builds a linux/amd64 image on GitHub's own runners and pushes it to GHCR, so
+# a machine that is NOT this Mac — the TrueNAS box, for instance — can run the
+# app by pulling rather than by building.
+#
+# SECURITY, and the reason this is not simply "another self-hosted runner":
+# the repo is public. deploy.yml already runs on a self-hosted runner, and is
+# safe only because `push` to main is owner-only (see its header). Putting a
+# second self-hosted runner on the NAS would make every workflow change a
+# potential foothold on the box that holds the household's storage. Here the
+# NAS never executes anything from this repo — it pulls an image. The blast
+# radius stays inside GitHub's runner.
+#
+# NOT on `push` on purpose: pushing to GHCR publishes a package under the
+# owner's account, and that's a decision to take deliberately rather than as a
+# side effect of a commit. Flip `on:` to include push once you want it
+# automatic.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (default: latest)"
+        required: false
+        default: latest
+
+concurrency:
+  group: ghcr-image
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    # GitHub-hosted, x86_64 — the NAS's architecture, built natively. Doing
+    # this on the Mac would mean emulating amd64 through QEMU, which turns a
+    # three-minute `npm ci` into a twenty-minute one because better-sqlite3
+    # compiles from source when no prebuilt binary matches.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ inputs.tag || 'latest' }}
+            ${{ env.IMAGE }}:${{ github.sha }}
+          # Layer cache in the registry: `npm ci` and `next build` are the
+          # whole runtime of this job, and both are cacheable when
+          # package-lock.json hasn't moved.
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+
+      - name: Report
+        run: |
+          echo "pushed ${{ env.IMAGE }}:${{ inputs.tag || 'latest' }}"
+          echo "     and ${{ env.IMAGE }}:${{ github.sha }}"
