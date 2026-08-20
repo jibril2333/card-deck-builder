@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { listCredentialsForUser } from "@/lib/auth/webauthn";
 import { PasskeySection } from "./passkey-section";
+import { DataSection } from "./data-section";
 
 export const metadata = { title: "账号 · DCG Deck Builder" };
 export const dynamic = "force-dynamic";
@@ -34,6 +35,8 @@ export default async function AccountPage() {
           last_used_at: c.last_used_at,
         }))}
       />
+
+      <DataSection />
     </main>
   );
 }

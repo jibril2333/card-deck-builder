@@ -718,35 +718,6 @@ export type DigimonCollectionRow = {
   quantity: number;
 };
 
-/**
- * All collected (qty > 0) cards for the given user, with the image URL of the
- * specific variant joined in. Sorted by code then variant so base art comes
- * before its parallels.
- */
-export function listCollection(currentUserId: string): DigimonCollectionRow[] {
-  return db()
-    .prepare(
-      `SELECT
-         cc.card_id,
-         c.code,
-         c.name,
-         c.color,
-         c.rarity,
-         c.card_type,
-         c.level,
-         cc.variant,
-         COALESCE(ci.image_url, c.image_url) AS image_url,
-         cc.quantity
-       FROM user.card_collection cc
-       JOIN cards c ON c.id = cc.card_id
-       LEFT JOIN card_images ci
-         ON ci.code = c.code AND ci.variant = cc.variant
-       WHERE cc.user_id = ? AND cc.quantity > 0
-       ORDER BY c.code, cc.variant`,
-    )
-    .all(currentUserId) as DigimonCollectionRow[];
-}
-
 export function getCardCollectionQty(
   currentUserId: string,
   cardId: string,
