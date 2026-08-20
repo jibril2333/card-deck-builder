@@ -73,4 +73,9 @@ USER nextjs
 EXPOSE 3001
 # Bootstraps an empty database and (optionally) runs the refresh daemon before
 # handing PID 1 to the server. See docker/entrypoint.sh.
+# No CMD on purpose. Docker passes CMD to the ENTRYPOINT as arguments, so a
+# default CMD would be indistinguishable from a command the user typed — and
+# the entrypoint treats arguments as "run this instead of the server", which
+# would skip the database bootstrap on every ordinary start. Verified the
+# painful way: the container came up 503, "数据库文件不存在".
 ENTRYPOINT ["/app/entrypoint.sh"]

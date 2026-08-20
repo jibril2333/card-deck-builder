@@ -11,6 +11,15 @@ set -e
 DATA_DIR="${CDB_DATA_DIR:-/app/data.nosync}"
 SCRIPTS="${CDB_SCRIPTS_DIR:-/app/scripts-dist}"
 
+# A command given on the command line runs INSTEAD of the server, with none of
+# the bootstrap below — `docker run <image> ls scripts-dist`, or a one-off
+# `docker run <image> node /app/scripts-dist/refresh-daemon.js --once sets`.
+# Without this an ENTRYPOINT swallows the arguments and silently starts the
+# server anyway, which is a confusing way to lose ten minutes.
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
 if [ ! -f "$DATA_DIR/digimon.db" ]; then
   echo "[entrypoint] no database in $DATA_DIR — creating one"
   CDB_DATA_DIR="$DATA_DIR" node "$SCRIPTS/init-db.js"
