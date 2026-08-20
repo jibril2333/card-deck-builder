@@ -134,3 +134,73 @@ jobs:
             -t "${{ env.IMAGE }}:${{ github.sha }}" \
             $(printf "${{ env.IMAGE }}@sha256:%s " *)
           docker buildx imagetools inspect "${{ env.IMAGE }}:$TAG"
+
+  # Tell the NAS to take the new image, over Tailscale.
+  #
+  # Why Tailscale rather than a public webhook: the NAS has no inbound exposure
+  # and this doesn't add any. The runner joins the tailnet as an EPHEMERAL,
+  # TAGGED node for the length of the job and disappears; ACLs decide what
+  # tag:ci may reach, so the blast radius is one port on one host rather than
+  # "the internet can ask my NAS to do things".
+  #
+  # Why not SSH: the call below is the whole capability — "pull the labelled
+  # images and recreate them". CI never gets a shell on the box, and the Docker
+  # socket stays inside watchtower's container. A stolen token replays a
+  # deployment; a stolen SSH key is the NAS.
+  #
+  # Unconfigured is not a failure: until the secrets exist this job no-ops and
+  # the poll (watchtower --interval) picks the image up on its own. Nobody
+  # should get a red build for not having finished a network setup.
+  deploy-nas:
+    needs: merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Are the secrets there?
+        id: check
+        run: |
+          if [ -n "${{ secrets.TS_OAUTH_CLIENT_ID }}" ] \
+             && [ -n "${{ secrets.NAS_WATCHTOWER_TOKEN }}" ] \
+             && [ -n "${{ vars.NAS_HOST }}" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "NAS 推送未配置(缺 TS_OAUTH_CLIENT_ID / NAS_WATCHTOWER_TOKEN / vars.NAS_HOST)。"
+            echo "镜像已经推到 GHCR,NAS 会在下一次轮询时自己拉。"
+          fi
+
+      - name: Join the tailnet
+        if: steps.check.outputs.ok == 'true'
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Ask watchtower to update
+        if: steps.check.outputs.ok == 'true'
+        run: |
+          set -e
+          NAS="${{ vars.NAS_HOST }}"
+          PORT="${{ vars.NAS_WATCHTOWER_PORT || '8080' }}"
+          curl -fsS --max-time 120 \
+            -H "Authorization: Bearer ${{ secrets.NAS_WATCHTOWER_TOKEN }}" \
+            "http://$NAS:$PORT/v1/update"
+          echo
+
+      - name: Wait for the NAS to serve the new image
+        if: steps.check.outputs.ok == 'true'
+        run: |
+          NAS="${{ vars.NAS_HOST }}"
+          PORT="${{ vars.NAS_APP_PORT || '3001' }}"
+          # /api/health reads a row from BOTH SQLite files, so a green gate
+          # here means the container came back with a usable database — not
+          # merely that something is listening.
+          for i in $(seq 1 40); do
+            if curl -fsS --max-time 5 "http://$NAS:$PORT/api/health" >/dev/null; then
+              echo "NAS is serving the new image"; exit 0
+            fi
+            sleep 5
+          done
+          echo "NAS did not come back healthy within 200s" >&2
+          exit 1

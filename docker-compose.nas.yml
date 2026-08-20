@@ -82,6 +82,24 @@ services:
     image: containrrr/watchtower
     container_name: cdb-watchtower
     restart: unless-stopped
-    command: --label-enable --cleanup --interval ${CDB_WATCH_INTERVAL:-300}
+    # Two ways in, and they cover each other:
+    #   · --interval: the poll. Still there so a deploy isn't lost when the
+    #     NAS was down at the moment CI called.
+    #   · --http-api-update: an endpoint that updates NOW. GitHub Actions calls
+    #     it at the end of a build, over Tailscale — see .github/workflows.
+    #
+    # The endpoint is NOT published to the internet: no port forward, nothing
+    # on the Cloudflare tunnel. It is reachable from the LAN and from the
+    # tailnet, and the token is what authorises the call. Note what CI can and
+    # cannot do with it: ask watchtower to pull labelled images. Not a shell,
+    # not SSH, not the Docker socket — that stays inside this container.
+    command: >-
+      --label-enable --cleanup
+      --interval ${CDB_WATCH_INTERVAL:-3600}
+      --http-api-update --http-api-periodic-polls
+    environment:
+      WATCHTOWER_HTTP_API_TOKEN: "${CDB_WATCHTOWER_TOKEN:?set a long random token; GitHub Actions sends it}"
+    ports:
+      - "${CDB_WATCHTOWER_PORT:-8080}:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
