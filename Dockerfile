@@ -69,6 +69,12 @@ COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
 # compose volume is momentarily absent.
 RUN mkdir -p /app/data.nosync && chown nextjs:nodejs /app/data.nosync
 
+# Which commit this image was built from. Declared HERE, at the very end, so a
+# new SHA invalidates only this one tiny layer — put it earlier and every build
+# would recompile the app.
+ARG CDB_GIT_SHA=""
+ENV CDB_GIT_SHA=$CDB_GIT_SHA
+
 USER nextjs
 EXPOSE 3001
 # Bootstraps an empty database and (optionally) runs the refresh daemon before

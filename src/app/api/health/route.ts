@@ -14,8 +14,16 @@ import { getDB } from "@/lib/db/connection";
  * every 30s forever.
  *
  * This route is reachable through the public tunnel, so the response body
- * carries no paths, versions, or driver messages — details go to the server
- * log instead.
+ * carries no paths and no driver messages — those go to the server log.
+ *
+ * It DOES carry the commit the image was built from, which reverses an earlier
+ * decision here. The reason: without it there is no way to check that a deploy
+ * actually landed. "Something answered 200" is satisfied by the container that
+ * was already running, which is exactly what happened the first time the NAS
+ * push-deploy ran — it reported success three seconds after asking for an
+ * update, long before any container could have been recreated. What is given
+ * up is small: this repo is public and every build is already published as
+ * ghcr.io/…:<sha>, so the commit is not a secret in any sense.
  */
 export const dynamic = "force-dynamic";
 
@@ -27,7 +35,10 @@ export async function GET() {
     // User DB (ATTACHed as `user`) — decks/collection live here, and it is a
     // separate file that can fail independently of the cards DB.
     db.prepare("SELECT id FROM user.decks LIMIT 1").get();
-    return Response.json({ ok: true }, { status: 200 });
+    return Response.json(
+      { ok: true, version: process.env.CDB_GIT_SHA?.slice(0, 7) || null },
+      { status: 200 },
+    );
   } catch (err) {
     console.error("[health] probe failed:", err);
     return Response.json({ ok: false }, { status: 503 });

@@ -83,6 +83,8 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
+          build-args: |
+            CDB_GIT_SHA=${{ github.sha }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           # Separate cache per architecture; one shared ref would have the two
           # jobs overwriting each other's layers on every run.
@@ -201,19 +203,27 @@ jobs:
             "http://$NAS:$PORT/v1/update"
           echo
 
-      - name: Wait for the NAS to serve the new image
+      - name: Wait for the NAS to serve THIS build
         if: steps.check.outputs.ok == 'true'
         run: |
           NAS="${{ vars.NAS_HOST }}"
           PORT="${{ vars.NAS_APP_PORT || '3001' }}"
-          # /api/health reads a row from BOTH SQLite files, so a green gate
-          # here means the container came back with a usable database — not
-          # merely that something is listening.
-          for i in $(seq 1 40); do
-            if curl -fsS --max-time 5 "http://$NAS:$PORT/api/health" >/dev/null; then
-              echo "NAS is serving the new image"; exit 0
+          WANT="$(echo '${{ github.sha }}' | cut -c1-7)"
+          # Two conditions, and the second one is the point: /api/health reads
+          # a row from BOTH SQLite files (so the database is usable, not just
+          # the port open), AND reports the commit its image was built from.
+          # Waiting only for "something answers 200" passes against the
+          # container that was already running — the first run of this job did
+          # exactly that, three seconds after asking for an update.
+          for i in $(seq 1 60); do
+            GOT="$(curl -fsS --max-time 5 "http://$NAS:$PORT/api/health" \
+                     | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)"
+            if [ "$GOT" = "$WANT" ]; then
+              echo "NAS is serving $WANT"; exit 0
             fi
+            [ $((i % 6)) -eq 0 ] && echo "still on '${GOT:-unknown}', waiting for $WANT…"
             sleep 5
           done
-          echo "NAS did not come back healthy within 200s" >&2
+          echo "NAS never reported $WANT (last saw '${GOT:-unknown}') after 300s" >&2
+          echo "The image is published either way; check watchtower on the NAS." >&2
           exit 1
