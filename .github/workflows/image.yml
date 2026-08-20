@@ -176,6 +176,13 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
+          # MagicDNS off by default on these ephemeral nodes, so `truenas`
+          # would not resolve and the curl below would fail with something
+          # far less obvious than "DNS".
+          args: --accept-dns=true
+          # Fails here, with a clear message, rather than three steps later
+          # inside a curl timeout.
+          ping: ${{ vars.NAS_HOST }}
 
       - name: Ask watchtower to update
         if: steps.check.outputs.ok == 'true'
