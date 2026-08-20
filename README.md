@@ -34,6 +34,26 @@
 
 跨库查询用 `ATTACH DATABASE`,在连接建立时一次 ATTACH,用户表通过 `user.decks` / `user.deck_cards` 限定名访问。
 
+## 从零安装
+
+数据库不在仓库里(`data.nosync/` 是 gitignored 的,里面是账号和卡组),
+所以 clone 下来第一件事是把它建出来:
+
+```bash
+npm install
+npm run init-db          # 建 schema,跑完全部迁移;不会覆盖已存在的库
+```
+
+然后拉卡表 —— 这一步会访问官方站点,约 20 分钟:
+
+```bash
+scripts/refresh-cards.sh cards sets text art keywords rulings restrictions
+scripts/refresh-cards.sh prices      # 价格另跑,约 1 小时
+```
+
+之后 `npm run dev` 就能用了。要看这套刷新流水线是怎么组织的(它跑在宿主机上
+而不是容器里,以及为什么),见 AGENTS.md。
+
 ## 配置
 
 复制 `.env.example` 到 `.env.local` 并调整路径:
