@@ -15,18 +15,74 @@ export type RefreshStage = {
   id: string;
   label: string;
   hint: string;
+  /**
+   * The scripts this stage runs, in order, relative to `scripts/`.
+   *
+   * The shell script has always known this; it was the only one that did. The
+   * in-container daemon (scripts/refresh-daemon.ts) needs the same mapping,
+   * and two copies of "which scraper is the text stage" is exactly the kind of
+   * thing that goes stale — `tests/refresh-stages.test.ts` compares this list
+   * against what the shell actually invokes.
+   */
+  scripts: string[];
 };
 
 /** Order matches `refresh-cards.sh`'s ALL_STAGES, which is also run order. */
 export const REFRESH_STAGES: RefreshStage[] = [
-  { id: "cards", label: "新卡", hint: "发现并导入新卡（含新弹）" },
-  { id: "sets", label: "卡包", hint: "官方卡包列表与发售顺序（卡组版本用）" },
-  { id: "text", label: "中/日文", hint: "翻译文本 + 中文卡面" },
-  { id: "art", label: "异画", hint: "英/日文异画图" },
-  { id: "keywords", label: "关键词", hint: "官方规则里的关键词表" },
-  { id: "rulings", label: "裁定", hint: "官方 Q&A" },
-  { id: "prices", label: "价格", hint: "cardrush 市场价（最慢，约 1 小时）" },
-  { id: "restrictions", label: "禁限", hint: "禁限卡表" },
+  {
+    id: "cards",
+    label: "新卡",
+    hint: "发现并导入新卡（含新弹）",
+    scripts: ["sync-cards.ts"],
+  },
+  {
+    id: "sets",
+    label: "卡包",
+    hint: "官方卡包列表与发售顺序（卡组版本用）",
+    scripts: ["scrape-digimon-sets.ts"],
+  },
+  {
+    id: "text",
+    label: "中/日文",
+    hint: "翻译文本 + 中文卡面",
+    // Order matters: the official EN site repairs what the community mirror
+    // got structurally wrong, and JP gets the final word. See refresh-cards.sh.
+    scripts: [
+      "scrape-digimon-metadata.ts",
+      "scrape-digimon-cn.ts",
+      "scrape-digimon-jp.ts",
+    ],
+  },
+  {
+    id: "art",
+    label: "异画",
+    hint: "英/日文异画图",
+    scripts: ["scrape-digimon-alt-arts.ts"],
+  },
+  {
+    id: "keywords",
+    label: "关键词",
+    hint: "官方规则里的关键词表",
+    scripts: ["scrape-digimon-keywords.ts"],
+  },
+  {
+    id: "rulings",
+    label: "裁定",
+    hint: "官方 Q&A",
+    scripts: ["scrape-digimon-rulings.ts"],
+  },
+  {
+    id: "prices",
+    label: "价格",
+    hint: "cardrush 市场价（最慢，约 1 小时）",
+    scripts: ["scrape-cardrush-prices.ts"],
+  },
+  {
+    id: "restrictions",
+    label: "禁限",
+    hint: "禁限卡表",
+    scripts: ["scrape-restrictions.ts"],
+  },
 ];
 
 export const REFRESH_STAGE_IDS: string[] = REFRESH_STAGES.map((s) => s.id);

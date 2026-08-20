@@ -32,6 +32,17 @@ COPY . .
 ENV CDB_DOCKER=1
 RUN npm run build
 
+# Bundle the operational scripts (scrapers, init-db, the refresh daemon) into
+# plain JS. The runtime image is Next's `standalone` output: it has no tsx, no
+# TypeScript and no devDependencies, so without this step none of them could
+# run inside a container and the image would be a website with no way to fill
+# it. better-sqlite3 stays external — it's a native addon and standalone
+# already traced it in.
+RUN npx esbuild scripts/*.ts \
+      --bundle --platform=node --format=cjs --target=node22 \
+      --outdir=scripts-dist --external:better-sqlite3 \
+      --tsconfig=tsconfig.json --log-level=warning
+
 # ---- runner: copy only the standalone output + static assets ----
 FROM base AS runner
 WORKDIR /app
@@ -50,6 +61,8 @@ COPY --from=builder /app/public ./public
 # The static assets aren't part of standalone — copy them alongside.
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/scripts-dist ./scripts-dist
+COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
 
 # data.nosync (SQLite DBs) is bind-mounted at runtime via docker-compose —
 # never baked into the image. Create the mountpoint so it exists even if the
@@ -58,4 +71,6 @@ RUN mkdir -p /app/data.nosync && chown nextjs:nodejs /app/data.nosync
 
 USER nextjs
 EXPOSE 3001
-CMD ["node", "server.js"]
+# Bootstraps an empty database and (optionally) runs the refresh daemon before
+# handing PID 1 to the server. See docker/entrypoint.sh.
+ENTRYPOINT ["/app/entrypoint.sh"]

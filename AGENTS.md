@@ -134,6 +134,48 @@ is not enough — accounts go to friends, and a refresh restarts the container.
 Progress/results land in `data.nosync/refresh-status.json` (read by the admin
 UI) and `data.nosync/refresh.log`.
 
+### Two ways the refresh runs, and why they differ
+
+**On this Mac: the host drives it.** launchd ticks `scripts/refresh-tick.ts`
+every 15 minutes, which runs `scripts/refresh-cards.sh`, which scrapes into a
+COPY, validates it, stops the container, swaps the file in and starts it again.
+All of that shape comes from one fact: the SQLite files are bind-mounted across
+the macOS↔VM boundary where POSIX locks do NOT propagate (see the warning
+below), so a second process must never write a database the container has open.
+
+**In the image: the container drives it.** `scripts/refresh-daemon.ts`, started
+by `docker/entrypoint.sh` when `CDB_REFRESH_IN_CONTAINER=1`. On an ordinary
+Linux host there is one kernel and one local filesystem, SQLite's locking works
+as designed, and the scrapers write the live database directly — no copy, no
+swap, no Docker socket, nothing on the host at all. That is what makes the
+image self-contained: pull it, mount an empty directory, and the entrypoint
+creates the database while the daemon fills it.
+
+What container mode gives up is "throw the whole scrape away if it's bad",
+since writes land as they happen. Standing in for it: each scraper already
+refuses per set via `sanityOk` (the six days of `BT26: SANITY FAILED` in
+refresh.log are that working), and every run first writes a full snapshot to
+`.refresh-before.db`, which is both the changelog's "before" side and a restore
+point.
+
+**Do not turn `CDB_REFRESH_IN_CONTAINER` on for the Mac deployment.** There it
+is not a feature, it is the corruption bug.
+
+The precondition is the FILESYSTEM, not the process boundary — measured while
+building this. Two processes inside ONE container, writing a database on a
+macOS bind mount, hit `SQLITE_CORRUPT` within a minute; the same container
+against a Docker named volume (the Linux VM's own ext4) scraped 4398 cards
+while serving pages, zero corruption. On Linux, a bind mount to local disk is
+fine; on macOS/Windows Docker Desktop, use a named volume or leave the daemon
+off.
+
+The scripts are bundled into plain JS at image build time (esbuild, see the
+Dockerfile): the runtime image is Next's `standalone` output and has no tsx, no
+TypeScript and no devDependencies. `REFRESH_STAGES[].scripts` is the single
+list of which scraper belongs to which stage; `tests/refresh-stages.test.ts`
+checks it against the case block in refresh-cards.sh so host mode and container
+mode can't drift apart.
+
 ### Push notifications (ntfy)
 
 `scripts/refresh-cards.sh` pushes to ntfy at the end of a run. Two cases, and

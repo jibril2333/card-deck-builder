@@ -1,0 +1,288 @@
+/**
+ * The card-data refresh, running INSIDE the container.
+ *
+ * The host-side pipeline (launchd → refresh-cards.sh) exists because of a
+ * macOS-specific problem: the prod container bind-mounts the SQLite files
+ * across the macOS↔VM boundary, where POSIX locks do NOT propagate, so a host
+ * process writing the live database while the container has it open corrupts
+ * the container's view. Everything about that script — scrape into a copy,
+ * validate, stop the container, swap the file, start it again — is built
+ * around not writing a database somebody else has open.
+ *
+ * On an ordinary Linux host (a NAS, a VPS, anyone who just pulled the image)
+ * that problem doesn't exist: one kernel, one local filesystem, and SQLite's
+ * locking works exactly as designed. So here the scrapers write the live
+ * database directly, which is what makes "download the image and everything
+ * works" possible at all — no Docker socket, no host scripts, no stop/start.
+ *
+ * ## What is given up, and what replaces it
+ *
+ * Host mode can throw away a bad scrape wholesale, because nothing is live
+ * until the swap. Here a scraper's writes land as they happen. Two things
+ * stand in for that:
+ *   · every scraper already refuses per set — `sanityOk` blocks a write when a
+ *     set comes back empty or malformed, which is the failure that actually
+ *     happens (see the BT26 entries in refresh.log for six days of it working);
+ *   · a full snapshot is taken before each run, kept as `.refresh-before.db`.
+ *     It is both the changelog's "before" side and a restore point.
+ *
+ * ## The precondition is the FILESYSTEM, not the process boundary
+ *
+ * "One kernel" is not enough — the database has to live on a filesystem whose
+ * locks are real. Demonstrated the hard way while building this: two processes
+ * INSIDE one container, on a macOS bind mount, produce
+ * `SQLITE_CORRUPT: database disk image is malformed` within a minute, because
+ * the file is still on the macOS side of Docker Desktop's boundary where
+ * locking is emulated. The identical container against a Docker named volume
+ * (the Linux VM's own ext4) scraped 4398 cards while serving pages, with zero
+ * corruption.
+ *
+ * So on Linux hosts: a bind mount to a local disk is fine. On macOS/Windows
+ * Docker Desktop: use a named volume, or don't turn this on.
+ *
+ * ## Not enabled unless asked
+ *
+ * `CDB_REFRESH_IN_CONTAINER=1`. The Mac deployment leaves it off and keeps its
+ * host pipeline — turning it on there would be the corruption bug, not a
+ * feature.
+ *
+ *   node scripts-dist/refresh-daemon.js          # loop (the entrypoint's job)
+ *   node scripts-dist/refresh-daemon.js --once cards sets   # run and exit
+ */
+
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import Database from "better-sqlite3";
+import {
+  parseSchedule,
+  dueSlot,
+  nextRun,
+  describeSchedule,
+} from "../src/lib/refresh-schedule";
+import { REFRESH_STAGES, REFRESH_STAGE_IDS } from "../src/lib/refresh-stages";
+
+const DATA_DIR = process.env.CDB_DATA_DIR ?? "/app/data.nosync";
+const LIVE_DB = path.join(DATA_DIR, "digimon.db");
+const BEFORE_DB = path.join(DATA_DIR, ".refresh-before.db");
+const SCHEDULE_FILE = path.join(DATA_DIR, "refresh-schedule.json");
+const STATE_FILE = path.join(DATA_DIR, "refresh-schedule-state.json");
+const STATUS_FILE = path.join(DATA_DIR, "refresh-status.json");
+const REQUEST_FILE = path.join(DATA_DIR, "refresh-request");
+const LOCK_FILE = path.join(DATA_DIR, ".refresh.lock");
+const LOG_FILE = path.join(DATA_DIR, "refresh.log");
+/** Bundled JS next to this file when running in the image; source when not. */
+const SCRIPTS_DIR = process.env.CDB_SCRIPTS_DIR ?? __dirname;
+const TICK_MS = 60_000;
+
+function log(msg: string) {
+  const line = `[${new Date().toLocaleString("sv")}] [daemon] ${msg}\n`;
+  try {
+    fs.appendFileSync(LOG_FILE, line);
+  } catch {
+    /* the log is a convenience, never a reason to stop */
+  }
+  console.log(line.trimEnd());
+}
+
+function readJson<T>(file: string): T | undefined {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeJsonAtomic(file: string, value: unknown) {
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
+  fs.renameSync(tmp, file);
+}
+
+/** Same shape the shell writes — the admin page reads one file either way. */
+function writeStatus(
+  state: "running" | "ok" | "failed",
+  message: string,
+  stages: string[],
+  startedAt: string,
+  trigger: string,
+) {
+  writeJsonAtomic(STATUS_FILE, {
+    state,
+    message,
+    stages: stages.join(" "),
+    trigger,
+    startedAt,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+/** Run one bundled script as a child process, inheriting the data dir. */
+function runScript(name: string, args: string[] = []): boolean {
+  const js = path.join(SCRIPTS_DIR, name.replace(/\.ts$/, ".js"));
+  const useSource = !fs.existsSync(js);
+  const r = useSource
+    ? spawnSync("npx", ["tsx", path.join("scripts", name), ...args], {
+        stdio: ["ignore", "inherit", "inherit"],
+        env: { ...process.env, CDB_DATA_DIR: DATA_DIR },
+      })
+    : spawnSync(process.execPath, [js, ...args], {
+        stdio: ["ignore", "inherit", "inherit"],
+        env: { ...process.env, CDB_DATA_DIR: DATA_DIR },
+      });
+  return r.status === 0;
+}
+
+/** A consistent copy of the live DB, taken while the app keeps serving. */
+function snapshot(): boolean {
+  try {
+    fs.rmSync(BEFORE_DB, { force: true });
+    const db = new Database(LIVE_DB, { readonly: true });
+    // better-sqlite3's backup is async; the daemon is a loop, so drive it to
+    // completion synchronously here rather than making every caller async.
+    db.exec(`VACUUM INTO '${BEFORE_DB.replace(/'/g, "''")}'`);
+    db.close();
+    return true;
+  } catch (e) {
+    log(`snapshot failed: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+function refresh(stages: string[], trigger: string): boolean {
+  // A lock file rather than a directory: same intent as the shell's mkdir
+  // lock, but this one records WHO holds it, because a container that was
+  // killed mid-refresh leaves it behind and the message should say so.
+  if (fs.existsSync(LOCK_FILE)) {
+    const held = fs.readFileSync(LOCK_FILE, "utf8").trim();
+    log(`another refresh holds the lock (${held}) — skipping`);
+    return false;
+  }
+  fs.writeFileSync(LOCK_FILE, `pid ${process.pid} since ${new Date().toISOString()}\n`);
+
+  const startedAt = new Date().toISOString();
+  const chosen = stages.length ? stages : REFRESH_STAGE_IDS;
+  log(`=== refresh start (${trigger}): ${chosen.join(" ")} ===`);
+  writeStatus("running", `starting: ${chosen.join(" ")}`, chosen, startedAt, trigger);
+
+  let ok = true;
+  let failedStage = "";
+  try {
+    const before = snapshot();
+
+    for (const id of chosen) {
+      const stage = REFRESH_STAGES.find((s) => s.id === id);
+      if (!stage) continue;
+      for (const script of stage.scripts) {
+        log(`--- ${id}: ${script} ---`);
+        writeStatus("running", id, chosen, startedAt, trigger);
+        if (!runScript(script)) {
+          failedStage = id;
+          ok = false;
+          break;
+        }
+      }
+      if (!ok) break;
+    }
+
+    if (ok && before) {
+      // Never fatal: a refresh that scraped fine must not be reported as a
+      // failure because the bookkeeping did not.
+      log("--- changelog ---");
+      runScript("diff-refresh.ts", [BEFORE_DB, LIVE_DB, `--run-at=${startedAt}`]);
+    }
+  } finally {
+    fs.rmSync(LOCK_FILE, { force: true });
+  }
+
+  if (ok) {
+    const n = (() => {
+      try {
+        const db = new Database(LIVE_DB, { readonly: true });
+        const r = db.prepare("SELECT COUNT(*) n FROM cards").get() as { n: number };
+        db.close();
+        return r.n;
+      } catch {
+        return -1;
+      }
+    })();
+    writeStatus("ok", `${n} cards`, chosen, startedAt, trigger);
+    log(`=== refresh done (${n} cards) ===`);
+  } else {
+    writeStatus(
+      "failed",
+      `${failedStage} failed; 数据库保持在这次刷新写入的状态,回滚点见 .refresh-before.db`,
+      chosen,
+      startedAt,
+      trigger,
+    );
+    log(`FAILED at ${failedStage}`);
+  }
+  runScript("notify-refresh.ts", ok ? ["ok", "{}"] : ["failed", failedStage || "refresh", "1"]);
+  return ok;
+}
+
+/** The admin button drops a file; that's the only signal the app can send. */
+function takeRequest(): string[] | null {
+  if (!fs.existsSync(REQUEST_FILE)) return null;
+  let stages: string[] = [];
+  try {
+    const body = fs.readFileSync(REQUEST_FILE, "utf8").trim();
+    if (body) {
+      stages = body
+        .split(/[\s,]+/)
+        .filter((s) => REFRESH_STAGE_IDS.includes(s));
+    }
+  } catch {
+    /* an unreadable request still means "refresh" */
+  }
+  fs.rmSync(REQUEST_FILE, { force: true });
+  return stages;
+}
+
+function tick() {
+  const requested = takeRequest();
+  if (requested) {
+    refresh(requested, "manual");
+    return;
+  }
+
+  const schedule = parseSchedule(readJson(SCHEDULE_FILE), REFRESH_STAGE_IDS);
+  const state = readJson<{ lastSlot?: string }>(STATE_FILE) ?? {};
+  const due = dueSlot(schedule, new Date());
+  const next = nextRun(schedule, new Date());
+  writeJsonAtomic(STATE_FILE, {
+    ...state,
+    describe: describeSchedule(schedule),
+    nextRunAt: next ? next.toISOString() : null,
+    checkedAt: new Date().toISOString(),
+  });
+  if (!due) return;
+  if (state.lastSlot && new Date(state.lastSlot) >= due) return;
+
+  // Claim the slot BEFORE running: a refresh that dies half way must not be
+  // retried every minute for the rest of the day.
+  writeJsonAtomic(STATE_FILE, {
+    ...state,
+    lastSlot: due.toISOString(),
+    lastStartedAt: new Date().toISOString(),
+    describe: describeSchedule(schedule),
+    nextRunAt: next ? next.toISOString() : null,
+    checkedAt: new Date().toISOString(),
+  });
+  refresh(schedule.stages, "auto");
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const onceAt = args.indexOf("--once");
+  if (onceAt >= 0) {
+    const stages = args.slice(onceAt + 1).filter((s) => REFRESH_STAGE_IDS.includes(s));
+    process.exit(refresh(stages, "manual") ? 0 : 1);
+  }
+  log(`watching ${DATA_DIR} — schedule + ${path.basename(REQUEST_FILE)}`);
+  tick();
+  setInterval(tick, TICK_MS);
+}
+
+main();

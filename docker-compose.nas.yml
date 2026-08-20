@@ -16,6 +16,12 @@
 #   docker compose -f docker-compose.nas.yml pull && \
 #   docker compose -f docker-compose.nas.yml up -d      # take a new build
 #
+# An empty data directory is fine: the entrypoint builds the database, and the
+# refresh daemon fills it with cards on the schedule. To not wait for that:
+#
+#   docker exec card-deck-builder \
+#     node /app/scripts-dist/refresh-daemon.js --once cards sets text art
+#
 # ⚠️ CDB_DATA_DIR MUST be a local ZFS dataset. Never an NFS/SMB share, and
 # never a path that lives on another machine: SQLite coordinates writers with
 # POSIX locks, and network filesystems do not implement them faithfully. That
@@ -35,6 +41,10 @@ services:
       - "${CDB_PORT:-3001}:3001"
     environment:
       CDB_ADMIN_EMAILS: "${CDB_ADMIN_EMAILS:-}"
+      # Run the card-data refresh inside this container: the schedule from the
+      # admin page, and the 立即更新 button. Correct HERE and wrong on the Mac
+      # — see scripts/refresh-daemon.ts for why the two hosts differ.
+      CDB_REFRESH_IN_CONTAINER: "1"
     healthcheck:
       # No curl/wget in node:22-bookworm-slim; /api/health reads a row from
       # BOTH SQLite files, so this reports unhealthy on DB corruption too.
