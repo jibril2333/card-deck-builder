@@ -82,6 +82,15 @@ services:
     image: containrrr/watchtower
     container_name: cdb-watchtower
     restart: unless-stopped
+    # Behind a profile so the app can be brought up on its own:
+    #
+    #   docker compose -f docker-compose.nas.yml up -d                    # app only
+    #   docker compose -f docker-compose.nas.yml --profile auto-update up -d
+    #
+    # Without this the required token below would refuse to start ANYTHING,
+    # which is the wrong order — you want the site serving and verified before
+    # you wire up something that can restart it.
+    profiles: ["auto-update"]
     # Two ways in, and they cover each other:
     #   · --interval: the poll. Still there so a deploy isn't lost when the
     #     NAS was down at the moment CI called.
