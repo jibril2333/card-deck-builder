@@ -149,16 +149,23 @@ function snapshot(): boolean {
   }
 }
 
+/**
+ * Identifies THIS daemon process. Written into the lock file so a lock left
+ * behind by a previous container can be told from one a live sibling holds:
+ * the lock lives in the mounted data directory and therefore outlives the
+ * container, while PIDs restart from 1 in every new one — a stale lock saying
+ * "pid 14" is indistinguishable from a running "pid 14" without this.
+ */
+const INSTANCE = `${process.pid}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+
 function refresh(stages: string[], trigger: string): boolean {
-  // A lock file rather than a directory: same intent as the shell's mkdir
-  // lock, but this one records WHO holds it, because a container that was
-  // killed mid-refresh leaves it behind and the message should say so.
   if (fs.existsSync(LOCK_FILE)) {
     const held = fs.readFileSync(LOCK_FILE, "utf8").trim();
     log(`another refresh holds the lock (${held}) — skipping`);
+    log(`if nothing is actually running, clear it: rm ${LOCK_FILE}`);
     return false;
   }
-  fs.writeFileSync(LOCK_FILE, `pid ${process.pid} since ${new Date().toISOString()}\n`);
+  fs.writeFileSync(LOCK_FILE, `instance ${INSTANCE} since ${new Date().toISOString()}\n`);
 
   const startedAt = new Date().toISOString();
   const chosen = stages.length ? stages : REFRESH_STAGE_IDS;
@@ -279,6 +286,17 @@ function main() {
   if (onceAt >= 0) {
     const stages = args.slice(onceAt + 1).filter((s) => REFRESH_STAGE_IDS.includes(s));
     process.exit(refresh(stages, "manual") ? 0 : 1);
+  }
+  // Clear a lock nobody holds. In container mode this daemon is the only
+  // thing that ever takes it, so at startup — before its first tick — any
+  // lock on disk is by definition from a container that no longer exists.
+  // Killed mid-refresh (a redeploy, a NAS reboot) it would otherwise block
+  // every future run, silently, forever: the symptom is a site whose card
+  // data simply stops moving.
+  if (fs.existsSync(LOCK_FILE)) {
+    const held = fs.readFileSync(LOCK_FILE, "utf8").trim();
+    fs.rmSync(LOCK_FILE, { force: true });
+    log(`cleared a lock left behind by a previous run (${held})`);
   }
   log(`watching ${DATA_DIR} — schedule + ${path.basename(REQUEST_FILE)}`);
   tick();
