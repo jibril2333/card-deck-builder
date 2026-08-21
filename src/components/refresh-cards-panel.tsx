@@ -112,11 +112,6 @@ export function RefreshCardsPanel() {
           );
         })}
       </div>
-      <p className="text-[11px] text-[var(--color-muted-fg)] -mt-2">
-        {selected.length === 0
-          ? "未选择 = 全部更新（含价格，约 1 小时）"
-          : `将更新：${selected.join("、")}`}
-      </p>
 
       <div className="flex items-center gap-3">
         <button

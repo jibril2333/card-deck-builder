@@ -110,9 +110,6 @@ export function NtfyPanel() {
     >
       <div className="flex items-baseline gap-2 flex-wrap">
         <h2 className="text-sm font-semibold">更新通知 (ntfy)</h2>
-        <span className="text-xs text-[var(--color-muted-fg)]">
-          卡表有变动、或者更新失败时推到手机
-        </span>
       </div>
 
       {!cfg ? (
