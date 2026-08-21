@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DeckImageExport, type ExportCard } from "@/components/deck-image-export";
+import {
+  DeckImageExport,
+  type ExportCard,
+} from "@/components/deck-image-export";
 
 /**
  * The deck's three export actions behind one toolbar button.
@@ -82,21 +85,43 @@ export function DeckExportMenu({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="px-3 h-8 rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] cursor-pointer flex items-center gap-1.5"
+        // min-w keeps the toolbar still while the label swaps to 已复制 /
+        // 复制失败 and back.
+        className="px-3 h-8 min-w-[5.5rem] justify-center rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] cursor-pointer flex items-center gap-1.5"
       >
         {done ? "✓ 已复制" : failed ? "复制失败" : "⇡ 导出"}
-        <span className="text-[10px] text-[var(--color-muted-fg)]">▾</span>
+        <span
+          aria-hidden
+          className={`text-[9px] leading-none text-[var(--color-muted-fg)] transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        >
+          ▼
+        </span>
       </button>
 
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 z-30 w-40 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg overflow-hidden"
+          // Hangs from the button's LEFT edge: right-aligned, a 160px menu
+          // under an 88px button reached out to the left over the mode tabs,
+          // which reads as belonging to whatever it covers.
+          className="absolute left-0 top-full mt-1 z-30 min-w-full w-36 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg overflow-hidden"
         >
-          <button type="button" role="menuitem" className={item} onClick={() => copy("text")}>
-            ⇡ 文本
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => copy("text")}
+          >
+            📄 文本
           </button>
-          <button type="button" role="menuitem" className={item} onClick={() => copy("url")}>
+          <button
+            type="button"
+            role="menuitem"
+            className={item}
+            onClick={() => copy("url")}
+          >
             🔗 链接
           </button>
           <DeckImageExport
