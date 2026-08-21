@@ -2,10 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {
-  seedDigimonDb,
-  seedUserDb,
-} from "./tests/e2e/fixtures/seed";
+import { seedDigimonDb, seedUserDb } from "./tests/e2e/fixtures/seed";
 
 // Use a non-default port so an already-running local `npm run dev` on 3000
 // doesn't collide with the e2e webServer.
@@ -24,10 +21,7 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 // builder/data/user.db`, since Next.js fell back to default paths.
 // ────────────────────────────────────────────────────────────────────────
 
-const E2E_DIR = path.join(
-  os.tmpdir(),
-  `cdb-e2e-${Date.now()}-${process.pid}`,
-);
+const E2E_DIR = path.join(os.tmpdir(), `cdb-e2e-${Date.now()}-${process.pid}`);
 const FIXTURE_PATHS = {
   CDB_DIGIMON_DB: path.join(E2E_DIR, "digimon.db"),
   CDB_DIGIMON_USER_DB: path.join(E2E_DIR, "digimon-user.db"),
@@ -109,10 +103,14 @@ export default defineConfig({
     // The seeded account is an admin here so the admin page and its two
     // panels are reachable. In production this list comes from .env.deploy and
     // is empty by default — see lib/auth/admin.ts, which fails closed.
+    // The build stamp reads these two; without them the sidebar shows 开发版
+    // and the spec would only ever exercise the fallback.
     env: {
       ...FIXTURE_PATHS,
       CDB_E2E: "1",
       CDB_ADMIN_EMAILS: "e2e@test.local",
+      CDB_GIT_SHA: "e2e5ha0000000000000000000000000000000000",
+      CDB_BUILT_AT: "2026-08-22T10:00:00Z",
     } satisfies Record<string, string>,
   },
 });

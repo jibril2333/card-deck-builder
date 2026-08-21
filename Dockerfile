@@ -74,6 +74,11 @@ RUN mkdir -p /app/data.nosync && chown nextjs:nodejs /app/data.nosync
 # would recompile the app.
 ARG CDB_GIT_SHA=""
 ENV CDB_GIT_SHA=$CDB_GIT_SHA
+# Same layer, same reason: the commit's own timestamp, so the sidebar can say
+# WHEN as well as WHICH. Empty when built outside CI — the stamp then shows
+# the sha alone.
+ARG CDB_BUILT_AT=""
+ENV CDB_BUILT_AT=$CDB_BUILT_AT
 
 USER nextjs
 EXPOSE 3001

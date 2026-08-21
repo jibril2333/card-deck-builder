@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/user-menu";
 import { CardLangSwitcher } from "@/components/card-lang-switcher";
 import type { CardLang } from "@/lib/card-lang";
+import { BuildStamp } from "@/components/build-stamp";
+import type { BuildInfo } from "@/lib/build-info";
 
 type NavId =
   | "search"
@@ -43,7 +45,10 @@ function hrefFor(id: NavId, game: string): string {
 /** Which nav item the current path belongs to. */
 function activeFor(pathname: string, game: string): NavId {
   const base = `/${game}`;
-  if (pathname.startsWith(`${base}/decks`) || pathname.startsWith(`${base}/groups`))
+  if (
+    pathname.startsWith(`${base}/decks`) ||
+    pathname.startsWith(`${base}/groups`)
+  )
     return "decks";
   if (pathname.startsWith(`${base}/collection`)) return "collection";
   if (pathname.startsWith(`${base}/restrictions`)) return "restrictions";
@@ -64,11 +69,13 @@ export function SidebarBody({
   loggedIn,
   cardLang,
   user,
+  build,
 }: {
   game: GameId;
   loggedIn: boolean;
   cardLang: CardLang;
   user: React.ComponentProps<typeof UserMenu>["user"] | null;
+  build: BuildInfo;
 }) {
   const pathname = usePathname() ?? `/${game}`;
   const active = activeFor(pathname, game);
@@ -111,7 +118,10 @@ export function SidebarBody({
                 : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:bg-[var(--color-muted)]",
             )}
           >
-            <span aria-hidden className="text-base leading-none w-5 text-center">
+            <span
+              aria-hidden
+              className="text-base leading-none w-5 text-center"
+            >
               {n.icon}
             </span>
             <span>{n.label}</span>
@@ -135,6 +145,8 @@ export function SidebarBody({
           <span aria-hidden>👤</span> 登录
         </Link>
       )}
+      {/* Last line in the column, smallest thing on the page. */}
+      <BuildStamp info={build} />
     </div>
   );
 
@@ -193,7 +205,7 @@ export function SidebarBody({
                 ×
               </button>
             </div>
-                {/* min-h-0: without it a flex child refuses to shrink below its
+            {/* min-h-0: without it a flex child refuses to shrink below its
                 content height and never scrolls. */}
             <div className="flex-1 min-h-0 overflow-y-auto">{navList}</div>
             {footer}

@@ -85,6 +85,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: |
             CDB_GIT_SHA=${{ github.sha }}
+            CDB_BUILT_AT=${{ github.event.head_commit.timestamp }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           # Separate cache per architecture; one shared ref would have the two
           # jobs overwriting each other's layers on every run.
