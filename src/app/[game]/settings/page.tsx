@@ -5,6 +5,8 @@ import { isAdmin } from "@/lib/auth/admin";
 import { listCredentialsForUser } from "@/lib/auth/webauthn";
 import { PasskeySection } from "@/app/account/passkey-section";
 import { DataSection } from "@/app/account/data-section";
+import { summarizeUserData } from "@/lib/db/user-transfer";
+import { describeCounts } from "@/lib/user-data";
 import { RefreshCardsPanel } from "@/components/refresh-cards-panel";
 import { RefreshSchedulePanel } from "@/components/refresh-schedule-panel";
 import { RefreshChangesPanel } from "@/components/refresh-changes-panel";
@@ -60,7 +62,9 @@ export default async function SettingsPage({
           last_used_at: c.last_used_at,
         }))}
       />
-      <DataSection />
+      {/* What the export would contain, so the tile can say it before you
+          click rather than after you open the file. */}
+      <DataSection mine={describeCounts(summarizeUserData(me.id))} />
     </main>
   );
 }

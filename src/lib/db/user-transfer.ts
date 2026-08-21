@@ -18,6 +18,39 @@ import {
 
 const db = () => getDB("digimon");
 
+/**
+ * How much there is to export, without building the export.
+ *
+ * The export tile shows this so both halves of 数据搬运 read the same way:
+ * what is about to leave, what is about to arrive. Five COUNT(*)s — cheap
+ * enough to run on every settings render, which is the only reason it isn't
+ * just `describeExport(exportUserData(id))`.
+ */
+export function summarizeUserData(userId: string): {
+  decks: number;
+  cards: number;
+  groups: number;
+  collection: number;
+  prices: number;
+} {
+  const d = db();
+  const one = (sql: string) =>
+    (d.prepare(sql).get(userId) as { n: number } | undefined)?.n ?? 0;
+  return {
+    decks: one(`SELECT COUNT(*) AS n FROM user.decks WHERE user_id = ?`),
+    cards: one(
+      `SELECT COUNT(*) AS n FROM user.deck_cards dc
+         JOIN user.decks d ON d.id = dc.deck_id
+        WHERE d.user_id = ?`,
+    ),
+    groups: one(`SELECT COUNT(*) AS n FROM user.deck_groups WHERE user_id = ?`),
+    collection: one(
+      `SELECT COUNT(*) AS n FROM user.card_collection WHERE user_id = ?`,
+    ),
+    prices: one(`SELECT COUNT(*) AS n FROM user.card_prices WHERE user_id = ?`),
+  };
+}
+
 export function exportUserData(userId: string, note?: string): UserExport {
   const d = db();
 

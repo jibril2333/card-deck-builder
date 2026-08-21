@@ -94,13 +94,30 @@ export function isUserExport(v: unknown): v is UserExport {
 
 /** A human-readable summary for the confirm step, before anything is written. */
 export function describeExport(x: UserExport): string {
-  const cards = x.decks.reduce((n, d) => n + d.cards.length, 0);
-  const bits = [
-    `${x.decks.length} 副卡组`,
-    `${cards} 条卡片记录`,
-    x.groups.length ? `${x.groups.length} 个卡池` : "",
-    x.collection.length ? `${x.collection.length} 条收藏` : "",
-    x.prices.length ? `${x.prices.length} 条价格` : "",
-  ].filter(Boolean);
-  return bits.join(" · ");
+  return describeCounts({
+    decks: x.decks.length,
+    cards: x.decks.reduce((n, d) => n + d.cards.length, 0),
+    groups: x.groups.length,
+    collection: x.collection.length,
+    prices: x.prices.length,
+  });
+}
+
+/** The same sentence from raw counts — what the export tile shows. */
+export function describeCounts(c: {
+  decks: number;
+  cards: number;
+  groups: number;
+  collection: number;
+  prices: number;
+}): string {
+  return [
+    `${c.decks} 副卡组`,
+    `${c.cards} 条卡片记录`,
+    c.groups ? `${c.groups} 个卡池` : "",
+    c.collection ? `${c.collection} 条收藏` : "",
+    c.prices ? `${c.prices} 条价格` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }

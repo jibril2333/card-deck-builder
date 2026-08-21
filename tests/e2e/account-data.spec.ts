@@ -21,7 +21,7 @@ test("exports a file, and it carries no account", async ({ page }) => {
 
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    box.getByRole("link", { name: /导出我的数据/ }).click(),
+    box.getByRole("link", { name: /导出/ }).click(),
   ]);
   const file = path.join(os.tmpdir(), `cdb-e2e-${Date.now()}.json`);
   await download.saveAs(file);
@@ -76,13 +76,17 @@ test("summarises a picked file before importing, then imports it", async ({
   await page.goto("/digimon/settings");
   const box = panel(page);
   await box.locator('input[type="file"]').setInputFiles(file);
-  // Read in the browser and summarised BEFORE anything is sent.
-  await expect(box).toContainText("1 副卡组");
-  await expect(box).toContainText("1 条卡片记录");
+  // Read in the browser and summarised BEFORE anything is sent. Scoped to the
+  // drop target: the export tile carries a count sentence of its own now, and
+  // an unscoped match would pass on that one instead.
+  const drop = box.locator("label:has(input[type=file])");
+  await expect(drop).toContainText(path.basename(file));
+  await expect(drop).toContainText("1 副卡组");
+  await expect(drop).toContainText("1 条卡片记录");
 
   await box.getByRole("button", { name: /合并导入/ }).click();
   await expect(box.getByText("导入完成")).toBeVisible();
-  await expect(box).toContainText("卡组 新建 1");
+  await expect(box).toContainText("卡组 +1");
 
   await page.goto("/digimon/decks");
   await expect(page.getByText("导入进来的卡组")).toBeVisible();
