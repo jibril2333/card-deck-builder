@@ -8,6 +8,7 @@ import { buildSetOrder, deckVersionOf } from "@/lib/deck-version";
 import { backupBeforeWrite } from "@/lib/db/connection";
 import { parseDeckText } from "@/lib/deck-formats";
 import { stripAltArt } from "@/lib/alt-art";
+import { isSearchableQuery } from "@/lib/search-terms";
 import { isEmptyReport, type ImportReport } from "@/lib/import-report";
 import { requireUser } from "@/lib/auth/session";
 
@@ -406,7 +407,7 @@ export async function searchCardsAction(
   await requireUser();
   if (!isGameId(game)) throw new Error("invalid game");
   const query = q.trim();
-  if (query.length < 2) return [];
+  if (!isSearchableQuery(query)) return [];
   // Name/code only, ranked by how well the name matches. Both callers — the
   // build-mode picker and the adjustment memo — are "I know which card I want
   // and I'm typing its name". Matching effect text there buried the card:

@@ -8,6 +8,7 @@ import {
   type CardPickerHit,
 } from "@/app/[game]/actions";
 import { useComposition } from "@/lib/use-composition";
+import { isSearchableQuery } from "@/lib/search-terms";
 
 /**
  * Search-and-add box for build mode.
@@ -60,7 +61,7 @@ export function DeckCardSearch({
     const query = q.trim();
     let cancelled = false;
     const t = setTimeout(async () => {
-      if (query.length < 2) {
+      if (!isSearchableQuery(query)) {
         if (!cancelled) setHits([]);
         return;
       }
@@ -103,9 +104,7 @@ export function DeckCardSearch({
     // below replaces it with whatever the server actually allowed.
     setHits((hs) =>
       hs.map((h) =>
-        h.id === cardId
-          ? { ...h, in_deck: Math.max(0, h.in_deck + delta) }
-          : h,
+        h.id === cardId ? { ...h, in_deck: Math.max(0, h.in_deck + delta) } : h,
       ),
     );
     startTransition(async () => {
@@ -161,7 +160,7 @@ export function DeckCardSearch({
         ) : null}
       </div>
 
-      {open && q.trim().length >= 2 ? (
+      {open && isSearchableQuery(q) ? (
         <div className="absolute z-30 left-0 right-0 mt-1 max-h-96 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
           {searching && hits.length === 0 ? (
             <div className="px-3 py-3 text-xs text-[var(--color-muted-fg)]">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitTerms } from "@/lib/search-terms";
+import { isSearchableQuery, splitTerms } from "@/lib/search-terms";
 
 /**
  * Every term becomes its own LIKE and all of them must match, so what counts
@@ -46,5 +46,33 @@ describe("splitTerms", () => {
     // No trimming inside the word — "X-Antibody" is one term, not two.
     expect(splitTerms("X-Antibody")).toEqual(["X-Antibody"]);
     expect(splitTerms("BT24-031")).toEqual(["BT24-031"]);
+  });
+});
+
+describe("isSearchableQuery", () => {
+  it("takes a single CJK character", () => {
+    // One ideograph is a word: 渡 is four cards, not half the pool. The
+    // pickers used to show nothing at all for it — no results, no "没有匹配",
+    // no dropdown — which is what a per-character IME produces after the
+    // first commit of 渡鸦兽.
+    expect(isSearchableQuery("渡")).toBe(true);
+    expect(isSearchableQuery("亚")).toBe(true);
+    expect(isSearchableQuery("ア")).toBe(true);
+    expect(isSearchableQuery("龍")).toBe(true);
+  });
+
+  it("still wants two characters of anything else", () => {
+    expect(isSearchableQuery("a")).toBe(false);
+    expect(isSearchableQuery("7")).toBe(false);
+    expect(isSearchableQuery(" x ")).toBe(false);
+    expect(isSearchableQuery("ab")).toBe(true);
+    expect(isSearchableQuery("BT1-010")).toBe(true);
+  });
+
+  it("gives nothing back for nothing", () => {
+    expect(isSearchableQuery("")).toBe(false);
+    expect(isSearchableQuery("　")).toBe(false);
+    expect(isSearchableQuery(undefined)).toBe(false);
+    expect(isSearchableQuery(null)).toBe(false);
   });
 });

@@ -28,3 +28,23 @@ export function splitTerms(q: string | undefined | null): string[] {
     .slice(0, MAX_TERMS);
 }
 
+/**
+ * Is this query long enough to look up?
+ *
+ * The pickers debounce and then refuse to search a single character, which is
+ * right for Latin — one letter matches half the card pool — and wrong for
+ * Chinese and Japanese, where one character is a word: 渡 is already only four
+ * cards, 亚 only a handful. Typing 渡鸦兽 with a per-character IME therefore
+ * produced NOTHING after the first commit — no results, no "没有匹配", not even
+ * a dropdown — which reads as a broken search rather than as "keep typing".
+ *
+ * CJK ideographs, kana and the Hangul range all count as one-character words;
+ * everything else keeps the two-character floor.
+ */
+const CJK = /[぀-ヿ㐀-䶿一-鿿가-힯豈-﫿ｦ-ﾟ]/;
+
+export function isSearchableQuery(q: string | undefined | null): boolean {
+  const s = (q ?? "").trim();
+  if (s.length >= 2) return true;
+  return s.length === 1 && CJK.test(s);
+}

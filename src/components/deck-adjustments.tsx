@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useComposition } from "@/lib/use-composition";
+import { isSearchableQuery } from "@/lib/search-terms";
 import {
   addDeckAdjustmentAction,
   removeDeckAdjustmentAction,
@@ -99,7 +100,7 @@ export function DeckAdjustments({
     max: 288,
   });
 
-  const listOpen = open && q.trim().length >= 2;
+  const listOpen = open && isSearchableQuery(q);
   useEffect(() => {
     if (!listOpen) return;
     function measure() {
@@ -129,7 +130,7 @@ export function DeckAdjustments({
     // Everything happens inside the timeout: setting state synchronously in an
     // effect body cascades renders (and eslint rejects it).
     const t = setTimeout(async () => {
-      if (query.length < 2) {
+      if (!isSearchableQuery(query)) {
         if (!cancelled) setHits([]);
         return;
       }

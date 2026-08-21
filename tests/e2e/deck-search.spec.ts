@@ -36,3 +36,26 @@ test("deck search has a clear button", async ({ page }) => {
   await input.press("Escape");
   await expect(input).toHaveValue("");
 });
+
+test("one Chinese character is a search; one Latin letter isn't", async ({
+  page,
+}) => {
+  await page.goto("/digimon/decks");
+  await page.getByPlaceholder("卡组名").fill("CJK " + Date.now());
+  await page.getByRole("button", { name: /创建/ }).click();
+  await page.waitForURL(/\/digimon\/decks\/[a-z0-9-]+/i);
+  await page.getByRole("link", { name: /🛠 组建/ }).click();
+
+  const input = page.getByPlaceholder("搜卡加入卡组…");
+
+  // 石 is the first character of 石田大和 — one commit of a per-character IME.
+  // It used to render nothing at all: no hits, no 没有匹配, no dropdown.
+  await input.fill("石");
+  await expect(page.getByLabel(/^加入卡组 /)).toHaveCount(1);
+
+  // A single Latin letter still doesn't: it matches half the pool, and the
+  // two-character floor is what keeps that list from opening on every keypress.
+  await input.fill("a");
+  await expect(page.getByText("没有匹配的卡")).toHaveCount(0);
+  await expect(page.getByLabel(/^加入卡组 /)).toHaveCount(0);
+});
