@@ -7,6 +7,7 @@ import { DecksGrid } from "@/components/decks-grid";
 import { GroupsStrip } from "@/components/groups-strip";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
+import { deckIsComplete } from "@/lib/deck-legality";
 
 export const dynamic = "force-dynamic";
 
@@ -155,7 +156,17 @@ export default async function DecksPage({
               // (bottom, read-only). They get their own header + DecksGrid so
               // the visual boundary between "mine" and "borrowed" is obvious
               // even at a glance.
-              const mineDecks = decks.filter((d) => d.mine);
+              // Locked AND no longer legal: a deck you finished with, that the
+              // current rules have moved past. It can't be fixed without
+              // unlocking it, and you closed it on purpose — so it sits at the
+              // bottom instead of carrying a red badge through the main list
+              // forever.
+              const isLegacy = (d: (typeof decks)[number]) =>
+                d.mine &&
+                d.locked &&
+                (d.issues > 0 || !deckIsComplete(d.counts));
+              const mineDecks = decks.filter((d) => d.mine && !isLegacy(d));
+              const legacyDecks = decks.filter(isLegacy);
               const otherDecks = decks.filter((d) => !d.mine);
               const toGridShape = (
                 d: (typeof decks)[number],
@@ -259,6 +270,23 @@ export default async function DecksPage({
                       <DecksGrid
                         game={game}
                         decks={otherDecks.map(toGridShape)}
+                      />
+                    </section>
+                  ) : null}
+
+                  {legacyDecks.length > 0 ? (
+                    <section className="mb-6 pt-6 border-t border-[var(--color-border)]">
+                      <header className="mb-2">
+                        <h2 className="text-sm font-semibold text-[var(--color-muted-fg)] uppercase tracking-wide">
+                          封存{" "}
+                          <span className="font-normal normal-case">
+                            ({legacyDecks.length})
+                          </span>
+                        </h2>
+                      </header>
+                      <DecksGrid
+                        game={game}
+                        decks={legacyDecks.map(toGridShape)}
                       />
                     </section>
                   ) : null}
