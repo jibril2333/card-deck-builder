@@ -78,9 +78,9 @@ export function PasskeySection({
   }
 
   return (
-    <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-5 space-y-4">
+    <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3">
       <div>
-        <h2 className="text-lg font-semibold">Passkey 登录</h2>
+        <h2 className="text-sm font-semibold">Passkey 登录</h2>
       </div>
 
       <div className="flex gap-2 items-end">

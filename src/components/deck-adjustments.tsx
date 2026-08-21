@@ -174,9 +174,6 @@ export function DeckAdjustments({
     <section className="mt-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
       <header className="flex items-baseline gap-2 mb-3">
         <h2 className="text-sm font-semibold">调整备忘</h2>
-        <span className="text-[11px] text-[var(--color-muted-fg)]">
-          不计入张数、价格、缺卡与导出
-        </span>
       </header>
 
       <div ref={boxRef} className="relative mb-4">

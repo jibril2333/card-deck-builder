@@ -43,6 +43,15 @@ export default async function SettingsPage({
         </div>
       </div>
 
+      {admin ? (
+        <>
+          <RefreshCardsPanel />
+          <RefreshSchedulePanel />
+          <RefreshChangesPanel />
+          <NtfyPanel />
+        </>
+      ) : null}
+
       <PasskeySection
         credentials={listCredentialsForUser(me.id).map((c) => ({
           id: c.id,
@@ -52,15 +61,6 @@ export default async function SettingsPage({
         }))}
       />
       <DataSection />
-
-      {admin ? (
-        <>
-          <RefreshCardsPanel />
-          <RefreshSchedulePanel />
-          <RefreshChangesPanel />
-          <NtfyPanel />
-        </>
-      ) : null}
     </main>
   );
 }
