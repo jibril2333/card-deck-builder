@@ -38,6 +38,9 @@ export type ExportedDeck = {
   pinned: number;
   version: string | null;
   locked: number;
+  /** What the import that made this deck couldn't place; absent in files
+   *  written before `decks.import_report` existed. See lib/import-report. */
+  import_report?: string | null;
   created_at: string;
   updated_at: string;
   cards: { code: string; quantity: number; purchased: number }[];

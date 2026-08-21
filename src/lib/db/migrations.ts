@@ -1176,6 +1176,25 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 38,
+    name: "decks.import_report — what the importer had to drop",
+    up: (db) => {
+      // An import that couldn't place every card used to say so in the deck's
+      // NOTES, which is the owner's field: the report sat in the middle of it
+      // until they deleted it by hand, and any note they wrote first was
+      // pushed down by a wall of card codes. It gets its own column and its
+      // own line in the deck's info bar, dismissable in one click.
+      //
+      // Idempotent, per the rule above: this alters the ATTACHED user DB while
+      // the version stamp lives on the cards DB.
+      if (!hasColumn(db, "user.decks", "import_report")) {
+        db.exec(
+          "ALTER TABLE user.decks ADD COLUMN import_report TEXT DEFAULT NULL",
+        );
+      }
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

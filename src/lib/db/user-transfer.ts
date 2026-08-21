@@ -25,10 +25,13 @@ export function exportUserData(userId: string, note?: string): UserExport {
     .prepare(
       `SELECT id, name, notes, accent_color, accent_color2, cover_card_id,
               cover_variant, sort_order, pinned, version, locked,
-              created_at, updated_at
+              import_report, created_at, updated_at
          FROM user.decks WHERE user_id = ? ORDER BY sort_order, created_at`,
     )
-    .all(userId) as (Omit<ExportedDeck, "cards" | "adjustments" | "cover_card_code"> & {
+    .all(userId) as (Omit<
+    ExportedDeck,
+    "cards" | "adjustments" | "cover_card_code"
+  > & {
     cover_card_id: string | null;
   })[];
 
@@ -58,7 +61,9 @@ export function exportUserData(userId: string, note?: string): UserExport {
     ...g,
     deckIds: (
       d
-        .prepare(`SELECT deck_id FROM user.deck_group_members WHERE group_id = ?`)
+        .prepare(
+          `SELECT deck_id FROM user.deck_group_members WHERE group_id = ?`,
+        )
         .all(g.id) as { deck_id: string }[]
     ).map((r) => r.deck_id),
   }));
@@ -147,23 +152,32 @@ export function importUserData(
   d.transaction(() => {
     if (opts.replace) {
       const mine = (
-        d.prepare(`SELECT id FROM user.decks WHERE user_id = ?`).all(userId) as {
+        d
+          .prepare(`SELECT id FROM user.decks WHERE user_id = ?`)
+          .all(userId) as {
           id: string;
         }[]
       ).map((r) => r.id);
       for (const id of mine) {
         d.prepare(`DELETE FROM user.deck_cards WHERE deck_id = ?`).run(id);
-        d.prepare(`DELETE FROM user.deck_adjustments WHERE deck_id = ?`).run(id);
-        d.prepare(`DELETE FROM user.deck_group_members WHERE deck_id = ?`).run(id);
+        d.prepare(`DELETE FROM user.deck_adjustments WHERE deck_id = ?`).run(
+          id,
+        );
+        d.prepare(`DELETE FROM user.deck_group_members WHERE deck_id = ?`).run(
+          id,
+        );
       }
       d.prepare(`DELETE FROM user.decks WHERE user_id = ?`).run(userId);
       d.prepare(`DELETE FROM user.deck_groups WHERE user_id = ?`).run(userId);
-      d.prepare(`DELETE FROM user.card_collection WHERE user_id = ?`).run(userId);
+      d.prepare(`DELETE FROM user.card_collection WHERE user_id = ?`).run(
+        userId,
+      );
       d.prepare(`DELETE FROM user.card_prices WHERE user_id = ?`).run(userId);
     }
 
     for (const deck of data.decks) {
-      const existing = ownerOf.get(deck.id) as { user_id: string | null } | undefined;
+      const existing = ownerOf.get(deck.id) as
+        { user_id: string | null } | undefined;
       if (existing && existing.user_id !== userId) {
         report.conflicts.push(deck.name);
         continue;
@@ -173,10 +187,10 @@ export function importUserData(
         `INSERT INTO user.decks
            (id, name, notes, accent_color, accent_color2, cover_card_id,
             cover_variant, sort_order, pinned, version, locked,
-            created_at, updated_at, user_id)
+            import_report, created_at, updated_at, user_id)
          VALUES (@id, @name, @notes, @accent_color, @accent_color2, @cover,
                  @cover_variant, @sort_order, @pinned, @version, @locked,
-                 @created_at, @updated_at, @user_id)
+                 @import_report, @created_at, @updated_at, @user_id)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name, notes = excluded.notes,
            accent_color = excluded.accent_color,
@@ -185,6 +199,7 @@ export function importUserData(
            cover_variant = excluded.cover_variant,
            sort_order = excluded.sort_order, pinned = excluded.pinned,
            version = excluded.version, locked = excluded.locked,
+           import_report = excluded.import_report,
            updated_at = excluded.updated_at`,
       ).run({
         id: deck.id,
@@ -198,6 +213,8 @@ export function importUserData(
         pinned: deck.pinned ?? 0,
         version: deck.version ?? null,
         locked: deck.locked ?? 0,
+        // Optional: files written before the column existed just carry null.
+        import_report: deck.import_report ?? null,
         created_at: deck.created_at,
         updated_at: deck.updated_at,
         user_id: userId,
@@ -218,14 +235,23 @@ export function importUserData(
         report.cards++;
       }
 
-      d.prepare(`DELETE FROM user.deck_adjustments WHERE deck_id = ?`).run(deck.id);
+      d.prepare(`DELETE FROM user.deck_adjustments WHERE deck_id = ?`).run(
+        deck.id,
+      );
       for (const a of deck.adjustments ?? []) {
         const id = cardId(a.code);
         if (!id) continue;
         d.prepare(
           `INSERT INTO user.deck_adjustments (id, deck_id, card_id, kind, quantity, note)
            VALUES (?, ?, ?, ?, ?, ?)`,
-        ).run(crypto.randomUUID(), deck.id, id, a.kind, a.quantity ?? 1, a.note ?? null);
+        ).run(
+          crypto.randomUUID(),
+          deck.id,
+          id,
+          a.kind,
+          a.quantity ?? 1,
+          a.note ?? null,
+        );
       }
     }
 
@@ -235,11 +261,14 @@ export function importUserData(
          VALUES (?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
       ).run(g.id, g.name, userId, g.created_at);
-      d.prepare(`DELETE FROM user.deck_group_members WHERE group_id = ?`).run(g.id);
+      d.prepare(`DELETE FROM user.deck_group_members WHERE group_id = ?`).run(
+        g.id,
+      );
       for (const deckId of g.deckIds) {
         // Only decks that actually landed — a conflicted deck must not leave a
         // membership row pointing at somebody else's deck.
-        const owner = ownerOf.get(deckId) as { user_id: string | null } | undefined;
+        const owner = ownerOf.get(deckId) as
+          { user_id: string | null } | undefined;
         if (!owner || owner.user_id !== userId) continue;
         d.prepare(
           `INSERT OR IGNORE INTO user.deck_group_members (group_id, deck_id) VALUES (?, ?)`,

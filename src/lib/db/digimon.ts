@@ -72,6 +72,10 @@ export type DigimonDeck = {
   version: string | null;
   /** 1 = closed to edits. Enforced in the repo, not just the UI. */
   locked: number;
+  /** JSON `ImportReport` from the import that made this deck: the cards it
+   *  couldn't place. Shown in the deck's info bar until dismissed, then NULL
+   *  forever. See lib/import-report. */
+  import_report: string | null;
   created_at: string;
   updated_at: string;
   user_id: string | null;
@@ -628,12 +632,14 @@ export function createDeck(input: {
   notes?: string;
   accent_color?: string;
   accent_color2?: string | null;
+  /** Serialized `ImportReport` — only the importer sets this. */
+  import_report?: string | null;
 }): string {
   const id = crypto.randomUUID();
   db()
     .prepare(
-      `INSERT INTO user.decks (id, name, notes, accent_color, accent_color2, user_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO user.decks (id, name, notes, accent_color, accent_color2, user_id, import_report)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
@@ -642,6 +648,7 @@ export function createDeck(input: {
       input.accent_color ?? "#f59e0b",
       input.accent_color2 ?? null,
       input.user_id,
+      input.import_report ?? null,
     );
   return id;
 }
@@ -663,6 +670,8 @@ export function updateDeckMeta(
     accent_color2?: string | null;
     /** Pack code from `card_sets`, or null to clear. See lib/deck-version. */
     version?: string | null;
+    /** Only ever set to null, by the 知道了 button on the info bar. */
+    import_report?: string | null;
   },
 ): void {
   // Name, notes, colours and version are all "the deck", so a lock covers
@@ -689,6 +698,10 @@ export function updateDeckMeta(
   if (patch.version !== undefined) {
     sets.push("version = ?");
     params.push(patch.version);
+  }
+  if (patch.import_report !== undefined) {
+    sets.push("import_report = ?");
+    params.push(patch.import_report);
   }
   if (sets.length === 0) return;
   sets.push("updated_at = CURRENT_TIMESTAMP");

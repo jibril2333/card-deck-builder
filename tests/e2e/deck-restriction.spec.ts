@@ -19,7 +19,7 @@ test("names the cards the banlist disagrees with, and changes nothing", async ({
 }) => {
   await page.goto(DECK_URL);
 
-  const notice = page.getByRole("status", { name: "禁限提醒" });
+  const notice = page.getByRole("status", { name: "卡组信息" });
   await expect(notice).toBeVisible();
   // The card, the cap, and what you actually hold — nothing else. The box
   // used to open with a sentence about the banlist and close with a paragraph

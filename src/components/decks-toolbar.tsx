@@ -106,9 +106,8 @@ export function DecksToolbar({
     startTransition(async () => {
       const r = await importDeckAction(buildFD({ text }));
       if (r.ok && r.deckId) {
-        // Compose a one-line summary; the deck's notes already carries
-        // the detailed drop reasons (parse errors / banned / pair /
-        // overlimit) so we don't need to re-render them here.
+        // One line only — we're about to navigate to the deck, whose info
+        // bar carries the detail (parse errors / banned / pair / overlimit).
         const bits: string[] = [`导入 ${r.imported ?? 0} 张`];
         if (r.missing && r.missing.length > 0) {
           bits.push(`${r.missing.length} 张数据库里没找到`);

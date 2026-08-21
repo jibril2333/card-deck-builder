@@ -29,7 +29,8 @@ import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import { DECK_TARGET } from "@/lib/deck-legality";
 import { tallyColors, tallyLevels, MULTI_COLOR } from "@/lib/deck-tally";
-import { DeckRestrictionNotice } from "@/components/deck-restriction-notice";
+import { DeckInfoBar } from "@/components/deck-info-bar";
+import { parseImportReport } from "@/lib/import-report";
 import { computeDeckJogress } from "@/lib/jogress";
 import {
   buildSetOrder,
@@ -156,6 +157,8 @@ type Loaded = {
     version: string | null;
     /** Closed to edits — every write path refuses. */
     locked: boolean;
+    /** Raw JSON from the import that made this deck. See lib/import-report. */
+    import_report: string | null;
     updated_at: string;
     user_id: string | null;
   };
@@ -304,6 +307,7 @@ export default async function DeckEditPage({
       cover_variant: deck.cover_variant ?? "",
       version: deck.version ?? null,
       locked: !!deck.locked,
+      import_report: deck.import_report ?? null,
       updated_at: deck.updated_at,
       user_id: deck.user_id,
     },
@@ -623,22 +627,31 @@ export default async function DeckEditPage({
                   the cards a whole line further down for no added meaning. */}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-3">
                 <div className="text-xs text-[var(--color-muted-fg)]">
-                  主卡组 {main} / {target.main}
-                  {loaded.isDigimon ? ` · 蛋卡 ${eggs} / ${target.egg}` : null}
+                  {/* The numbers say it themselves — a red 48 against a 50 is
+                      the whole message, and the sentence that used to sit
+                      here ("主卡组数量不达标") repeated it in words. The info
+                      bar above 卡组分布 carries the same fact for anyone
+                      scanning the sidebar. */}
+                  主卡组{" "}
+                  <span className={mainOk ? "" : "text-red-500 font-medium"}>
+                    {main}
+                  </span>{" "}
+                  / {target.main}
+                  {loaded.isDigimon ? (
+                    <>
+                      {" · 蛋卡 "}
+                      <span className={eggOk ? "" : "text-red-500 font-medium"}>
+                        {eggs}
+                      </span>
+                      {` / ${target.egg}`}
+                    </>
+                  ) : null}
                   {totalPrice > 0 ? (
                     <span className="ml-2">
                       · 预期总价{" "}
                       <b className="text-[var(--color-accent2)]">
                         {fmtPrice(totalPrice)}
                       </b>
-                    </span>
-                  ) : null}
-                  {!mainOk ? (
-                    <span className="ml-2 text-red-500">主卡组数量不达标</span>
-                  ) : null}
-                  {!eggOk ? (
-                    <span className="ml-2 text-red-500">
-                      蛋卡超过 {target.egg} 张
                     </span>
                   ) : null}
                 </div>
@@ -658,8 +671,6 @@ export default async function DeckEditPage({
                     editable={canEdit}
                   />
                 ) : null}
-
-                <DeckRestrictionNotice issues={restrictionIssues} />
 
                 {colorBreakdown.length ? (
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -835,6 +846,27 @@ export default async function DeckEditPage({
               这是别人的卡组,你只能浏览。
             </div>
           ) : null}
+
+          {/* Everything wrong with the deck, above the distribution panel:
+              banlist, size, and whatever the import couldn't place. Absent
+              when there is nothing to say. */}
+          <DeckInfoBar
+            game={game}
+            deckId={loaded.deck.id}
+            size={
+              loaded.cards.length > 0
+                ? {
+                    main,
+                    mainTarget: target.main,
+                    eggs,
+                    eggTarget: target.egg,
+                  }
+                : null
+            }
+            issues={restrictionIssues}
+            report={mine ? parseImportReport(loaded.deck.import_report) : null}
+            dismissable={canEdit}
+          />
 
           {loaded.cards.length > 0 ? (
             <DeckStats panels={loaded.statsPanels} />

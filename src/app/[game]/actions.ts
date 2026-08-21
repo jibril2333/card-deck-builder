@@ -8,6 +8,7 @@ import { buildSetOrder, deckVersionOf } from "@/lib/deck-version";
 import { backupBeforeWrite } from "@/lib/db/connection";
 import { parseDeckText } from "@/lib/deck-formats";
 import { stripAltArt } from "@/lib/alt-art";
+import { isEmptyReport, type ImportReport } from "@/lib/import-report";
 import { requireUser } from "@/lib/auth/session";
 
 function lib(_game: GameId) {
@@ -75,7 +76,9 @@ export async function createDeckAction(formData: FormData) {
 
 // Create a deck without redirecting away from the current page.
 // Used by the in-card "add to deck" widget.
-export async function createDeckQuietAction(formData: FormData): Promise<string> {
+export async function createDeckQuietAction(
+  formData: FormData,
+): Promise<string> {
   const me = await requireUser();
   const game = String(formData.get("game"));
   const name = String(formData.get("name") ?? "").trim();
@@ -270,12 +273,25 @@ export async function setDeckGroupsAction(formData: FormData) {
   // write rather than after.
   const touched = lib(game)
     .listGroups(me.id)
-    .filter((g) => g.decks.some((d) => d.id === deckId) || groupIds.includes(g.id))
+    .filter(
+      (g) => g.decks.some((d) => d.id === deckId) || groupIds.includes(g.id),
+    )
     .map((g) => g.id);
   lib(game).setDeckGroups(me.id, deckId, groupIds);
   revalidatePath(`/${game}/decks/${deckId}`);
   bumpGroups(game);
   for (const id of touched) revalidatePath(`/${game}/groups/${id}`);
+}
+
+/** Dismiss a deck's import report — the 知道了 button on its info bar. */
+export async function clearImportReportAction(formData: FormData) {
+  const me = await requireUser();
+  const game = String(formData.get("game"));
+  const deckId = String(formData.get("deck_id"));
+  if (!isGameId(game)) throw new Error("invalid game");
+  backupBeforeWrite(game);
+  digimon.updateDeckMeta(me.id, deckId, { import_report: null });
+  bumpDeck(game, deckId);
 }
 
 export async function adjustDeckCardAction(formData: FormData) {
@@ -298,7 +314,10 @@ export async function reorderDecksAction(formData: FormData) {
   const idsRaw = String(formData.get("ids") ?? "");
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
-  const ids = idsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  const ids = idsRaw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (ids.length === 0) return;
   lib(game).reorderDecks(me.id, ids);
   bumpDeckList(game);
@@ -583,7 +602,7 @@ export async function importDeckAction(formData: FormData): Promise<{
 
   // Pre-fetch the banlist data so we can predict every clamp BEFORE we
   // touch user.deck_cards. This lets us:
-  //   (a) build a complete "what was dropped and why" report for notes
+  //   (a) build a complete "what was dropped and why" report
   //   (b) avoid the order-sensitive split-personality where pair detection
   //       happens *inside* clampQuantityToRestriction (still safe — we'll
   //       re-clamp on write — just rebuilt here for reporting).
@@ -619,7 +638,7 @@ export async function importDeckAction(formData: FormData): Promise<{
 
   const drops: Drop[] = [];
   /** Codes the parser read but the card DB doesn't have, with the requested
-   *  count — recorded in the notes so they aren't silently lost. */
+   *  count — recorded in the import report so they aren't silently lost. */
   const missing: { code: string; qty: number }[] = [];
   const plan: { cardId: string; qty: number }[] = [];
   const seenIdentities = new Set<string>();
@@ -641,7 +660,7 @@ export async function importDeckAction(formData: FormData): Promise<{
 
     // Pair conflict: anything earlier in the import that pairs with me?
     // Whichever card appeared FIRST in the text wins; the later one is
-    // dropped. Documented in the notes so the user can re-order intent.
+    // dropped. Reported, so the user can re-order intent.
     const opp = pairOpposites.get(identity);
     if (opp) {
       let blockedBy: string | null = null;
@@ -697,20 +716,11 @@ export async function importDeckAction(formData: FormData): Promise<{
     }
   }
 
-  // Build a single composite notes string. Each reason gets its own
-  // labeled section so the user can scan quickly. The parse-error head
-  // section preserves the previous behavior; new sections only render
-  // when there's something to say.
-  const notesParts: string[] = [];
-  if (errors.length) {
-    notesParts.push(
-      `解析失败 ${errors.length} 行:\n` +
-        errors
-          .slice(0, 10)
-          .map((e) => `  ${e}`)
-          .join("\n"),
-    );
-  }
+  // What we couldn't place, as data rather than prose. It used to be written
+  // into the deck's NOTES — the owner's own field — where it sat until they
+  // deleted it by hand. It now rides along in `decks.import_report` and shows
+  // up in the deck's info bar, which has a dismiss button. See
+  // lib/import-report.
   const bannedDrops = drops.filter((d) => d.type === "banned") as Extract<
     Drop,
     { type: "banned" }
@@ -724,48 +734,26 @@ export async function importDeckAction(formData: FormData): Promise<{
     Drop,
     { type: "pair" }
   >[];
-  if (missing.length) {
-    // These never made it into the deck at all: either the code is a typo, or
-    // it's a set our scrapers haven't imported yet. Writing them down means an
-    // import is never quietly incomplete — the user can re-add them by hand
-    // once the card exists.
-    notesParts.push(
-      `未找到的卡(未导入) ${missing.length}:\n` +
-        missing.map((m) => `  ${m.code} ×${m.qty}`).join("\n"),
-    );
-  }
-  if (bannedDrops.length) {
-    notesParts.push(
-      `禁卡(已跳过) ${bannedDrops.length}:\n` +
-        bannedDrops
-          .map((d) => `  ${d.code}(请求 ${d.requested} 张)`)
-          .join("\n"),
-    );
-  }
-  if (limitedDrops.length) {
-    notesParts.push(
-      `超出上限(已截到上限) ${limitedDrops.length}:\n` +
-        limitedDrops
-          .map((d) => {
-            const cap = d.cap;
-            const reason =
-              d.type === "limited"
-                ? `限${d.cap}`
-                : `上限 ${d.cap} 张`;
-            return `  ${d.code}(${d.requested} → ${cap}, ${reason})`;
-          })
-          .join("\n"),
-    );
-  }
-  if (pairDrops.length) {
-    notesParts.push(
-      `禁卡组合冲突(已跳过) ${pairDrops.length}:\n` +
-        pairDrops
-          .map((d) => `  ${d.code}(与 ${d.conflictWith} 互斥)`)
-          .join("\n"),
-    );
-  }
-  const notes = notesParts.length ? notesParts.join("\n\n") : undefined;
+  const report: ImportReport = {};
+  if (missing.length) report.missing = missing;
+  if (bannedDrops.length)
+    report.banned = bannedDrops.map((d) => ({
+      code: d.code,
+      qty: d.requested,
+    }));
+  if (limitedDrops.length)
+    report.capped = limitedDrops.map((d) => ({
+      code: d.code,
+      from: d.requested,
+      to: d.cap,
+    }));
+  if (pairDrops.length)
+    report.pairs = pairDrops.map((d) => ({
+      code: d.code,
+      with: d.conflictWith,
+    }));
+  if (errors.length) report.unparsed = errors.slice(0, 10);
+  const importReport = isEmptyReport(report) ? null : JSON.stringify(report);
 
   // Pick a "hero" card when the user didn't name the deck: whichever Lv 6
   // card has the most copies, ties broken alphabetically by name. We don't
@@ -786,7 +774,7 @@ export async function importDeckAction(formData: FormData): Promise<{
   const deckId = l.createDeck({
     user_id: me.id,
     name,
-    notes,
+    import_report: importReport,
     accent_color: GAMES[game].accent,
   });
   for (const w of plan) {
@@ -841,10 +829,7 @@ export async function setDeckCardPurchasedAction(formData: FormData) {
   // pool (each deck capped at its own quantity). Otherwise just this deck.
   const peers = lib(game).decksSharingPoolWith(me.id, deckId);
   if (peers.length > 1) {
-    const owned = Math.min(
-      purchased,
-      lib(game).maxNeedForCard(peers, cardId),
-    );
+    const owned = Math.min(purchased, lib(game).maxNeedForCard(peers, cardId));
     lib(game).reconcilePoolCard(peers, cardId, owned);
     bumpGame(game);
   } else {
