@@ -176,6 +176,24 @@ list of which scraper belongs to which stage; `tests/refresh-stages.test.ts`
 checks it against the case block in refresh-cards.sh so host mode and container
 mode can't drift apart.
 
+### Prices are resumable; a redeploy will interrupt a refresh
+
+`scrape-cardrush-prices.ts` skips cards priced within `--max-age` hours
+(default 72; `--force` re-checks everything). This is not a speed tweak — a
+full pass is ~4400 requests at 700ms, over an hour, and **anything that
+restarts the process inside that window used to throw the whole hour away**.
+
+That is a routine event on the container deployment: every push rebuilds the
+image, watchtower recreates the container, and whatever refresh was running
+dies with it. Three consecutive price runs on the NAS died this way on
+2026-08-20 — the log shows each one starting and then simply stopping, with no
+`FAILED` line, because nothing was left alive to write one.
+
+With the window, an interrupted run costs the tail rather than the whole pass,
+and a daily run costs almost nothing. Cards cardrush has no listing for (~115)
+are re-checked every run, since "we looked and found nothing" isn't recorded —
+that's about two minutes, and worth it to pick them up when they do appear.
+
 ### Push notifications (ntfy)
 
 `scripts/refresh-cards.sh` pushes to ntfy at the end of a run. Two cases, and
