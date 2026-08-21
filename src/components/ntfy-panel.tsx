@@ -14,9 +14,10 @@ type View = {
 /**
  * Push-notification settings: server, topic, token.
  *
- * The token box is always empty on load — the server won't hand it back (see
- * the route). Leaving it empty on save keeps the stored one, so fixing a typo
- * in the topic doesn't cost you the token.
+ * A saved token is shown masked, with a 更换 button, rather than as an empty
+ * box that means "keep it". The server never hands the value back (see the
+ * route), and an empty password field reads as "there is no token" as readily
+ * as "unchanged" — so the field only appears when you ask to replace it.
  *
  * The test button deliberately sends with the SAVED config rather than the
  * form's contents: a green tick has to mean "what the refresh will use works",
@@ -28,6 +29,8 @@ export function NtfyPanel() {
   const [topic, setTopic] = useState("");
   const [token, setToken] = useState("");
   const [enabled, setEnabled] = useState(false);
+  /** True while replacing a saved token — see the token field below. */
+  const [editingToken, setEditingToken] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -52,6 +55,7 @@ export function NtfyPanel() {
     setTopic(v.topic);
     setEnabled(v.enabled);
     setToken("");
+    setEditingToken(false);
     setDirty(false);
   }
 
@@ -153,30 +157,60 @@ export function NtfyPanel() {
             </label>
           </div>
 
-          <label className="space-y-1 block">
-            <div className="text-xs text-[var(--color-muted-fg)]">
-              令牌 (token)
-              {cfg.tokenSet ? (
-                <span className="ml-1">
-                  · 已保存 <code className="font-mono">{cfg.tokenHint}</code>
-                  ,留空即不改动
-                </span>
-              ) : (
-                <span className="ml-1">
-                  · ntfy 那边 <code className="font-mono">ntfy token add</code> 生成
-                </span>
-              )}
-            </div>
-            <input
-              className={field}
-              value={token}
-              onChange={(e) => edit(setToken)(e.target.value)}
-              placeholder={cfg.tokenSet ? "不改就留空" : "tk_…"}
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
+          <div className="space-y-1">
+            <div className="text-xs text-[var(--color-muted-fg)]">令牌 (token)</div>
+            {cfg.tokenSet && !editingToken ? (
+              // A saved secret is SHOWN, masked, rather than replaced by an
+              // empty box that silently means "keep the old one". An empty
+              // password field is ambiguous — it reads as "no token" and as
+              // "cleared" just as easily as "unchanged" — so there isn't one
+              // until you ask to replace the token, and saving can't wipe it
+              // by accident.
+              <div className="flex items-center gap-2">
+                <div
+                  className={`${field} flex items-center font-mono text-[var(--color-muted-fg)] bg-[var(--color-muted)]/40`}
+                >
+                  {cfg.tokenHint}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingToken(true);
+                    setToken("");
+                  }}
+                  className={`${btn} shrink-0 border border-[var(--color-border)] hover:bg-[var(--color-muted)]`}
+                >
+                  更换
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  className={field}
+                  value={token}
+                  onChange={(e) => edit(setToken)(e.target.value)}
+                  placeholder="tk_…"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoFocus={editingToken}
+                />
+                {cfg.tokenSet ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingToken(false);
+                      setToken("");
+                      setDirty(false);
+                    }}
+                    className={`${btn} shrink-0 border border-[var(--color-border)] hover:bg-[var(--color-muted)]`}
+                  >
+                    取消
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -216,12 +250,6 @@ export function NtfyPanel() {
               </span>
             ) : null}
           </div>
-
-          <p className="text-xs text-[var(--color-muted-fg)]">
-            手机上用 ntfy 客户端订阅同一个服务器的
-            <code className="font-mono mx-1">{topic || "topic"}</code>
-            主题。禁限表变动会以更高优先级发送;什么都没变的那次更新不发。
-          </p>
         </>
       )}
     </section>

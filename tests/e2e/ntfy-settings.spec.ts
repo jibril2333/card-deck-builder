@@ -35,13 +35,20 @@ test("saves the server and topic, and keeps the token to itself", async ({
   await expect(back.getByPlaceholder("dcg")).toHaveValue("dcg");
   await expect(back.getByRole("checkbox", { name: "启用" })).toBeChecked();
 
-  // The token: a hint, an empty box, and nowhere the real value appears.
+  // The token: shown masked, with no input box to mistake for "cleared", and
+  // the real value nowhere in the page.
   await expect(back).toContainText("tk_e2…alue");
-  await expect(back.getByPlaceholder("不改就留空")).toHaveValue("");
+  await expect(back.getByPlaceholder("tk_…")).toHaveCount(0);
   expect(await page.content()).not.toContain("tk_e2e_secret_value");
+
+  // Replacing it is an explicit act, and abandoning it puts the saved one back.
+  await back.getByRole("button", { name: "更换" }).click();
+  await expect(back.getByPlaceholder("tk_…")).toHaveValue("");
+  await back.getByRole("button", { name: "取消" }).click();
+  await expect(back).toContainText("tk_e2…alue");
 });
 
-test("saving with the token box empty doesn't wipe the token", async ({ page }) => {
+test("editing another field can't wipe the saved token", async ({ page }) => {
   await page.goto("/digimon/admin");
   const box = panel(page);
   // Only touch the topic, the way you would when fixing a typo.
