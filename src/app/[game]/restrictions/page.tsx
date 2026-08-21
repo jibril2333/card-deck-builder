@@ -130,7 +130,9 @@ export default async function RestrictionsPage({
             按身份计算:本体 + 异画合计
             {lastSync ? (
               <>
-                {" "}最后同步: <span className="tabular-nums">{lastSync.slice(0, 10)}</span>
+                {" "}
+                最后同步:{" "}
+                <span className="tabular-nums">{lastSync.slice(0, 10)}</span>
               </>
             ) : null}
           </p>
@@ -201,12 +203,12 @@ function Section({
 }) {
   if (rows.length === 0) return null;
   const accentClass =
-    kind === "banned"
-      ? "border-red-500/40"
-      : "border-amber-500/40";
+    kind === "banned" ? "border-red-500/40" : "border-amber-500/40";
 
   return (
-    <section className={`rounded-lg border ${accentClass} bg-[var(--color-card)]`}>
+    <section
+      className={`rounded-lg border ${accentClass} bg-[var(--color-card)]`}
+    >
       <header className="flex items-baseline gap-2 px-4 py-3 border-b border-[var(--color-border)]">
         <RestrictionBadge
           restriction={{
@@ -282,7 +284,9 @@ function RestrictionCard({ row, game }: { row: Row; game: string }) {
           </div>
         </div>
         <div className="text-[10.5px] leading-tight sm:text-xs sm:leading-normal font-medium truncate group-hover:text-[var(--color-accent)]">
-          {row.card_name ?? <span className="text-[var(--color-muted-fg)]">未在卡库中</span>}
+          {row.card_name ?? (
+            <span className="text-[var(--color-muted-fg)]">未在卡库中</span>
+          )}
         </div>
       </div>
     </>
@@ -322,13 +326,7 @@ type PairGroup = {
  * the trigger card alone; you CAN play the banned cards alone; the rule is
  * about co-occurrence.
  */
-function PairsSection({
-  groups,
-  game,
-}: {
-  groups: PairGroup[];
-  game: string;
-}) {
+function PairsSection({ groups, game }: { groups: PairGroup[]; game: string }) {
   if (groups.length === 0) return null;
   return (
     <section className="rounded-lg border border-purple-500/40 bg-[var(--color-card)]">
@@ -356,7 +354,11 @@ function PairsSection({
 
 function PairRow({ group, game }: { group: PairGroup; game: string }) {
   return (
-    <div className="p-4 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,2fr)] gap-4 items-start">
+    // Columns sized to a TILE (--pair-tile in globals.css), not to the row:
+    // fluid fractions made the trigger card 356px wide next to 178px tiles in
+    // the sections above — the same card at twice the size, for no reason
+    // other than which section it landed in.
+    <div className="p-4 grid grid-cols-1 md:grid-cols-[var(--pair-tile)_auto_minmax(0,1fr)] gap-4 items-start">
       <div>
         <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)] font-semibold mb-1.5">
           A · 触发卡
@@ -364,7 +366,7 @@ function PairRow({ group, game }: { group: PairGroup; game: string }) {
         {/* On a phone the trigger card has the whole screen width to itself and
             renders as one enormous card — next to a grid of four-up tiles it
             reads as a different page. Capped to a tile's width there; from `md`
-            it's back in its own column of the pair row and left alone. */}
+            its column is already 11rem. */}
         <div className="w-1/4 md:w-auto">
           <PairCard
             identity={group.trigger}
@@ -386,10 +388,10 @@ function PairRow({ group, game }: { group: PairGroup; game: string }) {
         <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)] font-semibold mb-1.5">
           B · 不能与 A 同卡组({group.banned.length})
         </div>
-        {/* Same four-up on a phone. The 3-column step waits for `md`, which is
-            where this list actually becomes the narrow right-hand column of the
-            pair row rather than the full width of the screen. */}
-        <div className="grid grid-cols-4 md:grid-cols-3 gap-1.5 sm:gap-2">
+        {/* Same four-up on a phone. From `md` the columns are a fixed tile
+            width and as many fit as fit — a 2-card pair used to stretch its
+            two cards across half the screen. */}
+        <div className="grid grid-cols-4 md:grid-cols-[repeat(auto-fill,var(--pair-tile))] gap-1.5 sm:gap-2">
           {group.banned.map((b) => (
             <PairCard
               key={b.identity}

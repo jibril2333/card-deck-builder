@@ -42,8 +42,9 @@
   --radius: 0.625rem;
 
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    sans-serif;
   --font-mono:
     ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -109,10 +110,16 @@ body::before {
       color-mix(in oklch, var(--color-accent) 26%, transparent) calc(100% - 1px)
     );
   background-size:
-    auto, auto, auto,
+    auto,
+    auto,
+    auto,
     54px 54px,
     54px 54px;
-  mask-image: linear-gradient(#000 0%, #000 55%, color-mix(in srgb, #000 45%, transparent) 100%);
+  mask-image: linear-gradient(
+    #000 0%,
+    #000 55%,
+    color-mix(in srgb, #000 45%, transparent) 100%
+  );
   opacity: 0.7;
 }
 
@@ -235,6 +242,33 @@ body::before {
   .group:hover .hover-reveal,
   .hover-reveal:focus-visible {
     opacity: 1;
+  }
+}
+
+/* Width of one card tile in the 禁卡组合 section.
+   The sections above it lay their tiles out as a fluid fraction of the page
+   (4 / 5 / 6 / 8 across), so a pair row that sizes its columns as fractions
+   of ITSELF ends up with the same card at twice the size — 356px next to
+   178px, which is what this exists to stop. One number per breakpoint, kept
+   next to the grid ladder in restrictions/page.tsx. */
+:root {
+  --pair-tile: 11rem;
+}
+@media (min-width: 1024px) {
+  :root {
+    --pair-tile: 8.5rem;
+  }
+}
+@media (min-width: 1280px) {
+  /* The section tiles are fluid inside this range (151px at 1280, 178px at
+     1440); 10rem sits in the middle rather than matching either end. */
+  :root {
+    --pair-tile: 10rem;
+  }
+}
+@media (min-width: 1536px) {
+  :root {
+    --pair-tile: 9.5rem;
   }
 }
 
