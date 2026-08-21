@@ -11,12 +11,9 @@ import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckHeader } from "@/components/deck-header";
 import { DeckDeleteButton } from "@/components/deck-delete-button";
 import { DeckLockButton } from "@/components/deck-lock-button";
-import { DeckPoolPicker } from "@/components/deck-pool-picker";
+import { DeckPoolSelect } from "@/components/deck-pool-select";
 import { DeckExportMenu } from "@/components/deck-export-menu";
-import {
-  computeDeckSearchTargets,
-  type SearchGroup,
-} from "@/lib/deck-search";
+import { computeDeckSearchTargets, type SearchGroup } from "@/lib/deck-search";
 import { DeckStats, type StatPanel } from "@/components/deck-stats";
 import {
   DeckAdjustments,
@@ -99,7 +96,10 @@ function buildDigimonStats(cards: RawDeckCard[]): StatPanel[] {
     }
   }
   return [
-    { title: "卡片类型", bars: tally(cards, (c) => c.card_type, { sort: "count" }) },
+    {
+      title: "卡片类型",
+      bars: tally(cards, (c) => c.card_type, { sort: "count" }),
+    },
     // Both of these keep a rule the generic `tally` can't express — empty
     // rungs, and a card counting for more than one bucket. See lib/deck-tally.
     { title: "等级", bars: tallyLevels(cards) },
@@ -120,7 +120,10 @@ function buildDigimonStats(cards: RawDeckCard[]): StatPanel[] {
     },
     {
       title: "特征 (Traits)",
-      bars: tally(traitCards, (c) => c.digi_types, { sort: "count", limit: 10 }),
+      bars: tally(traitCards, (c) => c.digi_types, {
+        sort: "count",
+        limit: 10,
+      }),
     },
     {
       title: "DP",
@@ -227,8 +230,8 @@ export default async function DeckEditPage({
     cardLang,
   );
   const coverCard = deck.cover_card_id
-    ? cards.find((c) => c.id === deck.cover_card_id) ??
-      digimon.getCardById(deck.cover_card_id)
+    ? (cards.find((c) => c.id === deck.cover_card_id) ??
+      digimon.getCardById(deck.cover_card_id))
     : undefined;
   // ジョグレス: which pairs already in this deck can make each card that DNA
   // digivolves. Matched against the Japanese rows (that's where the condition
@@ -271,10 +274,11 @@ export default async function DeckEditPage({
         cost: o.cost,
         parsed: o.parsed,
         pairs: o.pairs.map(
-          ([a, b]) => [displayCard(a), displayCard(b)] as [
-            ReturnType<typeof displayCard>,
-            ReturnType<typeof displayCard>,
-          ],
+          ([a, b]) =>
+            [displayCard(a), displayCard(b)] as [
+              ReturnType<typeof displayCard>,
+              ReturnType<typeof displayCard>,
+            ],
         ),
       })),
     ]),
@@ -313,7 +317,9 @@ export default async function DeckEditPage({
     // and it's the number they'd have to take out.
     newerThanVersion: (() => {
       const newer = new Set(
-        cardsNewerThan(deck.version ?? null, cards, setOrder).map((c) => c.code),
+        cardsNewerThan(deck.version ?? null, cards, setOrder).map(
+          (c) => c.code,
+        ),
       );
       return cards
         .filter((c) => newer.has(c.code))
@@ -418,7 +424,6 @@ export default async function DeckEditPage({
       : null,
     isDigimon: true,
   };
-  
 
   // Ownership gate: only the deck's owner can use build / purchase modes.
   // Anyone else (friend viewing) is silently demoted to browse, and the
@@ -432,8 +437,8 @@ export default async function DeckEditPage({
   const mode: "browse" | "build" | "purchase" = canEdit
     ? requestedMode
     : "browse";
-  // Shared pools, for the sidebar picker. Only the owner can change membership,
-  // so someone else's view doesn't need the query at all.
+  // Shared pools, for the toolbar select. Only the owner can change
+  // membership, so someone else's view doesn't need the query at all.
   const pools = mine && me ? digimon.listGroups(me.id) : [];
   // Purchase mode defaults to "only still-missing cards" — that's the
   // shopping view you actually want when you open it. Showing every card
@@ -515,85 +520,100 @@ export default async function DeckEditPage({
 
           {/* mode switcher — only show build/purchase tabs if this deck is mine */}
           <div className="flex items-center gap-2 mt-3 flex-wrap">
-          <div className="flex items-center gap-1 p-0.5 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)] w-fit">
-            <Link
-              href={`/${game}/decks/${loaded.deck.id}`}
-              replace
-              scroll={false}
-              className={`px-3 h-8 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
-                mode === "browse"
-                  ? "bg-[var(--color-muted)] text-[var(--color-fg)] font-medium"
-                  : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
-              }`}
-            >
-              👁 浏览
-            </Link>
-            {canEdit ? (
-              <>
-                <Link
-                  href={`/${game}/decks/${loaded.deck.id}?mode=build`}
-                  replace
-                  scroll={false}
-                  className={`px-3 h-8 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
-                    mode === "build"
-                      ? "bg-[var(--color-muted)] text-[var(--color-fg)] font-medium"
-                      : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
-                  }`}
-                >
-                  🛠 组建
-                </Link>
-                <Link
-                  href={`/${game}/decks/${loaded.deck.id}?mode=purchase`}
-                  replace
-                  scroll={false}
-                  className={`px-3 h-8 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
-                    mode === "purchase"
-                      ? "bg-[var(--color-muted)] text-[var(--color-fg)] font-medium"
-                      : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
-                  }`}
-                >
-                  🛒 购买
-                </Link>
-              </>
-            ) : null}
-          </div>
+            <div className="flex items-center gap-1 p-0.5 border border-[var(--color-border)] rounded-lg bg-[var(--color-card)] w-fit">
+              <Link
+                href={`/${game}/decks/${loaded.deck.id}`}
+                replace
+                scroll={false}
+                className={`px-3 h-8 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
+                  mode === "browse"
+                    ? "bg-[var(--color-muted)] text-[var(--color-fg)] font-medium"
+                    : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
+                }`}
+              >
+                👁 浏览
+              </Link>
+              {canEdit ? (
+                <>
+                  <Link
+                    href={`/${game}/decks/${loaded.deck.id}?mode=build`}
+                    replace
+                    scroll={false}
+                    className={`px-3 h-8 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
+                      mode === "build"
+                        ? "bg-[var(--color-muted)] text-[var(--color-fg)] font-medium"
+                        : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
+                    }`}
+                  >
+                    🛠 组建
+                  </Link>
+                  <Link
+                    href={`/${game}/decks/${loaded.deck.id}?mode=purchase`}
+                    replace
+                    scroll={false}
+                    className={`px-3 h-8 rounded-md text-sm flex items-center gap-1.5 transition-colors ${
+                      mode === "purchase"
+                        ? "bg-[var(--color-muted)] text-[var(--color-fg)] font-medium"
+                        : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
+                    }`}
+                  >
+                    🛒 购买
+                  </Link>
+                </>
+              ) : null}
+            </div>
 
-          <Link
-            href={`/${game}/decks/${loaded.deck.id}/playtest`}
-            className="px-3 h-8 rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] flex items-center gap-1.5"
-            title="起手模拟 + 抽到概率计算"
-          >
-            🎲 试玩
-          </Link>
-          <DeckExportMenu
-            text={exportText}
-            url={exportUrl}
-            deckName={loaded.deck.name}
-            accent={loaded.deck.accent_color}
-            accent2={loaded.deck.accent_color2}
-            gameLabel={GAMES[game as GameId].label}
-            subtitle={
-              loaded.isDigimon
-                ? `主卡组 ${main} 张 · 蛋卡 ${eggs} 张`
-                : `共 ${main} 张`
-            }
-            cards={loaded.cards.map((c) => ({
-              code: c.code,
-              name: c.name,
-              image_url: c.image_url ?? null,
-              quantity: c.quantity,
-            }))}
-          />
-          {/* Build mode: find and add cards without leaving the deck. Shares
+            <Link
+              href={`/${game}/decks/${loaded.deck.id}/playtest`}
+              className="px-3 h-8 rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] flex items-center gap-1.5"
+              title="起手模拟 + 抽到概率计算"
+            >
+              🎲 试玩
+            </Link>
+            <DeckExportMenu
+              text={exportText}
+              url={exportUrl}
+              deckName={loaded.deck.name}
+              accent={loaded.deck.accent_color}
+              accent2={loaded.deck.accent_color2}
+              gameLabel={GAMES[game as GameId].label}
+              subtitle={
+                loaded.isDigimon
+                  ? `主卡组 ${main} 张 · 蛋卡 ${eggs} 张`
+                  : `共 ${main} 张`
+              }
+              cards={loaded.cards.map((c) => ({
+                code: c.code,
+                name: c.name,
+                image_url: c.image_url ?? null,
+                quantity: c.quantity,
+              }))}
+            />
+            {/* Filing the deck into a shared pool: next to 导出 because it's the
+              same kind of act — something you do TO the whole deck, not to a
+              card in it. */}
+            {mine ? (
+              <DeckPoolSelect
+                game={game}
+                deckId={loaded.deck.id}
+                pools={pools.map((p) => ({ id: p.id, name: p.name }))}
+                current={
+                  pools.find((p) =>
+                    p.decks.some((d) => d.id === loaded.deck.id),
+                  )?.id ?? null
+                }
+              />
+            ) : null}
+            {/* Build mode: find and add cards without leaving the deck. Shares
               the toolbar row, pushed to the right edge by ml-auto — it wraps
               onto its own line on narrow screens like the rest of the row. */}
-          {mode === "build" ? (
-            <DeckCardSearch
-              game={game}
-              deckId={loaded.deck.id}
-              lang={cardLangForPage}
-            />
-          ) : null}
+            {mode === "build" ? (
+              <DeckCardSearch
+                game={game}
+                deckId={loaded.deck.id}
+                lang={cardLangForPage}
+              />
+            ) : null}
           </div>
 
           {mode !== "purchase" ? (
@@ -805,7 +825,6 @@ export default async function DeckEditPage({
               lang={cardLangForPage}
             />
           ) : null}
-
         </section>
 
         <aside className="space-y-4">
@@ -814,19 +833,6 @@ export default async function DeckEditPage({
           {!mine ? (
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 text-xs text-[var(--color-muted-fg)]">
               这是别人的卡组,你只能浏览。
-            </div>
-          ) : null}
-
-          {mine ? (
-            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-              <DeckPoolPicker
-                game={game}
-                deckId={loaded.deck.id}
-                pools={pools}
-                memberOf={pools
-                  .filter((p) => p.decks.some((d) => d.id === loaded.deck.id))
-                  .map((p) => p.id)}
-              />
             </div>
           ) : null}
 

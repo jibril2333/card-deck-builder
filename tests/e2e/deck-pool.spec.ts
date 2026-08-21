@@ -1,10 +1,14 @@
 /**
- * The shared-pool picker on a deck's own page.
+ * The shared-pool select on a deck's own page.
  *
  * Membership used to be editable only from a group, so pooling the deck you
  * were looking at meant knowing which group to open first. This drives the
- * deck side: create a pool from the deck, confirm it sticks across a reload,
- * toggle back off, and confirm someone else's deck never offers the control.
+ * deck side: file the deck into a pool, confirm it sticks across a reload,
+ * take it back out, and confirm someone else's deck never offers the control.
+ *
+ * One pool per deck — a deck is one stack of real cards and comes out of one
+ * box — so it's a select, and pools are created on the decks page rather than
+ * here.
  *
  * Runs against the seeded e2e DB with the pre-authenticated session from
  * global-setup, so these are real Server Actions writing real rows.
@@ -23,43 +27,57 @@ async function createDeck(page: import("@playwright/test").Page, name: string) {
   return page.url();
 }
 
+/** Make a pool from the decks page and name it. Lands on the pool's page. */
+async function createPool(page: import("@playwright/test").Page, name: string) {
+  await page.goto("/digimon/decks");
+  await page.getByRole("button", { name: /新建组合/ }).click();
+  await page.waitForURL(/\/digimon\/groups\/[a-z0-9-]+/i);
+  await page.getByRole("heading", { level: 1 }).click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type(name);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
+  return page.url();
+}
+
 test("pool a deck from its own page, and unpool it again", async ({ page }) => {
   const stamp = Date.now();
   const deckUrl = await createDeck(page, `E2E Pool Deck ${stamp}`);
   const poolName = `E2E 池 ${stamp}`;
+  const poolUrl = await createPool(page, poolName);
 
-  // The panel is there before any pool exists — otherwise the first pool
-  // could only ever be made from the decks list.
-  await expect(page.getByRole("heading", { name: /共享卡池/ })).toBeVisible();
-
-  // Creating from here seeds the pool with this deck and lands on it.
-  await page.getByRole("button", { name: /新建卡池/ }).click();
-  await page.getByPlaceholder("卡池名称").fill(poolName);
-  await page.getByRole("button", { name: "建", exact: true }).click();
-  await page.waitForURL(/\/digimon\/groups\/[a-z0-9-]+/i);
-  await expect(page.getByText(poolName).first()).toBeVisible();
-
-  // Back on the deck, the pool reads as joined — the round trip through the DB
-  // is the point, not the optimistic state right after the click.
   await page.goto(deckUrl);
-  const chip = page.getByRole("button", { name: new RegExp(poolName) });
-  await expect(chip).toHaveAttribute("aria-pressed", "true");
+  const select = page.getByLabel("共享卡池");
+  await expect(select.locator("option:checked")).toHaveText("🎴 无卡池");
 
-  // Toggling off is the same action with one fewer id, which is the case most
+  await select.selectOption({ label: `🎴 ${poolName}` });
+  // The round trip through the DB is the point, not the state right after the
+  // change event.
+  await page.reload();
+  await expect(
+    page.getByLabel("共享卡池").locator("option:checked"),
+  ).toHaveText(`🎴 ${poolName}`);
+  // Pooled decks get a way through to the buy-list.
+  await expect(page.getByLabel("打开卡池")).toHaveAttribute(
+    "href",
+    new URL(poolUrl).pathname,
+  );
+
+  // Taking it out again posts an empty membership list, which is the case most
   // likely to break if the action ever becomes additive.
-  await chip.click();
-  await expect(chip).toHaveAttribute("aria-pressed", "false");
+  await page.getByLabel("共享卡池").selectOption("");
   await page.reload();
   await expect(
-    page.getByRole("button", { name: new RegExp(poolName) }),
-  ).toHaveAttribute("aria-pressed", "false");
+    page.getByLabel("共享卡池").locator("option:checked"),
+  ).toHaveText("🎴 无卡池");
+  await expect(page.getByLabel("打开卡池")).toHaveCount(0);
 
-  // And back on, so the deck ends pooled.
-  await page.getByRole("button", { name: new RegExp(poolName) }).click();
+  // And back in, so the deck ends pooled.
+  await page.getByLabel("共享卡池").selectOption({ label: `🎴 ${poolName}` });
   await page.reload();
   await expect(
-    page.getByRole("button", { name: new RegExp(poolName) }),
-  ).toHaveAttribute("aria-pressed", "true");
+    page.getByLabel("共享卡池").locator("option:checked"),
+  ).toHaveText(`🎴 ${poolName}`);
 });
 
 test("the picker is absent on a deck you don't own", async ({ page }) => {
@@ -70,8 +88,7 @@ test("the picker is absent on a deck you don't own", async ({ page }) => {
   await page.context().clearCookies();
   await page.goto(deckUrl);
   await expect(page.getByText(/只能浏览/)).toBeVisible();
-  await expect(page.getByRole("heading", { name: /共享卡池/ })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /新建卡池/ })).toHaveCount(0);
+  await expect(page.getByLabel("共享卡池")).toHaveCount(0);
 });
 
 test("the member picker shows deck covers, many to a row", async ({ page }) => {
@@ -95,12 +112,7 @@ test("the member picker shows deck covers, many to a row", async ({ page }) => {
     await expect(page.getByTitle(/已是封面/)).toBeVisible();
   }
 
-  // Still on the last deck's page — make a pool from it, which lands on the
-  // pool where the member picker lives.
-  await page.getByRole("button", { name: /新建卡池/ }).click();
-  await page.getByPlaceholder("卡池名称").fill(`E2E 封面池 ${stamp}`);
-  await page.getByRole("button", { name: "建", exact: true }).click();
-  await page.waitForURL(/\/digimon\/groups\/[a-z0-9-]+/i);
+  await createPool(page, `E2E 封面池 ${stamp}`);
 
   await page.getByRole("button", { name: /管理成员/ }).click();
   const tiles = page.locator("label:has(input[type=checkbox])");
@@ -119,7 +131,9 @@ test("the member picker shows deck covers, many to a row", async ({ page }) => {
   await expect(tiles.locator("img").first()).toBeVisible();
 });
 
-test("banner: edit in place, no shift, colours and exports where asked", async ({ page }) => {
+test("banner: edit in place, no shift, colours and exports where asked", async ({
+  page,
+}) => {
   const name = `E2E Banner ${Date.now()}`;
   const url = await createDeck(page, name);
 
@@ -159,7 +173,8 @@ test("banner: edit in place, no shift, colours and exports where asked", async (
   await page.waitForTimeout(1200);
   await page.reload();
   await expect(page.getByLabel("备注")).toHaveText("店赛用");
-  const titleY2 = (await page.getByRole("heading", { level: 1 }).boundingBox())!.y;
+  const titleY2 = (await page.getByRole("heading", { level: 1 }).boundingBox())!
+    .y;
   expect(Math.abs(titleY2 - titleY)).toBeLessThanOrEqual(1);
 
   // (3) Renaming in place, and the notes survive it — one field per save.
@@ -170,7 +185,9 @@ test("banner: edit in place, no shift, colours and exports where asked", async (
   await page.keyboard.type(name + " 改");
   await page.waitForTimeout(1200);
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(name + " 改");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    name + " 改",
+  );
   await expect(page.getByLabel("备注")).toHaveText("店赛用");
 
   // (4) Three colour dots, and the cover dot is ringed once adopted.
@@ -183,9 +200,8 @@ test("banner: edit in place, no shift, colours and exports where asked", async (
   await expect(coverDot).toHaveAttribute("aria-pressed", "true");
   await page.waitForTimeout(400);
   const rings = await page.evaluate(() => ({
-    pair: getComputedStyle(
-      document.querySelector('[title="自选颜色"]')!,
-    ).boxShadow,
+    pair: getComputedStyle(document.querySelector('[title="自选颜色"]')!)
+      .boxShadow,
     cover: getComputedStyle(
       document.querySelector('[title="使用封面卡的颜色"]')!,
     ).boxShadow,
