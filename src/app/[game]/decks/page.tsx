@@ -73,14 +73,18 @@ export default async function DecksPage({
     cards: digimon.overlayDisplay(digimon.getDeckCards(d.id), cardLang),
   }));
 
-  // Multi-deck missing-cards / shopping-list tool: limited to YOUR own decks,
-  // since the use case is "what should I buy next" and that's personal.
+  // Multi-deck missing-cards / shopping-list tool: YOUR decks, and only the
+  // starred ones. "What should I buy next" is asked about the decks you mean
+  // to play; every deck you ever made buries those, and the star is already
+  // how you say which they are. None starred → the toolbar drops the button.
   const deckShortfalls = deckCardLists
-    .filter((d) => d.meta.mine)
+    .filter((d) => d.meta.mine && d.meta.pinned)
     .map(({ meta, cards }) => ({
       id: meta.id,
       name: meta.name,
       accent_color: meta.accent_color,
+      accent_color2: meta.accent_color2,
+      cover_image_url: meta.cover_image_url,
       missing: cards
         .filter((c) => c.purchased < c.quantity)
         .map((c) => ({
@@ -168,9 +172,7 @@ export default async function DecksPage({
               const mineDecks = decks.filter((d) => d.mine && !isLegacy(d));
               const legacyDecks = decks.filter(isLegacy);
               const otherDecks = decks.filter((d) => !d.mine);
-              const toGridShape = (
-                d: (typeof decks)[number],
-              ) => ({
+              const toGridShape = (d: (typeof decks)[number]) => ({
                 id: d.id,
                 name: d.name,
                 accent_color: d.accent_color,
@@ -207,7 +209,9 @@ export default async function DecksPage({
                         </header>
                         <DecksGrid
                           game={game}
-                          decks={mineDecks.filter((d) => d.pinned).map(toGridShape)}
+                          decks={mineDecks
+                            .filter((d) => d.pinned)
+                            .map(toGridShape)}
                         />
                       </section>
                       {mineDecks.some((d) => !d.pinned) ? (

@@ -14,6 +14,8 @@ export type DeckShortfall = {
   id: string;
   name: string;
   accent_color: string;
+  accent_color2: string | null;
+  cover_image_url: string | null;
   missing: MissingCard[];
 };
 
@@ -21,6 +23,15 @@ export type DeckShortfall = {
  * Panel-only controlled component. Parent owns open/close state and decides
  * placement. When mounted, this component renders the full-width panel; when
  * the user dismisses it, `onClose` is invoked.
+ *
+ * Only 主力卡组 are offered. The question this answers is "what do I buy
+ * next", and that is asked about the decks you actually intend to play — a
+ * list of every deck you have ever made buries them, and starring a deck is
+ * already how you say which those are. With none starred the parent doesn't
+ * render the button at all.
+ *
+ * Picked by cover art, the same way the pool's member picker does it: a deck
+ * is recognised by its art long before its name is read.
  */
 export function MissingCardsTool({
   game,
@@ -72,7 +83,9 @@ export function MissingCardsTool({
   const totalKinds = aggregate.length;
 
   function copyList() {
-    const text = aggregate.map((c) => `${c.need} ${c.code} ${c.name}`).join("\n");
+    const text = aggregate
+      .map((c) => `${c.need} ${c.code} ${c.name}`)
+      .join("\n");
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
     navigator.clipboard.writeText(text + "\n").then(() => {
       setCopied(true);
@@ -81,9 +94,12 @@ export function MissingCardsTool({
   }
 
   return (
-    <div className="mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3">
+    <section
+      aria-label="缺卡统计"
+      className="mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3"
+    >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">🛒 多卡组缺卡统计</h3>
+        <h3 className="text-sm font-semibold">🛒 缺卡统计</h3>
         <button
           type="button"
           onClick={onClose}
@@ -93,54 +109,95 @@ export function MissingCardsTool({
         </button>
       </div>
 
-      <p className="text-xs text-[var(--color-muted-fg)]">
-        勾选要一起买的卡组，下面汇总所有卡组里&ldquo;想要数 − 已购数&rdquo;的缺口（按购买模式记录计算）。
-      </p>
-
-      {/* Deck selectors */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
         {decks.map((d) => {
-          const isOn = selected.has(d.id);
+          const on = selected.has(d.id);
           const deckMissing = d.missing.reduce((s, c) => s + c.need, 0);
           return (
-            <button
+            <label
               key={d.id}
-              type="button"
-              onClick={() => toggle(d.id)}
-              className={`px-2.5 h-8 rounded-md border text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
-                isOn
-                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-fg)]"
-                  : "border-[var(--color-border)] text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:border-[var(--color-fg)]"
+              title={d.name}
+              className={`group relative rounded-lg border overflow-hidden cursor-pointer transition-all ${
+                on
+                  ? "border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40"
+                  : "border-[var(--color-border)] hover:border-[var(--color-fg)]"
               }`}
             >
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ background: d.accent_color }}
+              <input
+                type="checkbox"
+                checked={on}
+                onChange={() => toggle(d.id)}
+                className="sr-only"
               />
-              {d.name}
-              <span
-                className={`tabular-nums ${deckMissing > 0 ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"}`}
-              >
-                {deckMissing > 0 ? `缺${deckMissing}` : "✓"}
-              </span>
-            </button>
+              <div className="card-thumb relative">
+                {d.cover_image_url ? (
+                  <img
+                    src={d.cover_image_url}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    draggable={false}
+                    className={on ? "" : "opacity-55 group-hover:opacity-80"}
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex items-center justify-center"
+                    style={{
+                      background: d.accent_color2
+                        ? `linear-gradient(135deg, ${d.accent_color}55, ${d.accent_color2}55)`
+                        : `linear-gradient(135deg, ${d.accent_color}44, ${d.accent_color}11)`,
+                    }}
+                  >
+                    <span
+                      className="font-bold opacity-80"
+                      style={{ color: d.accent_color }}
+                    >
+                      {d.name.slice(0, 2)}
+                    </span>
+                  </div>
+                )}
+                <span
+                  className={`absolute bottom-1 right-1 px-1.5 h-5 rounded-full text-[11px] font-semibold tabular-nums flex items-center shadow ${
+                    deckMissing > 0
+                      ? "bg-amber-500 text-black"
+                      : "bg-green-600 text-white"
+                  }`}
+                >
+                  {deckMissing > 0 ? deckMissing : "✓"}
+                </span>
+                {on ? (
+                  <span className="absolute top-1 right-1 w-5 h-5 rounded-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-xs font-bold flex items-center justify-center shadow">
+                    ✓
+                  </span>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-1 px-1.5 py-1 bg-[var(--color-card)]">
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{
+                    background: d.accent_color2
+                      ? `linear-gradient(135deg, ${d.accent_color}, ${d.accent_color2})`
+                      : d.accent_color,
+                  }}
+                />
+                <span className="truncate text-xs">{d.name}</span>
+              </div>
+            </label>
           );
         })}
       </div>
 
-      {selected.size === 0 ? (
-        <div className="text-xs text-[var(--color-muted-fg)] py-4 text-center border border-dashed border-[var(--color-border)] rounded-md">
-          选择 1 个以上卡组查看汇总缺卡
-        </div>
-      ) : (
+      {/* Nothing picked: the tiles above are the whole interface, and a box
+          telling you to click them says less than they do. */}
+      {selected.size === 0 ? null : (
         <>
           <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-3">
             <div className="text-sm">
-              选中 <b>{selected.size}</b> 个卡组 · 共缺{" "}
+              共缺{" "}
               <b className="text-amber-600 dark:text-amber-400 tabular-nums">
                 {totalCards}
               </b>{" "}
-              张（{totalKinds} 种）
+              张({totalKinds} 种)
             </div>
             {totalKinds > 0 ? (
               <button
@@ -155,7 +212,7 @@ export function MissingCardsTool({
 
           {totalKinds === 0 ? (
             <div className="text-xs text-green-600 dark:text-green-400 py-3 text-center">
-              🎉 选中的卡组都凑齐了！
+              ✓ 都凑齐了
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
@@ -193,6 +250,6 @@ export function MissingCardsTool({
           )}
         </>
       )}
-    </div>
+    </section>
   );
 }
