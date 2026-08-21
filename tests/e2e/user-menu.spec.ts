@@ -20,12 +20,16 @@ for (const [w, h] of [
     await page.goto("/digimon");
     await page.getByRole("button", { name: "账号菜单" }).click();
 
-    const menu = page.getByRole("link", { name: "账号设置" });
-    await expect(menu).toBeVisible();
+    // 账号设置 is gone from here — 设置 is a nav item two rows above, in the
+    // same sidebar.
+    await expect(page.getByRole("link", { name: "账号设置" })).toHaveCount(0);
 
     const box = (await page.locator("div.w-56").first().boundingBox())!;
     expect(box.y, "menu top above the viewport").toBeGreaterThanOrEqual(0);
-    expect(box.y + box.height, "menu bottom past the viewport").toBeLessThanOrEqual(h);
+    expect(
+      box.y + box.height,
+      "menu bottom past the viewport",
+    ).toBeLessThanOrEqual(h);
 
     // 登出 is the item a downward menu pushed off first.
     await expect(page.getByRole("button", { name: "登出" })).toBeInViewport();

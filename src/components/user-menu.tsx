@@ -9,6 +9,10 @@ import type { User } from "@/lib/auth/types";
 /**
  * Top-nav user avatar + dropdown. Shows the display name; clicking opens a
  * small menu with the email and a logout button.
+ *
+ * No 账号设置 item: account settings are part of 设置, which is two rows above
+ * this in the same sidebar. A menu whose only entry duplicates a link already
+ * on screen is a menu that exists to hold 登出.
  */
 export function UserMenu({ user }: { user: User }) {
   const [open, setOpen] = useState(false);
@@ -70,13 +74,6 @@ export function UserMenu({ user }: { user: User }) {
               {user.email}
             </div>
           </div>
-          <Link
-            href="/digimon/settings"
-            onClick={() => setOpen(false)}
-            className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-muted)] cursor-pointer border-b border-[var(--color-border)]"
-          >
-            账号设置
-          </Link>
           <form
             action={() => {
               startTransition(async () => {
