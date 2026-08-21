@@ -245,33 +245,6 @@ body::before {
   }
 }
 
-/* Width of one card tile in the 禁卡组合 section.
-   The sections above it lay their tiles out as a fluid fraction of the page
-   (4 / 5 / 6 / 8 across), so a pair row that sizes its columns as fractions
-   of ITSELF ends up with the same card at twice the size — 356px next to
-   178px, which is what this exists to stop. One number per breakpoint, kept
-   next to the grid ladder in restrictions/page.tsx. */
-:root {
-  --pair-tile: 11rem;
-}
-@media (min-width: 1024px) {
-  :root {
-    --pair-tile: 8.5rem;
-  }
-}
-@media (min-width: 1280px) {
-  /* The section tiles are fluid inside this range (151px at 1280, 178px at
-     1440); 10rem sits in the middle rather than matching either end. */
-  :root {
-    --pair-tile: 10rem;
-  }
-}
-@media (min-width: 1536px) {
-  :root {
-    --pair-tile: 9.5rem;
-  }
-}
-
 .card-thumb {
   aspect-ratio: 5 / 7;
   background: var(--color-muted);

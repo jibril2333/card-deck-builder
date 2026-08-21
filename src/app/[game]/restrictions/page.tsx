@@ -354,20 +354,20 @@ function PairsSection({ groups, game }: { groups: PairGroup[]; game: string }) {
 
 function PairRow({ group, game }: { group: PairGroup; game: string }) {
   return (
-    // Columns sized to a TILE (--pair-tile in globals.css), not to the row:
-    // fluid fractions made the trigger card 356px wide next to 178px tiles in
-    // the sections above — the same card at twice the size, for no reason
-    // other than which section it landed in.
-    <div className="p-4 grid grid-cols-1 md:grid-cols-[var(--pair-tile)_auto_minmax(0,1fr)] gap-4 items-start">
-      <div>
-        <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)] font-semibold mb-1.5">
-          A · 触发卡
-        </div>
-        {/* On a phone the trigger card has the whole screen width to itself and
-            renders as one enormous card — next to a grid of four-up tiles it
-            reads as a different page. Capped to a tile's width there; from `md`
-            its column is already 11rem. */}
-        <div className="w-1/4 md:w-auto">
+    // ONE grid, with the same column ladder as the sections above (4 / 5 / 6 /
+    // 8 across). Every card on this page is then exactly the same width at
+    // every width, which no amount of sizing the pair row's own columns can
+    // achieve: those columns are fractions of the ROW, so the same card came
+    // out 356px here and 178px there.
+    //
+    // The trigger card is the first tile, ringed and carrying the ⇒; the rest
+    // of the row is what it outlaws. The two column captions ("A · 触发卡" /
+    // "B · 不能与 A 同卡组") are gone with the columns — the section header
+    // states the rule once, and a purple tile followed by plain ones is the
+    // same statement without the words.
+    <div className="p-2 sm:p-3 grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-1.5 sm:gap-3">
+      <div className="relative">
+        <div className="rounded-md ring-2 ring-purple-500/70">
           <PairCard
             identity={group.trigger}
             code={group.trigger_code}
@@ -377,34 +377,24 @@ function PairRow({ group, game }: { group: PairGroup; game: string }) {
             game={game}
           />
         </div>
+        <span
+          title={`卡组里有这张卡时,右边 ${group.banned.length} 张都不能同组`}
+          className="absolute -right-1 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center shadow"
+        >
+          ⇒
+        </span>
       </div>
-      <div
-        aria-hidden
-        className="self-center text-purple-500/70 text-xl font-bold hidden md:block"
-      >
-        ⇒
-      </div>
-      <div>
-        <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)] font-semibold mb-1.5">
-          B · 不能与 A 同卡组({group.banned.length})
-        </div>
-        {/* Same four-up on a phone. From `md` the columns are a fixed tile
-            width and as many fit as fit — a 2-card pair used to stretch its
-            two cards across half the screen. */}
-        <div className="grid grid-cols-4 md:grid-cols-[repeat(auto-fill,var(--pair-tile))] gap-1.5 sm:gap-2">
-          {group.banned.map((b) => (
-            <PairCard
-              key={b.identity}
-              identity={b.identity}
-              code={b.code}
-              name={b.name}
-              image_url={b.image_url}
-              color={b.color}
-              game={game}
-            />
-          ))}
-        </div>
-      </div>
+      {group.banned.map((b) => (
+        <PairCard
+          key={b.identity}
+          identity={b.identity}
+          code={b.code}
+          name={b.name}
+          image_url={b.image_url}
+          color={b.color}
+          game={game}
+        />
+      ))}
     </div>
   );
 }
