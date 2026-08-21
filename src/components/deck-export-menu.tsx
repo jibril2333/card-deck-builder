@@ -106,7 +106,11 @@ export function DeckExportMenu({
           // Hangs from the button's LEFT edge: right-aligned, a 160px menu
           // under an 88px button reached out to the left over the mode tabs,
           // which reads as belonging to whatever it covers.
-          className="absolute left-0 top-full mt-1 z-30 min-w-full w-36 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg overflow-hidden"
+          //
+          // Sized to its contents (w-max), floored at the button's width. A
+          // fixed width left a column of empty space to the right of three
+          // two-character labels.
+          className="absolute left-0 top-full mt-1 z-30 w-max min-w-full rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg overflow-hidden"
         >
           <button
             type="button"
