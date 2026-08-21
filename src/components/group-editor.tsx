@@ -19,9 +19,12 @@ type DeckLite = {
 
 /**
  * Inline management for a deck group: rename, pick which of the user's decks
- * belong to the shared pool, and delete. Each control posts a server action
- * and refreshes; membership edits are batched behind a "保存成员" button so
- * ticking boxes doesn't fire a write per click.
+ * belong to the shared pool, and delete.
+ *
+ * Ticking a deck saves it. The panel used to batch edits behind a 保存成员
+ * button, which meant every visit ended in the same two clicks and a closed
+ * panel could still be holding changes that were never written. One tile, one
+ * write — the same shape as the deck page's own pool select.
  */
 export function GroupEditor({
   game,
@@ -42,10 +45,6 @@ export function GroupEditor({
   const [nameVal, setNameVal] = useState(name);
   const [picked, setPicked] = useState<Set<string>>(new Set(memberIds));
   const [open, setOpen] = useState(false);
-
-  const dirty =
-    picked.size !== memberIds.length ||
-    memberIds.some((id) => !picked.has(id));
 
   function dot(d: DeckLite) {
     return d.accent_color2
@@ -71,11 +70,22 @@ export function GroupEditor({
     });
   }
 
-  function saveMembers() {
+  /**
+   * Toggle one deck and write the whole membership list.
+   *
+   * The action SETS rather than adds, so the post carries every id — which is
+   * also why the optimistic set has to be computed before the transition
+   * rather than read out of state inside it.
+   */
+  function toggleDeck(deckId: string) {
+    const next = new Set(picked);
+    if (next.has(deckId)) next.delete(deckId);
+    else next.add(deckId);
+    setPicked(next);
     const fd = new FormData();
     fd.set("game", game);
     fd.set("id", groupId);
-    for (const id of picked) fd.append("deck_id", id);
+    for (const id of next) fd.append("deck_id", id);
     startTransition(async () => {
       await setGroupDecksAction(fd);
       router.refresh();
@@ -83,7 +93,7 @@ export function GroupEditor({
   }
 
   function del() {
-    if (!confirm("删除这个组合？(只删组合，不影响里面的卡组)")) return;
+    if (!confirm("删除这个卡池？卡组本身不受影响")) return;
     const fd = new FormData();
     fd.set("game", game);
     fd.set("id", groupId);
@@ -131,9 +141,6 @@ export function GroupEditor({
 
       {open ? (
         <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3">
-          <div className="text-xs text-[var(--color-muted-fg)] mb-2">
-            勾选共享同一套卡的卡组
-          </div>
           {/* Cover tiles, not a checkbox list. Decks are recognised by their
               art long before their name is read, and the page is up to 1500px
               wide — two columns of text left most of it empty and made a
@@ -156,14 +163,7 @@ export function GroupEditor({
                   <input
                     type="checkbox"
                     checked={on}
-                    onChange={() =>
-                      setPicked((p) => {
-                        const n = new Set(p);
-                        if (n.has(d.id)) n.delete(d.id);
-                        else n.add(d.id);
-                        return n;
-                      })
-                    }
+                    onChange={() => toggleDeck(d.id)}
                     className="sr-only"
                   />
                   <div className="card-thumb relative">
@@ -174,7 +174,9 @@ export function GroupEditor({
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         draggable={false}
-                        className={on ? "" : "opacity-55 group-hover:opacity-80"}
+                        className={
+                          on ? "" : "opacity-55 group-hover:opacity-80"
+                        }
                       />
                     ) : (
                       // Same fallback the deck list uses: accent wash plus the
@@ -216,18 +218,10 @@ export function GroupEditor({
           <div className="flex items-center gap-2 mt-3">
             <button
               type="button"
-              onClick={saveMembers}
-              disabled={!dirty || pending}
-              className="px-3 h-8 rounded-md text-sm font-medium bg-[var(--color-accent)] text-[var(--color-accent-fg)] disabled:opacity-40 cursor-pointer"
-            >
-              保存成员
-            </button>
-            <button
-              type="button"
               onClick={del}
               className="px-3 h-8 rounded-md text-sm border border-red-500/40 text-red-500 hover:bg-red-500/10 cursor-pointer ml-auto"
             >
-              删除组合
+              删除卡池
             </button>
           </div>
         </div>

@@ -30,7 +30,7 @@ async function createDeck(page: import("@playwright/test").Page, name: string) {
 /** Make a pool from the decks page and name it. Lands on the pool's page. */
 async function createPool(page: import("@playwright/test").Page, name: string) {
   await page.goto("/digimon/decks");
-  await page.getByRole("button", { name: /新建组合/ }).click();
+  await page.getByRole("button", { name: /新建卡池/ }).click();
   await page.waitForURL(/\/digimon\/groups\/[a-z0-9-]+/i);
   await page.getByRole("heading", { level: 1 }).click();
   await page.keyboard.press("ControlOrMeta+a");
@@ -129,6 +129,26 @@ test("the member picker shows deck covers, many to a row", async ({ page }) => {
 
   // And the tiles render art, not just a name.
   await expect(tiles.locator("img").first()).toBeVisible();
+
+  // Ticking IS the save. There's no 保存成员 button to forget, and a reload
+  // reads the membership back out of the database.
+  await expect(page.getByRole("button", { name: /保存/ })).toHaveCount(0);
+  const tile = page.getByTitle(`E2E Omnimon ${stamp}`);
+  await tile.click();
+  await expect(tile.getByRole("checkbox")).toBeChecked();
+  await page.reload();
+  await page.getByRole("button", { name: /管理成员/ }).click();
+  await expect(
+    page.getByTitle(`E2E Omnimon ${stamp}`).getByRole("checkbox"),
+  ).toBeChecked();
+
+  // And untick writes too — the action sets rather than adds.
+  await page.getByTitle(`E2E Omnimon ${stamp}`).click();
+  await page.reload();
+  await page.getByRole("button", { name: /管理成员/ }).click();
+  await expect(
+    page.getByTitle(`E2E Omnimon ${stamp}`).getByRole("checkbox"),
+  ).not.toBeChecked();
 });
 
 test("banner: edit in place, no shift, colours and exports where asked", async ({

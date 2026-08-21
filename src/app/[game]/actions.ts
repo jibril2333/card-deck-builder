@@ -213,7 +213,7 @@ function syncPoolForCard(
 export async function createGroupAction(formData: FormData) {
   const me = await requireUser();
   const game = String(formData.get("game"));
-  const name = String(formData.get("name") ?? "").trim() || "新组合";
+  const name = String(formData.get("name") ?? "").trim() || "新卡池";
   if (!isGameId(game)) throw new Error("invalid game");
   backupBeforeWrite(game);
   const id = lib(game).createGroup(me.id, name);

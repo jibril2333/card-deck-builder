@@ -55,7 +55,7 @@ export function GroupsStrip({
           type="submit"
           className="px-2.5 h-8 rounded-full border border-dashed border-[var(--color-border)] text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:border-[var(--color-fg)] cursor-pointer transition-colors"
         >
-          ＋ 新建组合
+          ＋ 新建卡池
         </button>
       </form>
     </div>
