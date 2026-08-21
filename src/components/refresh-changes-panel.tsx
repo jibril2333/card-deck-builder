@@ -74,9 +74,6 @@ export function RefreshChangesPanel() {
     >
       <div className="flex items-baseline gap-2 flex-wrap">
         <h2 className="text-sm font-semibold">更新变更</h2>
-        <span className="text-xs text-[var(--color-muted-fg)]">
-          每次刷新在换库前 diff 出来的
-        </span>
       </div>
 
       {error ? <div className="text-xs text-red-500">{error}</div> : null}

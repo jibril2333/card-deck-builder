@@ -44,7 +44,12 @@ test("schedule survives a save and a reload", async ({ page }) => {
 
   await page.reload();
   const after = await ready(page);
-  await expect(after.getByText("每天 21:45")).toBeVisible();
+  // Asserted on the controls, not on a sentence describing them: the panel
+  // used to carry a "现设为 每天 21:45" summary and no longer does — the
+  // selects say it themselves, which is the point.
+  await expect(after.getByRole("combobox").first()).toHaveValue("daily");
+  await expect(after.getByLabel("小时")).toHaveValue("21");
+  await expect(after.getByLabel("分钟")).toHaveValue("45");
   await expect(after.getByRole("button", { name: "新卡" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -55,15 +60,20 @@ test("schedule survives a save and a reload", async ({ page }) => {
   );
 });
 
-test("disabling it says so, and the controls go dead", async ({ page }) => {
+test("turning it off disables the controls, and that survives a reload", async ({
+  page,
+}) => {
   await page.goto("/digimon/admin");
   const box = await ready(page);
   await box.getByRole("checkbox").first().uncheck();
-  await expect(box.getByText("已关闭")).toBeVisible();
+  // Off is shown by the controls going dead, not by a line of text saying so.
   await expect(box.getByRole("button", { name: "新卡" })).toBeDisabled();
+  await expect(box.getByLabel("小时")).toBeDisabled();
 
   await box.getByRole("button", { name: "保存" }).click();
   await expect(box.getByText(/已保存/)).toBeVisible();
   await page.reload();
-  await expect((await ready(page)).getByText("已关闭")).toBeVisible();
+  const after = await ready(page);
+  await expect(after.getByRole("checkbox").first()).not.toBeChecked();
+  await expect(after.getByRole("button", { name: "新卡" })).toBeDisabled();
 });

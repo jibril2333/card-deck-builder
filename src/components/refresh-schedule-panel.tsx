@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { REFRESH_STAGES } from "@/lib/refresh-stages";
-import {
-  DEFAULT_SCHEDULE,
-  describeSchedule,
-  type RefreshSchedule,
-} from "@/lib/refresh-schedule";
+import { DEFAULT_SCHEDULE, type RefreshSchedule } from "@/lib/refresh-schedule";
 
 type State = {
   describe?: string;
@@ -107,9 +103,6 @@ export function RefreshSchedulePanel() {
     >
       <div className="flex items-baseline gap-2 flex-wrap">
         <h2 className="text-sm font-semibold">自动更新</h2>
-        <span className="text-xs text-[var(--color-muted-fg)]">
-          与上面的手动更新分开:各自决定跑哪些阶段
-        </span>
       </div>
 
       {!loaded ? (
@@ -183,15 +176,9 @@ export function RefreshSchedulePanel() {
               </select>
             </span>
 
-            <span className="text-xs text-[var(--color-muted-fg)]">
-              服务器本地时间 · 现设为 {describeSchedule(schedule)}
-            </span>
           </div>
 
           <div>
-            <div className="text-xs text-[var(--color-muted-fg)] mb-1.5">
-              自动跑哪些阶段 — 一个都不选 = 全部
-            </div>
             <div className="flex flex-wrap gap-1.5">
               {REFRESH_STAGES.map((s) => {
                 const on = schedule.stages.includes(s.id);
