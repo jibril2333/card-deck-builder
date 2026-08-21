@@ -146,7 +146,7 @@ export default async function DecksPage({
 
         {decks.length === 0 ? (
           <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">
-            还没有卡组。先在上面创建一个，或从卡牌检索里点 + 把卡加进来。
+            还没有卡组
           </div>
         ) : (
           <>

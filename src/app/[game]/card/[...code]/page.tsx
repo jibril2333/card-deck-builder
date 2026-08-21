@@ -568,7 +568,7 @@ function MarketListingsBlock({
     <div className="space-y-1">
       <div
         className="text-xs font-medium text-[var(--color-muted-fg)]"
-        title="数据来源:Cardrush(取每个画师版本的最低品相 A- 以上价)"
+        title="Cardrush 最低价(品相 A- 以上)"
       >
         Cardrush 市场价
       </div>

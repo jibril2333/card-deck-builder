@@ -159,7 +159,7 @@ export function DecksToolbar({
             type="submit"
             size="sm"
             disabled={pending}
-            title="新建一个空卡组(不填名字默认叫 “新卡组”,之后可改)"
+            
           >
             ＋ 创建
           </Button>

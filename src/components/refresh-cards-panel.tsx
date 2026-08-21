@@ -133,7 +133,7 @@ export function RefreshCardsPanel() {
 
       {running ? (
         <p className="text-xs text-[var(--color-muted-fg)]">
-          更新期间站点会短暂重启（约几秒）。价格阶段较慢，可以关掉此页面，稍后再回来查看。
+          更新期间站点会短暂重启
         </p>
       ) : null}
       {error ? <p className="text-xs text-red-500">{error}</p> : null}

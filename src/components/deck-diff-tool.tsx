@@ -108,9 +108,6 @@ export function DeckDiffTool({
       </div>
 
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="text-xs text-[var(--color-muted-fg)] flex-1 min-w-0">
-          点击两个卡组选 A 和 B,下面列出&ldquo;只在 A / 只在 B / 数量不同&rdquo;的差异。完全相同的卡片省略。
-        </p>
         <button
           type="button"
           onClick={swap}

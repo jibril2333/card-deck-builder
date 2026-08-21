@@ -180,7 +180,7 @@ export function DeckImageExport({
       onClick={exportPng}
       disabled={disabled}
       className="px-3 h-8 rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-      title="把整个卡组排版成一张 PNG 图片下载,方便分享"
+      title="PNG"
     >
       🖼️ {busy ? "生成中…" : "导出图片"}
     </button>

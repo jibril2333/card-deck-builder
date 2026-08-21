@@ -57,9 +57,6 @@ export function DeckPoolPicker({
   return (
     <div>
       <h3 className="text-sm font-semibold mb-1">🎴 共享卡池</h3>
-      <p className="text-xs text-[var(--color-muted-fg)] mb-3 leading-snug">
-        同一池里的卡组共用一套实体卡，只需按最费的那套备卡。
-      </p>
 
       <div className="flex flex-wrap gap-1.5">
         {pools.map((p) => {

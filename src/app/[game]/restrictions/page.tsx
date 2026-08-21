@@ -127,7 +127,7 @@ export default async function RestrictionsPage({
             </span>
           </h1>
           <p className="text-xs text-[var(--color-muted-fg)] mt-1">
-            官方规则,卡组构筑时按身份(本体 + 异画合计)计算。
+            按身份计算:本体 + 异画合计
             {lastSync ? (
               <>
                 {" "}最后同步: <span className="tabular-nums">{lastSync.slice(0, 10)}</span>

@@ -175,7 +175,7 @@ export function DeckAdjustments({
       <header className="flex items-baseline gap-2 mb-3">
         <h2 className="text-sm font-semibold">调整备忘</h2>
         <span className="text-[11px] text-[var(--color-muted-fg)]">
-          只是记下想怎么改（含张数）· 不计入卡组张数、价格、缺卡、共享卡池和导出
+          不计入张数、价格、缺卡与导出
         </span>
       </header>
 

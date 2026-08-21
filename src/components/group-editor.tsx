@@ -132,7 +132,7 @@ export function GroupEditor({
       {open ? (
         <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3">
           <div className="text-xs text-[var(--color-muted-fg)] mb-2">
-            勾选要共享同一套卡的卡组（只在这些卡组之间组合）：
+            勾选共享同一套卡的卡组
           </div>
           {/* Cover tiles, not a checkbox list. Decks are recognised by their
               art long before their name is read, and the page is up to 1500px
