@@ -58,10 +58,10 @@ export function DeckPoolSelect({
         title="同一个卡池里的卡组共用一套实体卡"
         className="h-8 max-w-[12rem] rounded-md border border-[var(--color-border)] bg-[var(--color-card)] px-2 text-sm cursor-pointer hover:bg-[var(--color-muted)] disabled:opacity-60"
       >
-        <option value="">🎴 无卡池</option>
+        <option value="">无卡池</option>
         {pools.map((p) => (
           <option key={p.id} value={p.id}>
-            🎴 {p.name}
+            {p.name}
           </option>
         ))}
       </select>

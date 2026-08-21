@@ -48,15 +48,15 @@ test("pool a deck from its own page, and unpool it again", async ({ page }) => {
 
   await page.goto(deckUrl);
   const select = page.getByLabel("共享卡池");
-  await expect(select.locator("option:checked")).toHaveText("🎴 无卡池");
+  await expect(select.locator("option:checked")).toHaveText("无卡池");
 
-  await select.selectOption({ label: `🎴 ${poolName}` });
+  await select.selectOption({ label: poolName });
   // The round trip through the DB is the point, not the state right after the
   // change event.
   await page.reload();
   await expect(
     page.getByLabel("共享卡池").locator("option:checked"),
-  ).toHaveText(`🎴 ${poolName}`);
+  ).toHaveText(poolName);
   // Pooled decks get a way through to the buy-list.
   await expect(page.getByLabel("打开卡池")).toHaveAttribute(
     "href",
@@ -69,15 +69,15 @@ test("pool a deck from its own page, and unpool it again", async ({ page }) => {
   await page.reload();
   await expect(
     page.getByLabel("共享卡池").locator("option:checked"),
-  ).toHaveText("🎴 无卡池");
+  ).toHaveText("无卡池");
   await expect(page.getByLabel("打开卡池")).toHaveCount(0);
 
   // And back in, so the deck ends pooled.
-  await page.getByLabel("共享卡池").selectOption({ label: `🎴 ${poolName}` });
+  await page.getByLabel("共享卡池").selectOption({ label: poolName });
   await page.reload();
   await expect(
     page.getByLabel("共享卡池").locator("option:checked"),
-  ).toHaveText(`🎴 ${poolName}`);
+  ).toHaveText(poolName);
 });
 
 test("the picker is absent on a deck you don't own", async ({ page }) => {
