@@ -21,13 +21,12 @@ test("names the cards the banlist disagrees with, and changes nothing", async ({
 
   const notice = page.getByRole("status", { name: "禁限提醒" });
   await expect(notice).toBeVisible();
-  await expect(notice).toContainText("1 处冲突");
-  await expect(notice).toContainText("超出上限");
+  // The card, the cap, and what you actually hold — nothing else. The box
+  // used to open with a sentence about the banlist and close with a paragraph
+  // about clamping; both described the feature rather than this deck.
   await expect(notice).toContainText(LEGACY_DECK.code);
-  // Says both numbers, so the reader knows how far over they are.
-  await expect(notice).toContainText(`${LEGACY_DECK.quantity} / ${LEGACY_DECK.max}`);
-  // And says out loud that it hasn't touched anything.
-  await expect(notice).toContainText("不会自动修改");
+  await expect(notice).toContainText(`限 ${LEGACY_DECK.max}`);
+  await expect(notice).toContainText(`现有 ${LEGACY_DECK.quantity}`);
 
   // The offending card is marked in the grid, not silently trimmed.
   const badge = page.getByTitle("违反现行禁限表");
