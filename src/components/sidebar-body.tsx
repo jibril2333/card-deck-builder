@@ -16,7 +16,7 @@ type NavId =
   | "restrictions"
   | "memory"
   | "about"
-  | "admin";
+  | "settings";
 
 const NAV: { id: NavId; label: string; icon: string; sub: string }[] = [
   { id: "search", label: "卡牌检索", icon: "🔍", sub: "Cards" },
@@ -27,9 +27,14 @@ const NAV: { id: NavId; label: string; icon: string; sub: string }[] = [
   { id: "about", label: "游戏知识", icon: "📖", sub: "About" },
 ];
 
-// Rendered only for admins (see lib/auth/admin.ts) — it drives the card-data
-// refresh, which restarts the container.
-const ADMIN_NAV = { id: "admin" as const, label: "管理", icon: "⚙️", sub: "Admin" };
+// Everyone signed in has settings (passkeys, their own data); admins see the
+// card-data panels on the same page. The gate is inside the page, not here.
+const SETTINGS_NAV = {
+  id: "settings" as const,
+  label: "设置",
+  icon: "⚙️",
+  sub: "Settings",
+};
 
 function hrefFor(id: NavId, game: string): string {
   return id === "search" ? `/${game}` : `/${game}/${id}`;
@@ -44,6 +49,7 @@ function activeFor(pathname: string, game: string): NavId {
   if (pathname.startsWith(`${base}/restrictions`)) return "restrictions";
   if (pathname.startsWith(`${base}/memory`)) return "memory";
   if (pathname.startsWith(`${base}/about`)) return "about";
+  if (pathname.startsWith(`${base}/settings`)) return "settings";
   return "search"; // /[game], /[game]/card/... and fallbacks
 }
 
@@ -58,13 +64,11 @@ export function SidebarBody({
   loggedIn,
   cardLang,
   user,
-  isAdmin = false,
 }: {
   game: GameId;
   loggedIn: boolean;
   cardLang: CardLang;
   user: React.ComponentProps<typeof UserMenu>["user"] | null;
-  isAdmin?: boolean;
 }) {
   const pathname = usePathname() ?? `/${game}`;
   const active = activeFor(pathname, game);
@@ -72,7 +76,7 @@ export function SidebarBody({
 
   // Collection is the current user's own — hide it for anon.
   const base = NAV.filter((n) => loggedIn || n.id !== "collection");
-  const items = isAdmin ? [...base, ADMIN_NAV] : base;
+  const items = loggedIn ? [...base, SETTINGS_NAV] : base;
 
   const brand = (
     <Link href="/" className="flex items-center gap-2 min-w-0">

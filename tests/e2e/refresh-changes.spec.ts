@@ -12,7 +12,7 @@ const panel = (p: import("@playwright/test").Page) =>
   p.getByRole("region", { name: "更新变更" });
 
 test("shows what a refresh changed, banlist moves first", async ({ page }) => {
-  await page.goto("/digimon/admin");
+  await page.goto("/digimon/settings");
   const box = panel(page);
   await expect(box).toBeVisible();
 

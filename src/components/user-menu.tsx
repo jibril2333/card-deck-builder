@@ -71,7 +71,7 @@ export function UserMenu({ user }: { user: User }) {
             </div>
           </div>
           <Link
-            href="/account"
+            href="/digimon/settings"
             onClick={() => setOpen(false)}
             className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-muted)] cursor-pointer border-b border-[var(--color-border)]"
           >

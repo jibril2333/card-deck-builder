@@ -15,7 +15,7 @@ const panel = (p: import("@playwright/test").Page) =>
   p.getByRole("region", { name: "数据搬运" });
 
 test("exports a file, and it carries no account", async ({ page }) => {
-  await page.goto("/account");
+  await page.goto("/digimon/settings");
   const box = panel(page);
   await expect(box).toBeVisible();
 
@@ -73,7 +73,7 @@ test("summarises a picked file before importing, then imports it", async ({
     }),
   );
 
-  await page.goto("/account");
+  await page.goto("/digimon/settings");
   const box = panel(page);
   await box.locator('input[type="file"]').setInputFiles(file);
   // Read in the browser and summarised BEFORE anything is sent.
@@ -92,7 +92,7 @@ test("summarises a picked file before importing, then imports it", async ({
 test("refuses a file that isn't one of ours", async ({ page }) => {
   const file = path.join(os.tmpdir(), `cdb-e2e-junk-${Date.now()}.json`);
   fs.writeFileSync(file, JSON.stringify({ hello: "world" }));
-  await page.goto("/account");
+  await page.goto("/digimon/settings");
   const box = panel(page);
   await box.locator('input[type="file"]').setInputFiles(file);
   await expect(box.getByText(/不是本站导出的数据/)).toBeVisible();

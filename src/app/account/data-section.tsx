@@ -65,16 +65,9 @@ export function DataSection() {
   return (
     <section
       aria-label="数据搬运"
-      className="mt-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-4"
+      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-4"
     >
-      <div>
-        <h2 className="text-sm font-semibold">数据搬运</h2>
-        <p className="text-xs text-[var(--color-muted-fg)] mt-1">
-          把你的卡组、卡池、收藏和价格带到另一个站点,或者留一份自己的备份。
-          文件里<b>不含密码、登录状态和 passkey</b> —— 导入时所有数据都会挂到
-          当前登录的账号名下。
-        </p>
-      </div>
+      <h2 className="text-sm font-semibold">数据搬运</h2>
 
       <div className="flex flex-wrap items-center gap-2">
         <a
@@ -110,13 +103,9 @@ export function DataSection() {
                 onChange={(e) => setReplace(e.target.checked)}
                 className="mt-0.5"
               />
-              <span>
-                先清空我在这个站点上的数据
-                <span className="text-[var(--color-muted-fg)]">
-                  {" "}
-                  —— 不勾就是合并:同一副卡组会被文件里的版本覆盖,文件里没有的保持不动
-                </span>
-              </span>
+              {/* The consequence is carried by the button below, which reads
+                  合并导入 or 清空并导入 depending on this box. */}
+              <span>先清空我在这个站点上的数据</span>
             </label>
             <button
               type="button"

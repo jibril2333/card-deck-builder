@@ -81,10 +81,6 @@ export function PasskeySection({
     <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-5 space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Passkey 登录</h2>
-        <p className="text-xs text-[var(--color-muted-fg)] mt-1">
-          用 Touch ID / Face ID / Windows Hello / 硬件密钥取代邮箱密码。
-          一个账号可以绑多个 — 手机 + 笔记本各注册一个最稳。
-        </p>
       </div>
 
       <div className="flex gap-2 items-end">

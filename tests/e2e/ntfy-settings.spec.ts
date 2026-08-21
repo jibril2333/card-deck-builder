@@ -14,7 +14,7 @@ const panel = (p: import("@playwright/test").Page) =>
 test("saves the server and topic, and keeps the token to itself", async ({
   page,
 }) => {
-  await page.goto("/digimon/admin");
+  await page.goto("/digimon/settings");
   const box = panel(page);
   await expect(box).toBeVisible();
 
@@ -49,7 +49,7 @@ test("saves the server and topic, and keeps the token to itself", async ({
 });
 
 test("editing another field can't wipe the saved token", async ({ page }) => {
-  await page.goto("/digimon/admin");
+  await page.goto("/digimon/settings");
   const box = panel(page);
   // Only touch the topic, the way you would when fixing a typo.
   await box.getByPlaceholder("dcg").fill("dcg2");
@@ -62,7 +62,7 @@ test("editing another field can't wipe the saved token", async ({ page }) => {
 });
 
 test("won't test unsaved edits, and says why the send failed", async ({ page }) => {
-  await page.goto("/digimon/admin");
+  await page.goto("/digimon/settings");
   const box = panel(page);
   const testBtn = box.getByRole("button", { name: "发送测试通知" });
 

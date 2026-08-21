@@ -26,7 +26,7 @@ async function ready(p: import("@playwright/test").Page) {
 }
 
 test("schedule survives a save and a reload", async ({ page }) => {
-  await page.goto("/digimon/admin");
+  await page.goto("/digimon/settings");
   const box = await ready(page);
 
   // Manual and automatic are separate sections, which is the point of the
@@ -63,7 +63,7 @@ test("schedule survives a save and a reload", async ({ page }) => {
 test("turning it off disables the controls, and that survives a reload", async ({
   page,
 }) => {
-  await page.goto("/digimon/admin");
+  await page.goto("/digimon/settings");
   const box = await ready(page);
   await box.getByRole("checkbox").first().uncheck();
   // Off is shown by the controls going dead, not by a line of text saying so.
