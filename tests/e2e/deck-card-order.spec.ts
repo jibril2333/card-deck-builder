@@ -52,3 +52,26 @@ test("egg first, then Digimon by level, then Tamers", async ({ page }) => {
     "BT1-050", // Option
   ]);
 });
+
+test("编号 sorts BT2 before BT10, plain and with alt arts expanded", async ({
+  page,
+}) => {
+  // Same defect on the card browser: `ORDER BY code` is a TEXT sort, so the
+  // pack number was compared one character at a time.
+  //
+  // The second URL is the alt-art branch, which builds its ORDER BY from a
+  // second string against the CTE — the collection page runs that same query,
+  // and it silently kept the old sort when only the first one was fixed.
+  for (const url of [
+    "/digimon?sort=code",
+    "/digimon?sort=code&show_alt_arts=1",
+  ]) {
+    await page.goto(url);
+    const codes = (await page.locator(".card-code").allInnerTexts()).map(
+      (t) => t.trim().split(/\s+/)[0],
+    );
+    expect(codes.length).toBeGreaterThan(3);
+    expect(codes.indexOf("BT2-030")).toBeGreaterThan(codes.indexOf("BT1-001"));
+    expect(codes.indexOf("BT10-050")).toBeGreaterThan(codes.indexOf("BT2-030"));
+  }
+});

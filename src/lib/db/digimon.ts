@@ -126,6 +126,32 @@ export type DigimonFilters = {
   q_mode?: "all" | "name";
 };
 
+/**
+ * A card code read as a NUMBER rather than as text.
+ *
+ * `ORDER BY code` puts BT10 before BT2 and -010 before -002, because "1" < "2"
+ * one character at a time. Every list of cards in the app is affected: the
+ * browser's 编号 sort, the collection, and the tie-break under every other
+ * sort.
+ *
+ * "BT13-089" splits into "BT" / 13 / 89. rtrim/ltrim take a character SET, not
+ * a prefix, which is what separates the letters from the set number without a
+ * regex; CAST stops at the first non-digit, which also handles a `_P1` suffix.
+ * A code with no "-" (none today) falls through to the plain string at the end.
+ */
+function codeNatural(col: string, dir: "ASC" | "DESC" = "ASC"): string {
+  const head = `substr(${col}, 1, instr(${col}, '-') - 1)`;
+  return [
+    // The two TOKEN rows carry no "-" at all; keep them out of the way in
+    // both directions rather than letting an empty head float them to the top.
+    `CASE WHEN instr(${col}, '-') = 0 THEN 1 ELSE 0 END`,
+    `rtrim(${head}, '0123456789') ${dir}`,
+    `CAST(ltrim(${head}, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') AS INTEGER) ${dir}`,
+    `CAST(substr(${col}, instr(${col}, '-') + 1) AS INTEGER) ${dir}`,
+    `${col} ${dir}`,
+  ].join(", ");
+}
+
 const SORT_FIELDS: Record<string, string> = {
   code: "code",
   name: "name",
@@ -268,7 +294,7 @@ export function searchCards(filters: DigimonFilters = {}): {
   const sortField = filters.sort_field
     ? SORT_FIELDS[filters.sort_field]
     : undefined;
-  const sortDir = filters.sort_dir === "desc" ? "DESC" : "ASC";
+  const sortDir: "ASC" | "DESC" = filters.sort_dir === "desc" ? "DESC" : "ASC";
 
   /**
    * Relevance, for name searches only.
@@ -296,9 +322,16 @@ export function searchCards(filters: DigimonFilters = {}): {
       ELSE 4
     END,`;
   const rank = terms.length && filters.q_mode === "name" ? relevanceSql : "";
-  const orderSql = sortField
-    ? `ORDER BY ${rank} ${sortField} ${sortDir} NULLS LAST, code`
-    : `ORDER BY ${rank} level NULLS LAST, code`;
+  // `code` isn't a column here but four expressions — see codeNatural. Every
+  // other sort still falls back to it, so two cards with the same level (or
+  // the same cost, or no DP at all) come out in pack order rather than in
+  // whatever order the text happened to give.
+  const orderSql =
+    filters.sort_field === "code"
+      ? `ORDER BY ${rank} ${codeNatural("code", sortDir)}`
+      : sortField
+        ? `ORDER BY ${rank} ${sortField} ${sortDir} NULLS LAST, ${codeNatural("code")}`
+        : `ORDER BY ${rank} level NULLS LAST, ${codeNatural("code")}`;
 
   const limit = filters.limit ?? 60;
   const offset = filters.offset ?? 0;
@@ -344,9 +377,12 @@ export function searchCards(filters: DigimonFilters = {}): {
         ELSE 4
       END,`
         : "";
-    const orderQualified = sortField
-      ? `ORDER BY ${rankQualified} base.${sortField} ${sortDir} NULLS LAST, base.code, ci.variant`
-      : `ORDER BY ${rankQualified} base.level NULLS LAST, base.code, ci.variant`;
+    const orderQualified =
+      filters.sort_field === "code"
+        ? `ORDER BY ${rankQualified} ${codeNatural("base.code", sortDir)}, ci.variant`
+        : sortField
+          ? `ORDER BY ${rankQualified} base.${sortField} ${sortDir} NULLS LAST, ${codeNatural("base.code")}, ci.variant`
+          : `ORDER BY ${rankQualified} base.level NULLS LAST, ${codeNatural("base.code")}, ci.variant`;
     rows = db()
       .prepare(
         `WITH base AS (SELECT * FROM cards ${whereSql})
@@ -620,11 +656,7 @@ const deckRepo = createDeckRepo<DigimonCard, DigimonDeck>({
       ELSE 1
     END,
     c.level NULLS LAST,
-    rtrim(substr(c.code, 1, instr(c.code, '-') - 1), '0123456789'),
-    CAST(ltrim(substr(c.code, 1, instr(c.code, '-') - 1),
-               'ABCDEFGHIJKLMNOPQRSTUVWXYZ') AS INTEGER),
-    CAST(substr(c.code, instr(c.code, '-') + 1) AS INTEGER),
-    c.code`,
+    ${codeNatural("c.code")}`,
   restrictionSource: "digimon",
   // Digimon stores parallel art in card_images keyed off the base code,
   // so cards.code IS the restriction identity — no transformation needed.
