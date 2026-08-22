@@ -114,7 +114,11 @@ const CARDS_SCHEMA = `
  *
  * Six in one status so a four-up row is a real row with something after it.
  */
-const SEED_RESTRICTIONS: [string, "banned" | "limited_1" | "limited_2", number][] = [
+const SEED_RESTRICTIONS: [
+  string,
+  "banned" | "limited_1" | "limited_2",
+  number,
+][] = [
   // The one restriction on a card that actually EXISTS in the fixture, so the
   // banlist has a tile with real art and a real name to localize. BT1-086 is
   // referenced by no other spec, so its `limited_1` cap can't clamp a deck
@@ -137,7 +141,12 @@ const SEED_RESTRICTIONS: [string, "banned" | "limited_1" | "limited_2", number][
  * which is what tells a name-only localization apart from a full one.
  */
 const SEED_TRANSLATIONS: [string, "ja" | "zh", string, string][] = [
-  ["BT1-086", "ja", "石田ヤマト", "https://digimoncard.com/images/cardlist/card/BT1-086.png"],
+  [
+    "BT1-086",
+    "ja",
+    "石田ヤマト",
+    "https://digimoncard.com/images/cardlist/card/BT1-086.png",
+  ],
   ["BT1-086", "zh", "石田大和", "https://source.windoent.com/DTCG/BT1-086.png"],
 ];
 
@@ -242,6 +251,42 @@ const SEED_CARDS: CardSeed[] = [
     rarity: "SR",
     main_effect: "End your turn.",
     image: STUB_IMAGE,
+  },
+  // ── Ordering fixture ──────────────────────────────────────────────────
+  // Two Lv.3s from sets whose codes sort one way as TEXT and the other way as
+  // numbers (BT10 before BT2 as text), and an Option whose code sorts before
+  // both Tamers'. Together they tell the deck's card order apart from the old
+  // `level NULLS LAST, code` — see tests/e2e/deck-card-order.spec.ts.
+  //
+  // No name here contains "mon": the adjustment dropdown's spec searches that
+  // and measures how tall the result list is.
+  {
+    code: "BT2-030",
+    name: "Cliff Raptor",
+    card_type: "Digimon",
+    color: "Red",
+    level: 3,
+    play_cost: 3,
+    dp: 3000,
+    rarity: "C",
+  },
+  {
+    code: "BT10-050",
+    name: "Dune Raptor",
+    card_type: "Digimon",
+    color: "Red",
+    level: 3,
+    play_cost: 3,
+    dp: 3000,
+    rarity: "C",
+  },
+  {
+    code: "BT1-050",
+    name: "Sky Fissure",
+    card_type: "Option",
+    color: "Blue",
+    play_cost: 2,
+    rarity: "C",
   },
   {
     code: "BT1-085",
@@ -380,7 +425,8 @@ export function seedDigimonDb(dbPath: string): void {
       `INSERT INTO card_sets (code, category, name_ja, release_order)
        VALUES (?, 'e2e', ?, ?)`,
     );
-    for (const [code, name, order] of SEED_SETS) insertSet.run(code, name, order);
+    for (const [code, name, order] of SEED_SETS)
+      insertSet.run(code, name, order);
 
     const insertRestriction = db.prepare(
       `INSERT INTO card_restrictions (source, identity, status, max_count)
@@ -412,9 +458,33 @@ export function seedDigimonDb(dbPath: string): void {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const c of [
-      ["2026-08-10T04:30:00Z", "card_added", "BT1-001", null, null, null, "Yokomon"],
-      ["2026-08-10T04:30:00Z", "field_changed", "BT1-084", null, "main_effect", "old", "new"],
-      ["2026-08-10T04:30:00Z", "restriction_changed", "BT1-086", null, null, "limited_1", "banned"],
+      [
+        "2026-08-10T04:30:00Z",
+        "card_added",
+        "BT1-001",
+        null,
+        null,
+        null,
+        "Yokomon",
+      ],
+      [
+        "2026-08-10T04:30:00Z",
+        "field_changed",
+        "BT1-084",
+        null,
+        "main_effect",
+        "old",
+        "new",
+      ],
+      [
+        "2026-08-10T04:30:00Z",
+        "restriction_changed",
+        "BT1-086",
+        null,
+        null,
+        "limited_1",
+        "banned",
+      ],
     ] as const) {
       insertChange.run(...c);
     }

@@ -183,7 +183,11 @@ export function searchCards(filters: DigimonFilters = {}): {
   }
 
   // Multi-select: build IN clauses with positional placeholders
-  function addIn(field: string, values: string[] | undefined, paramKey: string) {
+  function addIn(
+    field: string,
+    values: string[] | undefined,
+    paramKey: string,
+  ) {
     if (!values || values.length === 0) return;
     const keys = values.map((_, i) => `@${paramKey}${i}`);
     where.push(`${field} IN (${keys.join(",")})`);
@@ -234,7 +238,12 @@ export function searchCards(filters: DigimonFilters = {}): {
   // same rarity, just inconsistent casing across data sources. We don't have a
   // reliable alt-art indicator in this dataset, so show_alt_arts is ignored.
 
-  function addRange(field: string, min?: number, max?: number, prefix?: string) {
+  function addRange(
+    field: string,
+    min?: number,
+    max?: number,
+    prefix?: string,
+  ) {
     if (min !== undefined && Number.isFinite(min)) {
       where.push(`${field} >= @${prefix}_min`);
       params[`${prefix}_min`] = min;
@@ -245,7 +254,12 @@ export function searchCards(filters: DigimonFilters = {}): {
     }
   }
   addRange("level", filters.level_min, filters.level_max, "level");
-  addRange("play_cost", filters.play_cost_min, filters.play_cost_max, "play_cost");
+  addRange(
+    "play_cost",
+    filters.play_cost_min,
+    filters.play_cost_max,
+    "play_cost",
+  );
   addRange("dp", filters.dp_min, filters.dp_max, "dp");
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -362,9 +376,8 @@ export function searchCards(filters: DigimonFilters = {}): {
 }
 
 export function getCardByCode(code: string): DigimonCard | undefined {
-  return db()
-    .prepare(`SELECT * FROM cards WHERE code = ?`)
-    .get(code) as DigimonCard | undefined;
+  return db().prepare(`SELECT * FROM cards WHERE code = ?`).get(code) as
+    DigimonCard | undefined;
 }
 
 // ---- Card rulings (official Q&A from the JP site) ----
@@ -401,7 +414,10 @@ export function getDisplayTranslations(
   codes: string[],
   lang: CardLang,
 ): Map<string, { name: string | null; image_url: string | null }> {
-  const out = new Map<string, { name: string | null; image_url: string | null }>();
+  const out = new Map<
+    string,
+    { name: string | null; image_url: string | null }
+  >();
   if (lang === "en" || codes.length === 0) return out;
   const unique = [...new Set(codes)];
   // SQLite caps host parameters; chunk to stay well under it.
@@ -417,7 +433,8 @@ export function getDisplayTranslations(
       name: string | null;
       image_url: string | null;
     }[];
-    for (const r of rows) out.set(r.code, { name: r.name, image_url: r.image_url });
+    for (const r of rows)
+      out.set(r.code, { name: r.name, image_url: r.image_url });
   }
   return out;
 }
@@ -431,7 +448,10 @@ export function overlayDisplay<
   T extends { code: string; name: string; image_url?: string | null },
 >(rows: T[], lang: CardLang, opts?: { keepImage?: boolean }): T[] {
   if (lang === "en" || rows.length === 0) return rows;
-  const map = getDisplayTranslations(rows.map((r) => r.code), lang);
+  const map = getDisplayTranslations(
+    rows.map((r) => r.code),
+    lang,
+  );
   return rows.map((r) => {
     const t = map.get(r.code);
     if (!t) return r;
@@ -446,9 +466,8 @@ export function overlayDisplay<
 }
 
 export function getCardById(id: string): DigimonCard | undefined {
-  return db()
-    .prepare(`SELECT * FROM cards WHERE id = ?`)
-    .get(id) as DigimonCard | undefined;
+  return db().prepare(`SELECT * FROM cards WHERE id = ?`).get(id) as
+    DigimonCard | undefined;
 }
 
 export type CardImageVariant = {
@@ -466,10 +485,7 @@ export type CardImageVariant = {
  * we never MIX languages: a zh page shows zh art, or English art, not both
  * interleaved. Callers can tell which they got from `lang`.
  */
-export function getCardImages(
-  code: string,
-  lang = "en",
-): CardImageVariant[] {
+export function getCardImages(code: string, lang = "en"): CardImageVariant[] {
   const stmt = db().prepare(
     `SELECT variant, image_url, lang FROM card_images
       WHERE code = ? AND lang = ? ORDER BY variant`,
@@ -575,7 +591,40 @@ const deckRepo = createDeckRepo<DigimonCard, DigimonDeck>({
   // Keep `defaultAccent` in lock-step with the createDeck default below.
   defaultAccent: "#f59e0b",
   db,
-  deckCardOrderBy: "c.level NULLS LAST, c.code",
+  /**
+   * The order a deck's cards are read in — the grid, the text export, the
+   * image export and the stats all take it from here.
+   *
+   * Two things were wrong with `level NULLS LAST, code`:
+   *
+   *  - Tamers and Options both have a NULL level, so they landed in one pile
+   *    sorted by code and interleaved with each other. They're the two groups
+   *    a player counts separately.
+   *  - `code` is TEXT, so BT10 sorted before BT2 and -010 before -002. A deck
+   *    holding several sets read as if it had been shuffled.
+   *
+   * So: eggs, then Digimon by level, then Tamers, then Options — the order the
+   * text export already used for its two halves and the one a decklist is
+   * written in. Inside a group, the card number read as a NUMBER: the letters
+   * of the set, then the set's number, then the card's.
+   *
+   * rtrim/ltrim with a character SET (not a prefix) is what splits "BT13" into
+   * "BT" and 13 without regex; CAST stops at the first non-digit, which also
+   * takes care of a `_P1` suffix.
+   */
+  deckCardOrderBy: `
+    CASE c.card_type
+      WHEN 'Digi-Egg' THEN 0
+      WHEN 'Tamer' THEN 2
+      WHEN 'Option' THEN 3
+      ELSE 1
+    END,
+    c.level NULLS LAST,
+    rtrim(substr(c.code, 1, instr(c.code, '-') - 1), '0123456789'),
+    CAST(ltrim(substr(c.code, 1, instr(c.code, '-') - 1),
+               'ABCDEFGHIJKLMNOPQRSTUVWXYZ') AS INTEGER),
+    CAST(substr(c.code, instr(c.code, '-') + 1) AS INTEGER),
+    c.code`,
   restrictionSource: "digimon",
   // Digimon stores parallel art in card_images keyed off the base code,
   // so cards.code IS the restriction identity — no transformation needed.
@@ -741,9 +790,7 @@ export function getCardCollectionQty(
       `SELECT quantity FROM user.card_collection
        WHERE user_id = ? AND card_id = ? AND variant = ?`,
     )
-    .get(currentUserId, cardId, variant) as
-    | { quantity: number }
-    | undefined;
+    .get(currentUserId, cardId, variant) as { quantity: number } | undefined;
   return r?.quantity ?? 0;
 }
 
@@ -790,9 +837,7 @@ export function adjustCardCollection(
  * Used by the collection page to inject the owned-quantity into the grid in a
  * single query — instead of one lookup per displayed tile.
  */
-export function getCollectionMap(
-  currentUserId: string,
-): Map<string, number> {
+export function getCollectionMap(currentUserId: string): Map<string, number> {
   const rows = db()
     .prepare(
       `SELECT card_id, variant, quantity FROM user.card_collection
@@ -820,9 +865,7 @@ export type Restriction = {
  * Returns a Map keyed by `card_id` → restriction. Cards without a row in
  * `card_restrictions` are omitted (caller treats absence as "standard limit").
  */
-export function getRestrictionMap(
-  cardIds: string[],
-): Map<string, Restriction> {
+export function getRestrictionMap(cardIds: string[]): Map<string, Restriction> {
   if (cardIds.length === 0) return new Map();
   const placeholders = cardIds.map(() => "?").join(",");
   const rows = db()
@@ -1072,7 +1115,10 @@ export function listRefreshRuns(limit = 5): RefreshRun[] {
     run_at: r.run_at,
     total: r.total,
     counts: Object.fromEntries(
-      (byKind.all(r.run_at) as { kind: string; n: number }[]).map((k) => [k.kind, k.n]),
+      (byKind.all(r.run_at) as { kind: string; n: number }[]).map((k) => [
+        k.kind,
+        k.n,
+      ]),
     ),
     sample: sample.all(r.run_at) as RefreshChange[],
   }));
@@ -1142,7 +1188,10 @@ export function deckRestrictionIssues(deckId: string): DeckRestrictionIssue[] {
         WHERE p.source = 'digimon'
         ORDER BY cb.code`,
     )
-    .all(deckId) as Omit<Extract<DeckRestrictionIssue, { kind: "pair" }>, "kind">[];
+    .all(deckId) as Omit<
+    Extract<DeckRestrictionIssue, { kind: "pair" }>,
+    "kind"
+  >[];
 
   return [
     ...over.map((o) => ({ kind: "over_limit" as const, ...o })),
@@ -1233,7 +1282,9 @@ export function getJapaneseFacts(codes: string[]): Map<string, JapaneseFacts> {
         name: r.name,
         traits: r.traits,
         evo_req: r.evo_req,
-        text: [r.effect_main, r.effect_2, r.effect_3].filter(Boolean).join("\n"),
+        text: [r.effect_main, r.effect_2, r.effect_3]
+          .filter(Boolean)
+          .join("\n"),
       });
     }
   }

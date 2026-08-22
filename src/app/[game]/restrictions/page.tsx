@@ -379,7 +379,7 @@ function PairRow({ group, game }: { group: PairGroup; game: string }) {
         </div>
         <span
           title={`卡组里有这张卡时,右边 ${group.banned.length} 张都不能同组`}
-          className="absolute -right-1 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center shadow"
+          className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center shadow"
         >
           ⇒
         </span>

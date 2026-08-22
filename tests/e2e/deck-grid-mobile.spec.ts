@@ -7,7 +7,11 @@
  */
 import { expect, test } from "@playwright/test";
 
-test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+test.use({
+  viewport: { width: 390, height: 844 },
+  hasTouch: true,
+  isMobile: true,
+});
 
 test("four cards to a row, captions sized to match", async ({ page }) => {
   await page.goto("/digimon/decks");
@@ -105,15 +109,17 @@ test("banlist: four to a row, trigger card included", async ({ page }) => {
           [...g.children].every((k) => k.querySelector('[class*="aspect-"]')),
       )
       .map(rowOf);
-    // The A-side card is not in a grid; measure it against a B-side tile.
-    const trigger = document
-      .querySelector('section div.grid > *:has([class*="aspect-"])')
-      ?.getBoundingClientRect().width;
-    const label = [...document.querySelectorAll("div")].find(
-      (d) => d.textContent?.trim() === "A · 触发卡",
+    // The trigger card is the first cell of the pair row's own grid now, so
+    // "the same width as a tile" is measured between two cells of it.
+    const pair = [...document.querySelectorAll("section")].find((s) =>
+      s.querySelector("h2")?.textContent?.includes("禁卡组合"),
     );
-    const triggerTile = label?.nextElementSibling?.getBoundingClientRect().width;
-    return { grids, tile: trigger, triggerTile };
+    const cells = [...(pair?.querySelector("div.grid")?.children ?? [])];
+    return {
+      grids,
+      tile: cells[1]?.getBoundingClientRect().width,
+      triggerTile: cells[0]?.getBoundingClientRect().width,
+    };
   });
 
   expect(r.grids.length).toBeGreaterThan(0);
@@ -124,7 +130,8 @@ test("banlist: four to a row, trigger card included", async ({ page }) => {
   }
 
   // The trigger card used to take the full screen width, which read as a
-  // different page sitting under a grid of four-up tiles.
+  // different page sitting under a grid of four-up tiles. It is now simply
+  // the first tile of the same grid.
   expect(r.triggerTile).toBeGreaterThan(0);
   expect(r.triggerTile).toBeLessThanOrEqual((r.tile ?? 0) + 2);
 });
