@@ -6,6 +6,7 @@ import { isGameId, type GameId } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { Playtest, type PlaytestCard } from "@/components/playtest";
 import * as digimon from "@/lib/db/digimon";
+import { deckThemeCss } from "@/lib/deck-theme";
 
 /**
  * Deck playtesting page: opening-hand simulator + draw-probability table.
@@ -40,10 +41,15 @@ export default async function PlaytestPage({
     })),
     cardLang,
   );
-  
+
+  // Same as the deck page: inside a deck, the app wears the deck's colour.
+  const themeCss = deckThemeCss(deck.accent_color, deck.accent_color2 ?? null);
 
   return (
     <>
+      {themeCss ? (
+        <style dangerouslySetInnerHTML={{ __html: themeCss }} />
+      ) : null}
       {/* 1100 was sized for a three-column probability table. The table now
           shows every turn from `xl` up, and 1600 is what those columns plus the
           15rem level rail actually need — past that the extra width would go

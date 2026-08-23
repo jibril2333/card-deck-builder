@@ -31,6 +31,7 @@ import { DECK_TARGET } from "@/lib/deck-legality";
 import { tallyColors, tallyLevels, MULTI_COLOR } from "@/lib/deck-tally";
 import { DeckInfoBar } from "@/components/deck-info-bar";
 import { parseImportReport } from "@/lib/import-report";
+import { deckThemeCss } from "@/lib/deck-theme";
 import { computeDeckJogress } from "@/lib/jogress";
 import {
   buildSetOrder,
@@ -504,8 +505,23 @@ export default async function DeckEditPage({
   const fmtPrice = (n: number) =>
     "¥" + n.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
 
+  // While you're inside a deck, the app wears the deck's colour: the mode
+  // tabs, buttons and focus rings match the list you're reading instead of the
+  // site. The <style> unmounts with the page, so leaving puts the app's own
+  // accent back — no cleanup, no flash on the way out.
+  const themeCss = deckThemeCss(
+    loaded.deck.accent_color,
+    loaded.deck.accent_color2,
+  );
+
   return (
     <>
+      {themeCss ? (
+        // The value is a clamped `hsl(…)` built from a validated hex — see
+        // lib/deck-theme, which is where the "it came out of the database"
+        // part is handled.
+        <style dangerouslySetInnerHTML={{ __html: themeCss }} />
+      ) : null}
       <main className="w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         <section className="min-w-0">
           <BackLink
