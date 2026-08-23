@@ -75,3 +75,24 @@ test("编号 sorts BT2 before BT10, plain and with alt arts expanded", async ({
     expect(codes.indexOf("BT10-050")).toBeGreaterThan(codes.indexOf("BT2-030"));
   }
 });
+
+test("the card browser opens on the newest pack", async ({ page }) => {
+  // The default used to be `level, code`: the first screen was every Digi-Egg
+  // ever printed. What you open a card list for is what the newest pack holds.
+  //
+  // The fixture's two packs are ordered against their codes on purpose —
+  // BT-01 is the NEW one, ZZ-03 the old one — so a default that sorted by the
+  // code instead of by release order fails here.
+  await page.goto("/digimon");
+  const codes = (
+    await page
+      .locator("a[href*='/digimon/card/']")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("href") ?? ""))
+  ).map((h) => h.replace(/^.*\/card\//, "").replace(/[?#].*$/, ""));
+
+  expect(codes[0]).toBe("BT1-001");
+  expect(codes.indexOf("ZZ3-001")).toBeGreaterThan(codes.indexOf("BT1-086"));
+  // BT2 and BT10 aren't in the fixture's set list at all, so they have no
+  // release order and sort after everything that does.
+  expect(codes.indexOf("BT2-030")).toBeGreaterThan(codes.indexOf("ZZ3-004"));
+});

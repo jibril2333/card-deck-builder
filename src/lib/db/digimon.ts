@@ -152,6 +152,36 @@ function codeNatural(col: string, dir: "ASC" | "DESC" = "ASC"): string {
   ].join(", ");
 }
 
+/**
+ * How recent the pack a card comes from is — the default order of the card
+ * browser and of 已收集, newest pack first.
+ *
+ * The default used to be `level, code`, so the first screen was every Digi-Egg
+ * ever printed. What someone opening the card list actually wants to see is
+ * what the newest pack holds.
+ *
+ * The pack comes off the card's own code (BT26-082 → BT-26) rather than out of
+ * `set_names`, because the code is what a reprint keeps: a card printed again
+ * in a later pack still belongs, for this purpose, to the one it is numbered
+ * for. `card_sets.code` is inconsistently padded — the official dropdown says
+ * BT-01 but ST-1 — so both forms are tried.
+ *
+ * Promos (P-…) and the limited packs (LM-…) carry no pack number in their
+ * codes; they resolve to NULL and DESC leaves them at the end, which is where
+ * a "what's new" list wants them anyway.
+ *
+ * `col` MUST be qualified (cards.code / base.code): inside the subquery a bare
+ * `code` resolves to card_sets.code, and every row silently comes back NULL.
+ */
+function setRecency(col: string): string {
+  const head = `substr(${col}, 1, instr(${col}, '-') - 1)`;
+  const alpha = `rtrim(${head}, '0123456789')`;
+  const num = `CAST(ltrim(${head}, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') AS INTEGER)`;
+  return `(SELECT s.release_order FROM card_sets s
+             WHERE s.code = ${alpha} || '-' || ${num}
+                OR s.code = printf('%s-%02d', ${alpha}, ${num}))`;
+}
+
 const SORT_FIELDS: Record<string, string> = {
   code: "code",
   name: "name",
@@ -331,7 +361,7 @@ export function searchCards(filters: DigimonFilters = {}): {
       ? `ORDER BY ${rank} ${codeNatural("code", sortDir)}`
       : sortField
         ? `ORDER BY ${rank} ${sortField} ${sortDir} NULLS LAST, ${codeNatural("code")}`
-        : `ORDER BY ${rank} level NULLS LAST, ${codeNatural("code")}`;
+        : `ORDER BY ${rank} ${setRecency("cards.code")} DESC NULLS LAST, ${codeNatural("code")}`;
 
   const limit = filters.limit ?? 60;
   const offset = filters.offset ?? 0;
@@ -382,7 +412,7 @@ export function searchCards(filters: DigimonFilters = {}): {
         ? `ORDER BY ${rankQualified} ${codeNatural("base.code", sortDir)}, ci.variant`
         : sortField
           ? `ORDER BY ${rankQualified} base.${sortField} ${sortDir} NULLS LAST, ${codeNatural("base.code")}, ci.variant`
-          : `ORDER BY ${rankQualified} base.level NULLS LAST, ${codeNatural("base.code")}, ci.variant`;
+          : `ORDER BY ${rankQualified} ${setRecency("base.code")} DESC NULLS LAST, ${codeNatural("base.code")}, ci.variant`;
     rows = db()
       .prepare(
         `WITH base AS (SELECT * FROM cards ${whereSql})
