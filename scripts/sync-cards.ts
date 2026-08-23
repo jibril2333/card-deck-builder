@@ -82,6 +82,60 @@ async function main() {
     const id = c?.id;
     if (id && MODERN_CODE.test(id)) byCode.set(id, c);
   }
+
+  // Upstream lists one card twice under differently zero-padded numbers:
+  // `RB1-10` and `RB1-010` are both Siriusmon, and the short one carries
+  // `rarity: "Unknown"`. The check further down catches that against cards we
+  // ALREADY have — which is why this never showed up here — but a database
+  // starting from nothing sees both as new and imports both. The NAS did
+  // exactly that, and RB1-10 has been sitting in its card list since.
+  //
+  // Which spelling is right isn't guessable from the pair alone, so ask the
+  // rest of the set: RB1's other 36 cards are all three digits, ST22's are all
+  // two. Majority width wins; a tie keeps the longer, which is the padding
+  // the official site uses for everything except the starter decks.
+  const widthVotes = new Map<string, Map<number, number>>();
+  for (const code of byCode.keys()) {
+    const m = /^(.+)-(\d+)$/.exec(code);
+    if (!m) continue;
+    const votes = widthVotes.get(m[1]) ?? new Map<number, number>();
+    votes.set(m[2].length, (votes.get(m[2].length) ?? 0) + 1);
+    widthVotes.set(m[1], votes);
+  }
+  const modalWidth = (prefix: string) => {
+    const votes = widthVotes.get(prefix);
+    if (!votes) return null;
+    return [...votes].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
+  };
+  const canonicalKey = (code: string) =>
+    code.replace(/-(\d+)$/, (_, n: string) => `-${parseInt(n, 10)}`);
+  const byCanonical = new Map<string, string[]>();
+  for (const code of byCode.keys()) {
+    const k = canonicalKey(code);
+    byCanonical.set(k, [...(byCanonical.get(k) ?? []), code]);
+  }
+  for (const [, spellings] of byCanonical) {
+    if (spellings.length < 2) continue;
+    const keep = spellings
+      .slice()
+      .sort((a, b) => {
+        const wa = /-(\d+)$/.exec(a)![1].length;
+        const wb = /-(\d+)$/.exec(b)![1].length;
+        const prefix = a.slice(0, a.lastIndexOf("-"));
+        const want = modalWidth(prefix);
+        if (want !== null && (wa === want) !== (wb === want)) {
+          return wa === want ? -1 : 1;
+        }
+        return wb - wa;
+      })[0];
+    for (const code of spellings) {
+      if (code === keep) continue;
+      console.log(
+        `[sync] dropping ${code} — same card as ${keep}, differently padded`,
+      );
+      byCode.delete(code);
+    }
+  }
   console.log(
     `[sync] ${byCode.size} distinct modern-DCG codes ` +
       `(${new Set(all.map((c) => c?.id).filter(Boolean)).size - byCode.size} legacy/other filtered out)`,

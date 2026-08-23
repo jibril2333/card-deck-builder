@@ -32,9 +32,9 @@ function hasColumn(
   const [schema, name] = table.includes(".")
     ? table.split(".", 2)
     : ["main", table];
-  const cols = db
-    .prepare(`PRAGMA ${schema}.table_info(${name})`)
-    .all() as { name: string }[];
+  const cols = db.prepare(`PRAGMA ${schema}.table_info(${name})`).all() as {
+    name: string;
+  }[];
   return cols.some((c) => c.name === column);
 }
 
@@ -188,8 +188,7 @@ const MIGRATIONS: Migration[] = [
         // "CREATE [UNIQUE] INDEX <name>" → "CREATE [UNIQUE] INDEX user.<name>"
         const sql = idx.sql.replace(
           /CREATE\s+(UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?\w+[`"]?/i,
-          (_m, uniq) =>
-            `CREATE ${uniq ? "UNIQUE " : ""}INDEX user.${idx.name}`,
+          (_m, uniq) => `CREATE ${uniq ? "UNIQUE " : ""}INDEX user.${idx.name}`,
         );
         db.exec(sql);
       }
@@ -245,9 +244,7 @@ const MIGRATIONS: Migration[] = [
     up: (db) => {
       // Phase 1: add user_id column to decks if missing.
       const decksCols = (
-        db
-          .prepare("PRAGMA user.table_info(decks)")
-          .all() as { name: string }[]
+        db.prepare("PRAGMA user.table_info(decks)").all() as { name: string }[]
       ).map((r) => r.name);
       if (!decksCols.includes("user_id")) {
         db.exec("ALTER TABLE user.decks ADD COLUMN user_id TEXT");
@@ -261,14 +258,11 @@ const MIGRATIONS: Migration[] = [
       // → copy → drop old. user_id stays NULL on copied rows (legacy data
       // from the single-user era); the app will keep these as "global" entries
       // visible to everyone until the deploy-time owner script claims them.
-      const pricesCols = (
-        db
-          .prepare("PRAGMA user.table_info(card_prices)")
-          .all() as { name: string; pk: number }[]
-      );
+      const pricesCols = db
+        .prepare("PRAGMA user.table_info(card_prices)")
+        .all() as { name: string; pk: number }[];
       const hasUserId = pricesCols.some((c) => c.name === "user_id");
-      const compositePk =
-        pricesCols.filter((c) => c.pk > 0).length >= 2;
+      const compositePk = pricesCols.filter((c) => c.pk > 0).length >= 2;
 
       if (!hasUserId || !compositePk) {
         db.exec(`
@@ -666,7 +660,9 @@ const MIGRATIONS: Migration[] = [
       // 2-for-2 is a different note than 1-for-1. Existing rows predate the
       // idea and mean one copy.
       const cols = db
-        .prepare("SELECT name FROM pragma_table_info('deck_adjustments','user')")
+        .prepare(
+          "SELECT name FROM pragma_table_info('deck_adjustments','user')",
+        )
         .all() as { name: string }[];
       if (cols.some((c) => c.name === "quantity")) return;
       db.exec(
@@ -857,7 +853,11 @@ const MIGRATIONS: Migration[] = [
 
       // 1. digimoncard.io is wiki-derived and leaks raw template syntax. 42
       //    cards were literally displaying "|applinkdp =" as their 进化元效果.
-      for (const col of ["main_effect", "security_effect", "inherited_effect"]) {
+      for (const col of [
+        "main_effect",
+        "security_effect",
+        "inherited_effect",
+      ]) {
         db.exec(`
           UPDATE cards SET ${col} = NULL
            WHERE ${col} IS NOT NULL
@@ -1055,7 +1055,9 @@ const MIGRATIONS: Migration[] = [
       // it but no card has ever used one. The only six non-empty values are
       // LM-057…062, each a labelled copy of the security effect those cards
       // already have in the right column.
-      db.exec(`UPDATE cards SET source_effect = NULL WHERE source_effect IS NOT NULL`);
+      db.exec(
+        `UPDATE cards SET source_effect = NULL WHERE source_effect IS NOT NULL`,
+      );
     },
   },
   {
@@ -1192,6 +1194,69 @@ const MIGRATIONS: Migration[] = [
         db.exec(
           "ALTER TABLE user.decks ADD COLUMN import_report TEXT DEFAULT NULL",
         );
+      }
+    },
+  },
+  {
+    id: 39,
+    name: "merge zero-padding twins in cards (RB1-10 / RB1-010)",
+    up: (db) => {
+      // digimoncard.io lists one card twice under differently padded numbers:
+      // RB1-10 and RB1-010 are both Siriusmon, and the short one carries
+      // `rarity: "Unknown"`. sync-cards drops a spelling that collides with a
+      // card we already have — but a database built from nothing sees both as
+      // new, so the NAS imported both and has been showing the ghost ever
+      // since. (The importer now collapses them inside the batch too.)
+      //
+      // Which one survives: the one an OFFICIAL source knows about, i.e. the
+      // one with a `ja` row in card_translations. The ghost has none, which is
+      // also why it only ever showed up in English.
+      const twins = db
+        .prepare(
+          `SELECT a.id AS loser, b.id AS keeper, a.code AS loser_code
+             FROM cards a
+             JOIN cards b
+               ON b.code <> a.code
+              AND substr(b.code, 1, instr(b.code, '-') - 1)
+                = substr(a.code, 1, instr(a.code, '-') - 1)
+              AND CAST(substr(b.code, instr(b.code, '-') + 1) AS INTEGER)
+                = CAST(substr(a.code, instr(a.code, '-') + 1) AS INTEGER)
+              AND a.code GLOB '*-[0-9]*'
+              AND b.code GLOB '*-[0-9]*'
+            WHERE NOT EXISTS (SELECT 1 FROM card_translations t
+                               WHERE t.code = a.code AND t.lang = 'ja')
+              AND EXISTS (SELECT 1 FROM card_translations t
+                           WHERE t.code = b.code AND t.lang = 'ja')`,
+        )
+        .all() as { loser: string; keeper: string; loser_code: string }[];
+      for (const t of twins) {
+        // Re-point anything of the user's that already refers to the ghost
+        // rather than dropping it on the floor. OR IGNORE covers the deck that
+        // somehow holds both spellings; the DELETE then clears the leftover.
+        for (const sql of [
+          `UPDATE OR IGNORE user.deck_cards SET card_id = ? WHERE card_id = ?`,
+          `UPDATE OR IGNORE user.deck_adjustments SET card_id = ? WHERE card_id = ?`,
+          `UPDATE OR IGNORE user.card_collection SET card_id = ? WHERE card_id = ?`,
+          `UPDATE OR IGNORE user.card_prices SET card_id = ? WHERE card_id = ?`,
+        ]) {
+          db.prepare(sql).run(t.keeper, t.loser);
+        }
+        for (const sql of [
+          `DELETE FROM user.deck_cards WHERE card_id = ?`,
+          `DELETE FROM user.deck_adjustments WHERE card_id = ?`,
+          `DELETE FROM user.card_collection WHERE card_id = ?`,
+          `DELETE FROM user.card_prices WHERE card_id = ?`,
+          `DELETE FROM external_prices WHERE card_id = ?`,
+          `DELETE FROM external_listings WHERE card_id = ?`,
+        ]) {
+          db.prepare(sql).run(t.loser);
+        }
+        db.prepare(`DELETE FROM card_images WHERE code = ?`).run(t.loser_code);
+        db.prepare(`DELETE FROM card_translations WHERE code = ?`).run(
+          t.loser_code,
+        );
+        db.prepare(`DELETE FROM cards WHERE id = ?`).run(t.loser);
+        console.log(`[db] merged ${t.loser_code} into ${t.keeper}`);
       }
     },
   },
