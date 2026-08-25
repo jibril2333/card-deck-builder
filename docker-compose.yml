@@ -46,3 +46,5 @@ services:
       # it to $HOME/card-deck-builder/data.nosync. For local runs from the
       # project root, the default `./data.nosync` resolves correctly.
       - ${CDB_DATA_DIR:-./data.nosync}:/app/data.nosync
+      # Litestream's local replica — see docker-compose.nas.yml.
+      - ${CDB_BACKUP_DIR:-./data.nosync/litestream}:/app/backups

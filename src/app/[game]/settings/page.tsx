@@ -11,6 +11,7 @@ import { RefreshCardsPanel } from "@/components/refresh-cards-panel";
 import { RefreshSchedulePanel } from "@/components/refresh-schedule-panel";
 import { RefreshChangesPanel } from "@/components/refresh-changes-panel";
 import { NtfyPanel } from "@/components/ntfy-panel";
+import { BackupPanel } from "@/components/backup-panel";
 
 /**
  * One settings page, with the sections a person is allowed to see.
@@ -51,6 +52,7 @@ export default async function SettingsPage({
           <RefreshSchedulePanel />
           <RefreshChangesPanel />
           <NtfyPanel />
+          <BackupPanel />
         </>
       ) : null}
 

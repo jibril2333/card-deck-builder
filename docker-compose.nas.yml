@@ -66,6 +66,10 @@ services:
       retries: 3
     volumes:
       - ${CDB_DATA_DIR:?set CDB_DATA_DIR to the dataset holding the SQLite files}:/app/data.nosync
+      # Litestream's local replica. Point this at a DIFFERENT dataset from the
+      # one above: a copy that dies with the thing it is copying is decoration.
+      # The off-site copy (R2) is configured in the settings page, not here.
+      - ${CDB_BACKUP_DIR:-./backups}:/app/backups
 
   # Takes a new build without anything reaching into the NAS from outside.
   #

@@ -43,6 +43,12 @@ RUN npx esbuild scripts/*.ts \
       --outdir=scripts-dist --external:better-sqlite3 \
       --tsconfig=tsconfig.json --log-level=warning
 
+# ---- litestream: the continuous backup, pinned ----
+# Its official image is multi-arch, and each architecture of ours is built on a
+# machine of that architecture, so this resolves to the right binary without a
+# per-arch download URL to keep in sync.
+FROM litestream/litestream:0.5.16 AS litestream
+
 # ---- runner: copy only the standalone output + static assets ----
 FROM base AS runner
 WORKDIR /app
@@ -68,6 +74,10 @@ COPY --chown=nextjs:nodejs docker/entrypoint.sh ./entrypoint.sh
 # never baked into the image. Create the mountpoint so it exists even if the
 # compose volume is momentarily absent.
 RUN mkdir -p /app/data.nosync && chown nextjs:nodejs /app/data.nosync
+# Continuous backup. The replica directory is a mountpoint like the data dir:
+# a backup inside the dataset it is backing up is not a backup.
+COPY --from=litestream /usr/local/bin/litestream /usr/local/bin/litestream
+RUN mkdir -p /app/backups && chown nextjs:nodejs /app/backups
 
 # Which commit this image was built from. Declared HERE, at the very end, so a
 # new SHA invalidates only this one tiny layer — put it earlier and every build

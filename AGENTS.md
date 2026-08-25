@@ -239,6 +239,44 @@ Note the ntfy container running on THIS Mac (`127.0.0.1:8093`) is not
 necessarily the one behind `ntfy.raynefall.dev` — that server was moved to
 another machine. Point the settings at the real one.
 
+### Backups (Litestream)
+
+The user database — decks, collection, prices, accounts — is replicated
+continuously by **Litestream**, started by `docker/entrypoint.sh` and supervised
+by `scripts/backup-daemon.ts`. Two replicas:
+
+- **local**, always on, no configuration: `/app/backups`, which compose maps to
+  `CDB_BACKUP_DIR`. **Point that at a different dataset from the databases** —
+  a copy that dies with the thing it copies is decoration.
+- **off-site (Cloudflare R2 or any S3 bucket)**, configured in 设置 → 备份. The
+  page writes `data.nosync/backup.json` (0600, holds a key pair); the daemon
+  turns it into `litestream.yml` and restarts replication. Same
+  app-writes-a-file, daemon-reads-it arrangement as the ntfy settings, and for
+  the same reason: this container has no Docker socket and can't restart a
+  sidecar.
+
+Timings live in `src/lib/backup-config.ts`. Sync is per replica (1s local, 10s
+R2 — that caps R2 at ~26k PUTs/month against a free tier of a million).
+**Snapshot interval and retention are global in Litestream 0.5**, not per
+replica, so both share one policy: 12h snapshots, 30 days kept.
+
+Two things the daemon does that a config file can't:
+
+- **Says whether it is working.** `backup-status.json` (what the panel shows)
+  carries the newest LTX timestamp from the local replica and the last ERROR
+  Litestream logged — an unreachable R2 keeps the process alive and the local
+  copy fresh, so nothing else would notice.
+- **Restores.** Once a week it restores the newest copy to a temp file, runs
+  `integrity_check` and counts decks. A backup nobody has restored is a rumour.
+  Failures (and a crash-looping Litestream) go to ntfy at priority 4.
+
+`node scripts-dist/backup-daemon.js --verify` runs that drill on demand.
+
+The user database is in **WAL** mode because of this (`connection.ts` sets it on
+the ATTACHed file; the bare `journal_mode = WAL` only covers the card DB).
+Litestream replicates by streaming the WAL — in rollback mode there is nothing
+to stream.
+
 ### ⚠️ A migration that touches `user.*` must be idempotent
 
 `PRAGMA user_version` lives on the **cards** database, but several migrations

@@ -39,6 +39,14 @@ if [ "${CDB_REFRESH_IN_CONTAINER:-0}" = "1" ]; then
   CDB_DATA_DIR="$DATA_DIR" CDB_SCRIPTS_DIR="$SCRIPTS" node "$SCRIPTS/refresh-daemon.js" &
 fi
 
+# Continuous backup (Litestream). Unconditional, unlike the refresh daemon:
+# replicating a database is safe wherever the container runs, and this is the
+# one piece of the deployment whose absence is invisible until the day it
+# matters. With nothing configured it replicates to the local directory only;
+# the settings page adds the off-site copy.
+echo "[entrypoint] starting backup daemon"
+CDB_DATA_DIR="$DATA_DIR" node "$SCRIPTS/backup-daemon.js" &
+
 # exec: the server becomes PID 1, so `docker stop` reaches it directly and
 # Next.js gets its SIGTERM instead of the shell swallowing it.
 exec node server.js

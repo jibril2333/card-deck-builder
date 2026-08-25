@@ -34,6 +34,12 @@ export function getDB(game: GameId): Database.Database {
     const userPath = GAMES[game].userDbPath;
     const escaped = userPath.replace(/'/g, "''");
     db.exec(`ATTACH DATABASE '${escaped}' AS user`);
+    // WAL on the ATTACHED file too. `journal_mode = WAL` above only applies to
+    // `main` (the card database), which left the file that actually matters —
+    // decks, collection, accounts — in rollback mode. Two consequences: it
+    // took a full journal write per change, and Litestream, which backs it up
+    // by streaming the WAL, had nothing to stream. See scripts/backup-daemon.
+    db.pragma("user.journal_mode = WAL");
     runMigrations(db);
     cache[game] = db;
   }
