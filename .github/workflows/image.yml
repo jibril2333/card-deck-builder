@@ -143,6 +143,13 @@ jobs:
   # Why Tailscale rather than a public webhook: the NAS has no inbound exposure
   # and this doesn't add any. The runner joins the tailnet as an EPHEMERAL,
   # TAGGED node for the length of the job and disappears; ACLs decide what
+  # The NAS's name comes from `secrets.NAS_HOST` when it exists, and only falls
+  # back to `vars.NAS_HOST`. Not a security control — it is a tailnet name,
+  # useless to anyone not on the tailnet — but this repo is PUBLIC, which makes
+  # its workflow LOGS public, and GitHub renders a variable into the script it
+  # echoes ( `[ -n "truenas" ]` ) while masking a secret ( `***` ). No reason
+  # to publish the name of a machine in someone's house.
+  #
   # tag:ci may reach, so the blast radius is one port on one host rather than
   # "the internet can ask my NAS to do things".
   #
@@ -167,11 +174,11 @@ jobs:
           # (any plan, expires after at most 90 days).
           if { [ -n "${{ secrets.TS_OAUTH_CLIENT_ID }}" ] || [ -n "${{ secrets.TS_AUTHKEY }}" ]; } \
              && [ -n "${{ secrets.NAS_WATCHTOWER_TOKEN }}" ] \
-             && [ -n "${{ vars.NAS_HOST }}" ]; then
+             && [ -n "${{ secrets.NAS_HOST || vars.NAS_HOST }}" ]; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "NAS 推送未配置(缺 TS_AUTHKEY 或 TS_OAUTH_CLIENT_ID / NAS_WATCHTOWER_TOKEN / vars.NAS_HOST)。"
+            echo "NAS 推送未配置(缺 TS_AUTHKEY 或 TS_OAUTH_CLIENT_ID / NAS_WATCHTOWER_TOKEN / NAS_HOST)。"
             echo "镜像已经推到 GHCR,NAS 会在下一次轮询时自己拉。"
           fi
 
@@ -191,13 +198,13 @@ jobs:
           args: --accept-dns=true
           # Fails here, with a clear message, rather than three steps later
           # inside a curl timeout.
-          ping: ${{ vars.NAS_HOST }}
+          ping: ${{ secrets.NAS_HOST || vars.NAS_HOST }}
 
       - name: Ask watchtower to update
         if: steps.check.outputs.ok == 'true'
         run: |
           set -e
-          NAS="${{ vars.NAS_HOST }}"
+          NAS="${{ secrets.NAS_HOST || vars.NAS_HOST }}"
           PORT="${{ vars.NAS_WATCHTOWER_PORT || '8080' }}"
           curl -fsS --max-time 120 \
             -H "Authorization: Bearer ${{ secrets.NAS_WATCHTOWER_TOKEN }}" \
@@ -207,7 +214,7 @@ jobs:
       - name: Wait for the NAS to serve THIS build
         if: steps.check.outputs.ok == 'true'
         run: |
-          NAS="${{ vars.NAS_HOST }}"
+          NAS="${{ secrets.NAS_HOST || vars.NAS_HOST }}"
           PORT="${{ vars.NAS_APP_PORT || '3001' }}"
           WANT="$(echo '${{ github.sha }}' | cut -c1-7)"
           # Two conditions, and the second one is the point: /api/health reads
