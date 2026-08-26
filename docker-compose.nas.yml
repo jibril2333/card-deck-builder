@@ -74,7 +74,7 @@ services:
       # writable by it — a freshly created dataset belongs to root, and
       # Litestream then fails every sync with `mkdir …: permission denied`:
       #   chown -R 1001:1001 "$CDB_BACKUP_DIR"
-      - ${CDB_BACKUP_DIR:-./backups}:/app/backups
+      - ${CDB_BACKUP_DIR:-cdb-backups}:/app/backups
 
   # Takes a new build without anything reaching into the NAS from outside.
   #
@@ -121,3 +121,11 @@ services:
       - "${CDB_WATCHTOWER_PORT:-8080}:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+# A NAMED volume, not a host path, as the default: Docker copies the image's
+# ownership onto a fresh named volume, so /app/backups is writable by uid 1001
+# without anyone being told to chown anything. Set CDB_BACKUP_DIR to a real
+# path (a different dataset from the databases) to keep the copy somewhere you
+# can see it — and chown it to 1001:1001 when you do.
+volumes:
+  cdb-backups:

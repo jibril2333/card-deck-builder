@@ -47,4 +47,12 @@ services:
       # project root, the default `./data.nosync` resolves correctly.
       - ${CDB_DATA_DIR:-./data.nosync}:/app/data.nosync
       # Litestream's local replica — see docker-compose.nas.yml.
-      - ${CDB_BACKUP_DIR:-./data.nosync/litestream}:/app/backups
+      - ${CDB_BACKUP_DIR:-cdb-backups}:/app/backups
+
+# A NAMED volume, not a host path, as the default: Docker copies the image's
+# ownership onto a fresh named volume, so /app/backups is writable by uid 1001
+# without anyone being told to chown anything. Set CDB_BACKUP_DIR to a real
+# path (a different dataset from the databases) to keep the copy somewhere you
+# can see it — and chown it to 1001:1001 when you do.
+volumes:
+  cdb-backups:

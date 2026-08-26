@@ -245,14 +245,24 @@ The user database — decks, collection, prices, accounts — is replicated
 continuously by **Litestream**, started by `docker/entrypoint.sh` and supervised
 by `scripts/backup-daemon.ts`. Two replicas:
 
-- **local**, always on, no configuration: `/app/backups`, which compose maps to
-  `CDB_BACKUP_DIR`. **Point that at a different dataset from the databases** —
-  a copy that dies with the thing it copies is decoration. The container runs
-  as **uid 1001**, so that directory must be writable by it
-  (`chown -R 1001:1001 "$CDB_BACKUP_DIR"`); a new dataset belongs to root and
-  Litestream fails every sync with `mkdir …: permission denied`. The daemon
-  checks this itself and puts the fix in the status line rather than letting
-  the panel show a raw error every 32 seconds.
+- **local**, always on, no configuration. It has to work for someone who just
+  pulled the image, so the daemon picks the directory itself every tick
+  (`pickReplicaDir`), in three cases:
+  - **`/app/backups` is mounted and writable** → use it. Compose defaults it to
+    a NAMED VOLUME, because Docker copies the image's ownership onto a fresh
+    named volume: writable by uid 1001 with nobody told to chown anything.
+  - **mounted but root-owned** (a bind mount at a new dataset — the normal
+    first mistake) → replicate into the data volume instead and put the fix in
+    the status line: `chown -R 1001:1001 "$CDB_BACKUP_DIR"`. A stranger who
+    never opens the settings page still ends up with a backup.
+  - **nothing mounted** (`docker run` with only a data volume) →
+    `<data>/backups/litestream`, and say that the copy shares a disk with the
+    database. Replicating into the image's own filesystem would be a backup
+    that disappears on the next redeploy.
+
+  Setting `CDB_BACKUP_DIR` to a path on a **different dataset** is still the
+  right answer for a real deployment; the defaults exist so the feature is
+  never silently off.
 - **off-site (Cloudflare R2 or any S3 bucket)**, configured in 设置 → 备份. The
   page writes `data.nosync/backup.json` (0600, holds a key pair); the daemon
   turns it into `litestream.yml` and restarts replication. Same

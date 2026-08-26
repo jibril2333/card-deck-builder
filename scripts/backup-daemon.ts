@@ -38,8 +38,19 @@ import { parseNtfyConfig, EMPTY_NTFY } from "../src/lib/ntfy-config";
 import { sendNtfy } from "../src/lib/refresh-notify";
 
 const DATA_DIR = process.env.CDB_DATA_DIR ?? "/app/data.nosync";
-/** Mapped by compose to a dataset OUTSIDE the one holding the database. */
-const BACKUP_DIR = process.env.CDB_BACKUP_DIR ?? "/app/backups";
+/**
+ * Where the local replica goes.
+ *
+ * `/app/backups` is where compose mounts something — a named volume by
+ * default, a dataset if the operator set CDB_BACKUP_DIR. `docker run` with
+ * neither mounts nothing, and replicating into the image's own filesystem is a
+ * backup that disappears with the next `docker compose up -d`. So when nothing
+ * is mounted there, the replica moves INSIDE the data volume: same disk as the
+ * database, which is the weaker arrangement, but it survives a redeploy and it
+ * is a real point-in-time restore. `pickReplicaDir` decides, every tick.
+ */
+const MOUNTPOINT = process.env.CDB_BACKUP_DIR ?? "/app/backups";
+const FALLBACK_DIR = path.join(DATA_DIR, "backups", "litestream");
 const USER_DB =
   process.env.CDB_DIGIMON_USER_DB ?? path.join(DATA_DIR, "digimon-user.db");
 const CONFIG_FILE = path.join(DATA_DIR, "backup.json");
@@ -98,18 +109,19 @@ function readConfig(): BackupConfig {
   }
 }
 
-/**
- * Can we actually write the replica?
- *
- * `/app/backups` is a bind mount, and the container runs as uid 1001. A host
- * directory owned by root is the normal state of a freshly created dataset, so
- * this is the first thing that goes wrong on a new deployment — and Litestream
- * reports it as `mkdir …: permission denied` every 32 seconds forever while
- * the panel says nothing useful. Checked here so the status line can say what
- * to do about it, and rechecked every tick so fixing it on the host recovers
- * on its own within a minute.
- */
-function replicaDirProblem(dir: string): string | null {
+/** Is this path a mount of its own, or just a directory in the image? */
+function isMountpoint(dir: string): boolean {
+  try {
+    const here = fs.statSync(dir);
+    const parent = fs.statSync(path.dirname(dir));
+    return here.dev !== parent.dev;
+  } catch {
+    return false;
+  }
+}
+
+/** Can we write here? Returns why not, in words someone can act on. */
+function whyNotWritable(dir: string): string | null {
   try {
     fs.mkdirSync(dir, { recursive: true });
     const probe = path.join(dir, ".write-probe");
@@ -120,10 +132,38 @@ function replicaDirProblem(dir: string): string | null {
     const code = (e as NodeJS.ErrnoException).code;
     const uid = typeof process.getuid === "function" ? process.getuid() : "?";
     if (code === "EACCES" || code === "EPERM") {
-      return `备份目录不可写:${dir}(容器里是 uid ${uid});在宿主机上 chown -R 1001:1001`;
+      return `${dir} 不可写(容器里是 uid ${uid});在宿主机上 chown -R 1001:1001`;
     }
-    return `备份目录用不了:${dir} — ${e instanceof Error ? e.message : String(e)}`;
+    return `${dir} 用不了 — ${e instanceof Error ? e.message : String(e)}`;
   }
+}
+
+/**
+ * The directory to replicate into, and what to say about it.
+ *
+ * Three cases, in the order they actually happen to people:
+ *   · a mount that works                 → use it, say nothing
+ *   · a mount that is root-owned         → fall back, and say how to fix it,
+ *     because a stranger who never opens the settings page should still end up
+ *     with a backup rather than with a log line
+ *   · nothing mounted (`docker run` with only a data volume) → fall back, and
+ *     say that the copy shares a disk with the database
+ */
+function pickReplicaDir(): { dir: string; note: string | null } {
+  const mounted = isMountpoint(MOUNTPOINT) || process.env.CDB_BACKUP_DIR;
+  if (mounted) {
+    const problem = whyNotWritable(MOUNTPOINT);
+    if (!problem) return { dir: MOUNTPOINT, note: null };
+    const fallback = whyNotWritable(FALLBACK_DIR);
+    if (fallback) return { dir: MOUNTPOINT, note: problem };
+    return { dir: FALLBACK_DIR, note: `${problem};暂时先备到数据目录里` };
+  }
+  const problem = whyNotWritable(FALLBACK_DIR);
+  if (problem) return { dir: FALLBACK_DIR, note: problem };
+  return {
+    dir: FALLBACK_DIR,
+    note: "副本和数据库在同一个卷 —— 挂一个 CDB_BACKUP_DIR 到别处更稳",
+  };
 }
 
 function haveBinary(): boolean {
@@ -254,8 +294,7 @@ function startChild(yaml: string) {
  * (0.5 dropped the old `snapshots` command; asking for it returns "unknown
  * command", which is how this first shipped reporting nothing at all.)
  */
-function readLocalLatest(): string | null {
-  const localDir = path.join(BACKUP_DIR, path.basename(USER_DB, ".db"));
+function readLocalLatest(localDir: string): string | null {
   const r = spawnSync(
     LITESTREAM,
     ["ltx", "-level", "all", `file://${localDir}`],
@@ -316,10 +355,6 @@ function runDrill(): { ok: boolean; message: string } {
 function tick() {
   const now = Date.now();
   const config = readConfig();
-  const wantYaml = toLitestreamYaml(config, {
-    db: USER_DB,
-    localDir: path.join(BACKUP_DIR, path.basename(USER_DB, ".db")),
-  });
 
   if (!haveBinary()) {
     status = {
@@ -344,20 +379,22 @@ function tick() {
     return;
   }
 
-  const localDir = path.join(BACKUP_DIR, path.basename(USER_DB, ".db"));
-  const problem = replicaDirProblem(localDir);
-  if (problem) {
+  const picked = pickReplicaDir();
+  const localDir = path.join(picked.dir, path.basename(USER_DB, ".db"));
+  const wantYaml = toLitestreamYaml(config, { db: USER_DB, localDir });
+  const blocked = whyNotWritable(localDir);
+  if (blocked) {
     // Don't start a process whose every sync will fail; say what's wrong once,
     // and pick it up again as soon as the host side is fixed.
     stopChild();
-    if (status.message !== problem) {
-      log(problem);
-      void notify("备份没在跑", problem);
+    if (status.message !== blocked) {
+      log(blocked);
+      void notify("备份没在跑", blocked);
     }
     status = {
       ...status,
       state: "failed",
-      message: problem,
+      message: blocked,
       since: null,
       localLatest: null,
       checkedAt: new Date().toISOString(),
@@ -379,7 +416,7 @@ function tick() {
   // ask again leaves the panel saying "还没有备份" for an hour after a restart.
   if (!status.localLatest || now - lastSnapshotCheck > SNAPSHOT_CHECK_MS) {
     lastSnapshotCheck = now;
-    status.localLatest = readLocalLatest();
+    status.localLatest = readLocalLatest(localDir);
   }
   // Only drill against a replica that has something in it, and never in the
   // first half hour of a run.
@@ -400,7 +437,11 @@ function tick() {
   status = {
     ...status,
     state: child ? "running" : "failed",
-    message: child ? "正在复制" : "litestream 没在跑",
+    message: child
+      ? picked.note
+        ? `正在复制 —— ${picked.note}`
+        : "正在复制"
+      : "litestream 没在跑",
     since: startedAt,
     restarts,
     r2: r2Ready(config) ? "on" : "off",
@@ -421,7 +462,9 @@ function main() {
     stopChild();
     process.exit(0);
   }
-  log(`watching ${CONFIG_FILE} — replicating ${USER_DB} to ${BACKUP_DIR}`);
+  log(
+    `watching ${CONFIG_FILE} — replicating ${USER_DB} to ${pickReplicaDir().dir}`,
+  );
   tick();
   setInterval(tick, TICK_MS);
   for (const sig of ["SIGTERM", "SIGINT"] as const) {
