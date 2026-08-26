@@ -70,10 +70,11 @@ services:
       # one above: a copy that dies with the thing it is copying is decoration.
       # The off-site copy (R2) is configured in the settings page, not here.
       #
-      # The container runs as uid 1001, so the directory on the host has to be
-      # writable by it — a freshly created dataset belongs to root, and
+      # Writable by the uid this container runs as — `user:` above, i.e.
+      # CDB_UID/CDB_GID (568 = TrueNAS's own apps user), NOT the 1001 baked
+      # into the image. A freshly created dataset belongs to root and
       # Litestream then fails every sync with `mkdir …: permission denied`:
-      #   chown -R 1001:1001 "$CDB_BACKUP_DIR"
+      #   chown -R "${CDB_UID:-568}:${CDB_GID:-568}" "$CDB_BACKUP_DIR"
       - ${CDB_BACKUP_DIR:-cdb-backups}:/app/backups
 
   # Takes a new build without anything reaching into the NAS from outside.
@@ -122,10 +123,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
-# A NAMED volume, not a host path, as the default: Docker copies the image's
-# ownership onto a fresh named volume, so /app/backups is writable by uid 1001
-# without anyone being told to chown anything. Set CDB_BACKUP_DIR to a real
-# path (a different dataset from the databases) to keep the copy somewhere you
-# can see it — and chown it to 1001:1001 when you do.
+# A NAMED volume, not a host path, as the default: a fresh named volume takes
+# the image directory's mode with it (1777), so it is writable whatever uid
+# `user:` runs this container as, and nobody has to chown anything. Set
+# CDB_BACKUP_DIR to a real path (a different dataset from the databases) to
+# keep the copy somewhere you can snapshot — and chown that path to the same
+# uid:gid as `user:` when you do.
 volumes:
   cdb-backups:

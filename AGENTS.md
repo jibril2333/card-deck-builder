@@ -250,10 +250,13 @@ by `scripts/backup-daemon.ts`. Two replicas:
   (`pickReplicaDir`), in three cases:
   - **`/app/backups` is mounted and writable** → use it. Compose defaults it to
     a NAMED VOLUME, because Docker copies the image's ownership onto a fresh
-    named volume: writable by uid 1001 with nobody told to chown anything.
-  - **mounted but root-owned** (a bind mount at a new dataset — the normal
+    named volume rather than leaving it root-owned.
+  - **mounted but not writable** (a bind mount at a new dataset — the normal
     first mistake) → replicate into the data volume instead and put the fix in
-    the status line: `chown -R 1001:1001 "$CDB_BACKUP_DIR"`. A stranger who
+    the status line, with the uid the container is ACTUALLY running as. Both
+    compose files override it (`user: "${CDB_UID:-568}:${CDB_GID:-568}"` on the
+    NAS — TrueNAS's apps user), so the 1001 in the image is not the answer;
+    `/app/backups` is 1777 in the image for the same reason. A stranger who
     never opens the settings page still ends up with a backup.
   - **nothing mounted** (`docker run` with only a data volume) →
     `<data>/backups/litestream`, and say that the copy shares a disk with the

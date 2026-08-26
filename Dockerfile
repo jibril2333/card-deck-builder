@@ -77,7 +77,11 @@ RUN mkdir -p /app/data.nosync && chown nextjs:nodejs /app/data.nosync
 # Continuous backup. The replica directory is a mountpoint like the data dir:
 # a backup inside the dataset it is backing up is not a backup.
 COPY --from=litestream /usr/local/bin/litestream /usr/local/bin/litestream
-RUN mkdir -p /app/backups && chown nextjs:nodejs /app/backups
+# 1777, not 0755 root-owned: a host may start this image as a uid of its own
+# choosing (TrueNAS and OpenShift both do), and then a directory owned by 1001
+# is not writable and the backup can't start. Sticky world-writable is what
+# /tmp uses and is safe here — nothing else in this container shares it.
+RUN mkdir -p /app/backups && chown nextjs:nodejs /app/backups && chmod 1777 /app/backups
 
 # Which commit this image was built from. Declared HERE, at the very end, so a
 # new SHA invalidates only this one tiny layer — put it earlier and every build

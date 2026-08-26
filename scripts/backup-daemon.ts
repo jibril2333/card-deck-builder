@@ -130,9 +130,14 @@ function whyNotWritable(dir: string): string | null {
     return null;
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
+    // The uid is asked for rather than assumed: compose starts this container
+    // as `${CDB_UID}:${CDB_GID}` (568:568 on TrueNAS, the host's own apps
+    // user), so "chown 1001" — the uid baked into the image — is advice that
+    // doesn't work on the machine reading it.
     const uid = typeof process.getuid === "function" ? process.getuid() : "?";
+    const gid = typeof process.getgid === "function" ? process.getgid() : "?";
     if (code === "EACCES" || code === "EPERM") {
-      return `${dir} 不可写(容器里是 uid ${uid});在宿主机上 chown -R 1001:1001`;
+      return `${dir} 不可写(容器里跑的是 ${uid}:${gid});在宿主机上 chown -R ${uid}:${gid}`;
     }
     return `${dir} 用不了 — ${e instanceof Error ? e.message : String(e)}`;
   }

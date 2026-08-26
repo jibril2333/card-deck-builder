@@ -49,10 +49,11 @@ services:
       # Litestream's local replica — see docker-compose.nas.yml.
       - ${CDB_BACKUP_DIR:-cdb-backups}:/app/backups
 
-# A NAMED volume, not a host path, as the default: Docker copies the image's
-# ownership onto a fresh named volume, so /app/backups is writable by uid 1001
-# without anyone being told to chown anything. Set CDB_BACKUP_DIR to a real
-# path (a different dataset from the databases) to keep the copy somewhere you
-# can see it — and chown it to 1001:1001 when you do.
+# A NAMED volume, not a host path, as the default: a fresh named volume takes
+# the image directory's mode with it (1777), so it is writable whatever uid
+# `user:` runs this container as, and nobody has to chown anything. Set
+# CDB_BACKUP_DIR to a real path (a different dataset from the databases) to
+# keep the copy somewhere you can snapshot — and chown that path to the same
+# uid:gid as `user:` when you do.
 volumes:
   cdb-backups:
