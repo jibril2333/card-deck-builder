@@ -1,7 +1,7 @@
 /**
  * The refresh pipeline's stages, once.
  *
- * `scripts/refresh-cards.sh` is the authority — it's what actually runs, and
+ * `scripts/refresh-daemon.ts` runs these — it's what actually runs, and
  * `--list` prints this same set. The API and the admin panel used to each keep
  * their own copy of it, and both copies were missing `keywords`: the button
  * could never trigger that stage, and a comment claiming to mirror `--list`
@@ -22,12 +22,12 @@ export type RefreshStage = {
    * in-container daemon (scripts/refresh-daemon.ts) needs the same mapping,
    * and two copies of "which scraper is the text stage" is exactly the kind of
    * thing that goes stale — `tests/refresh-stages.test.ts` compares this list
-   * against what the shell actually invokes.
+   * against the files that exist in scripts/.
    */
   scripts: string[];
 };
 
-/** Order matches `refresh-cards.sh`'s ALL_STAGES, which is also run order. */
+/** Declaration order IS run order — the daemon walks this list. */
 export const REFRESH_STAGES: RefreshStage[] = [
   {
     id: "cards",
@@ -46,7 +46,7 @@ export const REFRESH_STAGES: RefreshStage[] = [
     label: "中/日文",
     hint: "翻译文本 + 中文卡面",
     // Order matters: the official EN site repairs what the community mirror
-    // got structurally wrong, and JP gets the final word. See refresh-cards.sh.
+    // got structurally wrong, and JP gets the final word.
     scripts: [
       "scrape-digimon-metadata.ts",
       "scrape-digimon-cn.ts",

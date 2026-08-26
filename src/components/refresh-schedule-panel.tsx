@@ -35,6 +35,8 @@ function fmt(iso?: string | null) {
 export function RefreshSchedulePanel() {
   const [schedule, setSchedule] = useState<RefreshSchedule>(DEFAULT_SCHEDULE);
   const [state, setState] = useState<State>({});
+  /** The zone the daemon evaluates "04:30" in — see the schedule route. */
+  const [timezone, setTimezone] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -43,11 +45,14 @@ export function RefreshSchedulePanel() {
   useEffect(() => {
     let alive = true;
     fetch("/api/admin/schedule")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((r) =>
+        r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
+      )
       .then((j) => {
         if (!alive) return;
         setSchedule(j.schedule);
         setState(j.state ?? {});
+        setTimezone(typeof j.timezone === "string" ? j.timezone : "");
         setLoaded(true);
       })
       .catch(() => alive && setError("读取排程失败"));
@@ -123,7 +128,9 @@ export function RefreshSchedulePanel() {
               className={field}
               value={schedule.frequency}
               onChange={(e) =>
-                patch({ frequency: e.target.value === "daily" ? "daily" : "weekly" })
+                patch({
+                  frequency: e.target.value === "daily" ? "daily" : "weekly",
+                })
               }
               disabled={!schedule.enabled}
             >
@@ -174,8 +181,15 @@ export function RefreshSchedulePanel() {
                   </option>
                 ))}
               </select>
+              {/* The time is evaluated in the DAEMON's zone, which is a
+                  container's — UTC unless TZ says otherwise. Printing it is
+                  the difference between a schedule and a guess. */}
+              {timezone ? (
+                <span className="text-xs text-[var(--color-muted-fg)]">
+                  {timezone}
+                </span>
+              ) : null}
             </span>
-
           </div>
 
           <div>
@@ -213,9 +227,13 @@ export function RefreshSchedulePanel() {
               {saving ? "保存中…" : "保存"}
             </button>
             {saved ? (
-              <span className="text-xs text-[var(--color-accent)]">{saved}</span>
+              <span className="text-xs text-[var(--color-accent)]">
+                {saved}
+              </span>
             ) : null}
-            {error ? <span className="text-xs text-red-500">{error}</span> : null}
+            {error ? (
+              <span className="text-xs text-red-500">{error}</span>
+            ) : null}
           </div>
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-[var(--color-muted-fg)] pt-1 border-t border-[var(--color-border)]">

@@ -77,3 +77,15 @@ test("turning it off disables the controls, and that survives a reload", async (
   await expect(after.getByRole("checkbox").first()).not.toBeChecked();
   await expect(after.getByRole("button", { name: "新卡" })).toBeDisabled();
 });
+
+test("says which time zone it is scheduling in", async ({ page }) => {
+  // "04:30" is arithmetic in the DAEMON's local time, and a container is on UTC
+  // unless TZ says otherwise — a schedule that doesn't name its zone is a
+  // schedule that silently means something else on someone else's machine.
+  await page.goto("/digimon/settings");
+  const box = page.getByRole("region", { name: "自动更新" });
+  const zone = await page.evaluate(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
+  await expect(box).toContainText(zone);
+});

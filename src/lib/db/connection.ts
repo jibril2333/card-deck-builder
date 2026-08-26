@@ -21,7 +21,7 @@ export function getDB(game: GameId): Database.Database {
       throw new Error(
         `数据库文件不存在: ${dbPath}\n` +
           `全新安装请先建库:npm run init-db(会建好 schema,再按提示跑一次 ` +
-          `scripts/refresh-cards.sh 拉卡表)。\n` +
+          `在容器里跑一次刷新拉卡表)。\n` +
           `已经有库的话,检查 ${ENV_VAR_NAME[game]} 环境变量(在项目根目录的 ` +
           `.env.local 里设置),或确认默认路径下的 .db 文件存在。`,
       );

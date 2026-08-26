@@ -345,7 +345,7 @@ async function main() {
     );
   }
   db.close();
-  // Exit non-zero so refresh-cards.sh aborts instead of swapping in a DB that
+  // Exit non-zero so the refresh aborts instead of carrying on with a DB that
   // is missing whatever the failing sets were supposed to contain.
   if (failed > 0) {
     console.error(`[jp] ${failed} set(s) failed the sanity gate`);

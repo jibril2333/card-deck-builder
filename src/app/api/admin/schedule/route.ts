@@ -8,15 +8,18 @@ import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
  * The automatic refresh's schedule.
  *
  * The app only writes a JSON file into the shared data volume; the clock that
- * reads it is either the host's `scripts/refresh-tick.ts` (Mac) or
- * `scripts/refresh-daemon.ts` inside the container (the published image). Same reason the manual button drops a
- * request file instead of running anything: this container is internet-facing
- * through the tunnel and has no business editing a launchd plist or calling
- * `launchctl`.
+ * reads it is `scripts/refresh-daemon.ts`, running beside the server in this
+ * same container. Same reason the manual button drops a request file instead
+ * of running anything itself: a route handler is not a scheduler, and the
+ * refresh takes an hour.
  *
- * GET also returns the host's computed state (next run, last run). Those can't
- * be worked out here — the container is on UTC and the machine is on JST, so a
- * "04:30" evaluated in this process is six and a half hours out.
+ * GET also returns the state the CLOCK computed (next run, last run) rather
+ * than working it out here: whichever process owns the schedule is the one
+ * whose local time "04:30" means, and it isn't necessarily this one.
+ *
+ * It also returns that process's time zone, because the panel is asking someone
+ * to type a time and the answer is meaningless without it. In the container
+ * that zone is whatever `TZ` says (compose sets it; unset would mean UTC).
  */
 export const dynamic = "force-dynamic";
 
@@ -43,7 +46,14 @@ export async function GET() {
     lastStartedAt?: string;
     checkedAt?: string;
   };
-  return Response.json({ schedule, state });
+  return Response.json({
+    schedule,
+    state,
+    // Both daemons run in this container, so this process's zone IS the
+    // schedule's zone. On the Mac deployment the host clock owns it, and the
+    // two are the same machine anyway.
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
 }
 
 export async function PUT(req: Request) {
@@ -68,7 +78,10 @@ export async function PUT(req: Request) {
     fs.renameSync(tmp, SCHEDULE_FILE);
   } catch (err) {
     console.error("[admin/schedule] write failed:", err);
-    return Response.json({ ok: false, error: "无法写入排程文件" }, { status: 500 });
+    return Response.json(
+      { ok: false, error: "无法写入排程文件" },
+      { status: 500 },
+    );
   }
 
   return Response.json({ ok: true, schedule });

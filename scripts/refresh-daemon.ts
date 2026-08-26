@@ -1,50 +1,33 @@
 /**
  * The card-data refresh, running INSIDE the container.
  *
- * The host-side pipeline (launchd → refresh-cards.sh) exists because of a
- * macOS-specific problem: the prod container bind-mounts the SQLite files
- * across the macOS↔VM boundary, where POSIX locks do NOT propagate, so a host
- * process writing the live database while the container has it open corrupts
- * the container's view. Everything about that script — scrape into a copy,
- * validate, stop the container, swap the file, start it again — is built
- * around not writing a database somebody else has open.
+ * The scrapers write the live database directly. That is what makes "download
+ * the image and everything works" possible at all: no Docker socket, no host
+ * scripts, no stop/start dance.
  *
- * On an ordinary Linux host (a NAS, a VPS, anyone who just pulled the image)
- * that problem doesn't exist: one kernel, one local filesystem, and SQLite's
- * locking works exactly as designed. So here the scrapers write the live
- * database directly, which is what makes "download the image and everything
- * works" possible at all — no Docker socket, no host scripts, no stop/start.
+ * ## What that costs, and what pays for it
  *
- * ## What is given up, and what replaces it
- *
- * Host mode can throw away a bad scrape wholesale, because nothing is live
- * until the swap. Here a scraper's writes land as they happen. Two things
- * stand in for that:
- *   · every scraper already refuses per set — `sanityOk` blocks a write when a
- *     set comes back empty or malformed, which is the failure that actually
+ * There is no staging copy to throw away, so a scraper's writes land as they
+ * happen. Two things stand in for the discarded-copy safety net:
+ *   · every scraper refuses per set — `sanityOk` blocks a write when a set
+ *     comes back empty or malformed, which is the failure that actually
  *     happens (see the BT26 entries in refresh.log for six days of it working);
  *   · a full snapshot is taken before each run, kept as `.refresh-before.db`.
  *     It is both the changelog's "before" side and a restore point.
  *
- * ## The precondition is the FILESYSTEM, not the process boundary
+ * ## The precondition is the FILESYSTEM
  *
- * "One kernel" is not enough — the database has to live on a filesystem whose
- * locks are real. Demonstrated the hard way while building this: two processes
- * INSIDE one container, on a macOS bind mount, produce
- * `SQLITE_CORRUPT: database disk image is malformed` within a minute, because
- * the file is still on the macOS side of Docker Desktop's boundary where
- * locking is emulated. The identical container against a Docker named volume
- * (the Linux VM's own ext4) scraped 4398 cards while serving pages, with zero
- * corruption.
+ * The database has to live on a filesystem whose locks are real. Demonstrated
+ * the hard way: two processes inside one container, on a macOS bind mount,
+ * produce `SQLITE_CORRUPT: database disk image is malformed` within a minute,
+ * because the file is still on the macOS side of Docker Desktop's boundary
+ * where locking is emulated. The identical container against a Docker named
+ * volume (the Linux VM's own ext4) scraped 4398 cards while serving pages,
+ * with zero corruption.
  *
- * So on Linux hosts: a bind mount to a local disk is fine. On macOS/Windows
- * Docker Desktop: use a named volume, or don't turn this on.
- *
- * ## Not enabled unless asked
- *
- * `CDB_REFRESH_IN_CONTAINER=1`. The Mac deployment leaves it off and keeps its
- * host pipeline — turning it on there would be the corruption bug, not a
- * feature.
+ * So: a Linux host with a local disk is fine — that is the NAS, and it is the
+ * deployment. On macOS/Windows Docker Desktop, use a named volume or leave
+ * `CDB_REFRESH_IN_CONTAINER` off.
  *
  *   node scripts-dist/refresh-daemon.js          # loop (the entrypoint's job)
  *   node scripts-dist/refresh-daemon.js --once cards sets   # run and exit

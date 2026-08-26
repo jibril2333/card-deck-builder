@@ -27,64 +27,49 @@ now ~17 s.
   copy and the stale `~/Desktop/Workspace/card-deck-builder` had to go via
   Finder.
 
-## Local servers
+## Where it runs
 
-- **3000** = dev (`npm run dev`) — start manually when developing.
-- **3001** = prod — runs in **Docker** (see "Production deployment" below).
-  This is what the Cloudflare tunnel serves.
+- **3000** = dev (`npm run dev`) on this Mac — start manually when developing.
+  It reads `data.nosync/`, which is a working copy: the real data lives on the
+  NAS. Nothing here serves anyone but you.
+- **Production is the NAS**, in Docker, behind the Cloudflare tunnel
+  (`deck.raynefall.dev`), reachable on the tailnet as `<NAS>:3001`.
+  `docker-compose.nas.yml` is the only compose file.
 
-Port 3001 is owned solely by the `card-deck-builder` Docker container. The old
-native-process prod flow (LaunchAgent `com.rei.card-deck-builder` →
-`scripts/serve-prod.sh` → `npm start`) used to fight it for that port; it has
-been retired, disabled, and **deleted** — plist, `serve-prod.sh` and
-`rebuild-prod.sh` are all gone. Don't reintroduce a second thing that binds
-3001. (`launchctl print-disabled gui/501` still lists the old label as
-disabled; that's a harmless leftover flag, not a service.)
-
-The container runs as **`user: "501:20"`** (the host owner) — see the comment in
-`docker-compose.yml`. This is required: the SQLite DBs are bind-mounted from the
-host and owned by uid 501, so the image's built-in `nextjs` (1001) user could
-only READ them and every write (deck edits, collection changes, scraper runs)
-would silently fail.
+The Mac used to run production too — a container on 3001, a self-hosted GitHub
+Actions runner, and two launchd agents driving the refresh. All of it is gone;
+`deploy.yml`, `docker-compose.yml`, `refresh-cards.sh`, `refresh-tick.ts` and
+`refresh-on-request.sh` went with it. **Don't reintroduce a host-side pipeline**
+— everything the deployment needs now lives inside the image, which is what
+lets someone else run this at all.
 
 **After a meaningful code change (feature / stage / bug-fix — not every Edit),
-just push to `main`** — a GitHub Actions workflow
-(`.github/workflows/deploy.yml`) running on a self-hosted runner on this same
-Mac rebuilds the Docker image and redeploys automatically:
+just push to `main`.** `.github/workflows/image.yml` builds both architectures,
+publishes to ghcr, and asks watchtower on the NAS to take the new image; it
+then waits until `/api/health` reports the SHA it just built, so a green run
+means that build is actually serving.
 
-1. `git push origin main` (only the repo owner can — sole collaborator).
-2. The push triggers `.github/workflows/deploy.yml` on the self-hosted runner
-   (registered as the user-level LaunchAgent
-   `~/Library/LaunchAgents/actions.runner.jibril2333-card-deck-builder.cdb-mac-mini.plist`,
-   itself always-on). It runs `docker compose build && docker compose up -d`,
-   waits for `:3001` to answer, then prunes dangling images.
-3. Watch it with `gh run watch` (or `gh run list` for recent runs). Verify
-   `docker ps` shows a freshly-`Created` container and `curl localhost:3001`
-   returns 200.
-
-**Do NOT add `pull_request` / `pull_request_target` triggers to that
-workflow.** This repo is public; a self-hosted runner executing untrusted PR
-code would hand out arbitrary code execution on this Mac. `push` to `main` is
-safe only because the owner is the sole collaborator with push access —
-re-verify that invariant (`gh api repos/{owner}/{repo}/collaborators`) before
-ever loosening the trigger.
-
-If dev (3000) needs the new code too: `kill` its parent `npm run dev` process
-and relaunch `npm run dev` in the background — that flow is unchanged.
+- Watch it with `gh run watch`, or check `curl -s <NAS>:3001/api/health`.
+- The runner is GitHub-hosted. **Never** add a self-hosted runner or a
+  `pull_request` trigger to a public repo — that hands arbitrary code execution
+  to anyone opening a PR.
+- Watchtower recreates the container from its EXISTING configuration plus the
+  new image. Mounts, `user:`, environment: none of those change until someone
+  runs `docker compose up -d` on the NAS.
 
 ## Refreshing card data
 
-**Use `scripts/refresh-cards.sh` — don't run scrapers by hand against the live
-DB.** It snapshots the DB, runs the scrapers against the COPY (every scraper
-honours `CDB_DATA_DIR`), validates the result (`integrity_check`, and the card
-count must not shrink), and only then stops the container for the ~3 seconds it
-takes to swap the file in. It rolls back automatically if the new DB fails its
-health check, and keeps the last 5 backups.
+**Go through the daemon — don't run scrapers by hand against a live DB.** It
+takes a full snapshot first (`.refresh-before.db`, the changelog's "before"
+side and a restore point), runs the stages in order, and writes progress where
+the settings page can read it.
 
 ```
-scripts/refresh-cards.sh                 # everything (prices make it ~1h)
-scripts/refresh-cards.sh cards text art  # pick stages
-scripts/refresh-cards.sh --list
+# on the NAS
+docker exec card-deck-builder node /app/scripts-dist/refresh-daemon.js --once
+docker exec card-deck-builder node /app/scripts-dist/refresh-daemon.js --once cards text art
+# from a checkout (dev database)
+npx tsx scripts/refresh-daemon.ts --once cards
 ```
 
 Stages: `cards` (discover/import new cards) · `text` (zh+ja) · `art` (en+ja alt
@@ -116,65 +101,40 @@ everything would rewrite **4287** image URLs to its own scans, lowercase
 official scrapers keep the cards they own, and this one only fills the gap
 where they are silent.
 
-Runs happen three ways:
-1. **Weekly** — LaunchAgent `com.rei.cdb-refresh-weekly`, Mondays 04:30.
-2. **The button** — `/[game]/admin` → "立即更新". The app only writes
-   `data.nosync/refresh-request`; the host agent `com.rei.cdb-refresh-watch`
-   (WatchPaths) picks it up and runs `scripts/refresh-on-request.sh`. **The
-   container deliberately has no Docker socket** — it's internet-facing through
-   the tunnel, so app-level RCE would otherwise mean host compromise. Don't
-   "simplify" this by mounting the socket.
-3. **By hand** — the command above.
+Runs happen three ways, all of them inside the container:
+1. **On a schedule** — `scripts/refresh-daemon.ts` ticks every minute and fires
+   when the settings page's schedule says so. That schedule is arithmetic in
+   LOCAL time, so the container needs `TZ` (compose sets it).
+2. **The button** — 设置 → "立即更新". The app only writes
+   `data.nosync/refresh-request`; the daemon picks it up on its next tick.
+   **The container deliberately has no Docker socket** — it is internet-facing
+   through the tunnel, so app-level RCE would otherwise mean host compromise.
+   Don't "simplify" this by mounting the socket.
+3. **By hand** — `docker exec <container> node /app/scripts-dist/refresh-daemon.js --once cards sets`.
 
-Admin access is an explicit allowlist, `CDB_ADMIN_EMAILS`, set in
-`~/card-deck-builder/.env.deploy` (host-only, gitignored, sourced by the deploy
-workflow). It fails closed: unset means nobody is an admin. Plain "logged in"
-is not enough — accounts go to friends, and a refresh restarts the container.
+Admin access is an explicit allowlist, `CDB_ADMIN_EMAILS`, set in the NAS's
+`.env`. It fails closed: unset means nobody is an admin. Plain "logged in" is
+not enough — accounts go to friends, and a refresh is an hour of scraping.
 
 Progress/results land in `data.nosync/refresh-status.json` (read by the admin
 UI) and `data.nosync/refresh.log`.
 
-### Two ways the refresh runs, and why they differ
+### The refresh writes the live database
 
-**On this Mac: the host drives it.** launchd ticks `scripts/refresh-tick.ts`
-every 15 minutes, which runs `scripts/refresh-cards.sh`, which scrapes into a
-COPY, validates it, stops the container, swaps the file in and starts it again.
-All of that shape comes from one fact: the SQLite files are bind-mounted across
-the macOS↔VM boundary where POSIX locks do NOT propagate (see the warning
-below), so a second process must never write a database the container has open.
-
-**In the image: the container drives it.** `scripts/refresh-daemon.ts`, started
-by `docker/entrypoint.sh` when `CDB_REFRESH_IN_CONTAINER=1`. On an ordinary
-Linux host there is one kernel and one local filesystem, SQLite's locking works
-as designed, and the scrapers write the live database directly — no copy, no
-swap, no Docker socket, nothing on the host at all. That is what makes the
+`scripts/refresh-daemon.ts` runs beside the server and the scrapers write the
+live file — no staging copy, no swap, no Docker socket. That is what makes the
 image self-contained: pull it, mount an empty directory, and the entrypoint
 creates the database while the daemon fills it.
 
-What container mode gives up is "throw the whole scrape away if it's bad",
-since writes land as they happen. Standing in for it: each scraper already
-refuses per set via `sanityOk` (the six days of `BT26: SANITY FAILED` in
-refresh.log are that working), and every run first writes a full snapshot to
-`.refresh-before.db`, which is both the changelog's "before" side and a restore
-point.
+What that gives up is "throw the whole scrape away if it turned out bad", since
+writes land as they happen. Standing in for it: each scraper already refuses
+per set (`sanityOk` blocks a write when a set comes back empty or malformed —
+six days of BT26 entries in refresh.log are it working), and a full snapshot is
+taken before every run as `.refresh-before.db`, which is both the changelog's
+"before" side and a restore point.
 
-**Do not turn `CDB_REFRESH_IN_CONTAINER` on for the Mac deployment.** There it
-is not a feature, it is the corruption bug.
-
-The precondition is the FILESYSTEM, not the process boundary — measured while
-building this. Two processes inside ONE container, writing a database on a
-macOS bind mount, hit `SQLITE_CORRUPT` within a minute; the same container
-against a Docker named volume (the Linux VM's own ext4) scraped 4398 cards
-while serving pages, zero corruption. On Linux, a bind mount to local disk is
-fine; on macOS/Windows Docker Desktop, use a named volume or leave the daemon
-off.
-
-The scripts are bundled into plain JS at image build time (esbuild, see the
-Dockerfile): the runtime image is Next's `standalone` output and has no tsx, no
-TypeScript and no devDependencies. `REFRESH_STAGES[].scripts` is the single
-list of which scraper belongs to which stage; `tests/refresh-stages.test.ts`
-checks it against the case block in refresh-cards.sh so host mode and container
-mode can't drift apart.
+The precondition is a filesystem whose locks are real — a Linux host with a
+local disk. See the warning below for what happens on a macOS bind mount.
 
 ### Prices are resumable; a redeploy will interrupt a refresh
 
@@ -196,8 +156,8 @@ that's about two minutes, and worth it to pick them up when they do appear.
 
 ### Push notifications (ntfy)
 
-`scripts/refresh-cards.sh` pushes to ntfy at the end of a run. Two cases, and
-only two:
+The refresh pushes to ntfy at the end of a run (`scripts/notify-refresh.ts`).
+Two cases, and only two:
 
 - **The data changed.** A banlist move raises the priority and leads the title,
   because it's the only change that can make a deck you already built illegal.
@@ -238,6 +198,27 @@ docker exec ntfy ntfy token add --expires=never --label="cdb refresh" card-deck-
 Note the ntfy container running on THIS Mac (`127.0.0.1:8093`) is not
 necessarily the one behind `ntfy.raynefall.dev` — that server was moved to
 another machine. Point the settings at the real one.
+
+### Running it on a LAN, and the container's clock
+
+Three things the published image needs told, and each one fails silently if it
+isn't:
+
+- **`CDB_INSECURE_COOKIES=1`** — only when the app is reached over plain http
+  (`http://nas:3001`). The image sets `NODE_ENV=production`, so the session
+  cookie carries `Secure`, and a browser DISCARDS a Secure cookie that arrives
+  over http: login succeeds, the site says you're signed out, nothing logs
+  anything. HTTPS in front (tunnel, reverse proxy) needs no flag and is the
+  better answer; this one is for a trusted LAN with no HTTPS to be had.
+- **`TZ`** — the refresh schedule is arithmetic in local time, and a container
+  is on UTC unless told otherwise, so "04:30" in the settings page fires at
+  13:30 JST. Both compose files set it (`CDB_TZ`, default Asia/Tokyo) and the
+  panel prints the zone it is scheduling in.
+- **`init: true`** — the entrypoint runs two daemons beside the server, which
+  is PID 1 and does not reap orphans. It also restarts them in a loop now: an
+  uncaught exception in either used to be invisible, because the health check
+  only knows about `/api/health` and would keep reporting a healthy site whose
+  backup had been stopped for weeks.
 
 ### Backups (Litestream)
 
@@ -311,30 +292,26 @@ current. 36 re-issues it. When you hit this: **add a new migration id** with a
 `hasColumn` guard rather than editing the old one, since already-correct
 databases must no-op.
 
-### ⚠️ NEVER write the SQLite DBs while the container is running
+### ⚠️ Two processes must not write one SQLite file across a Docker bind mount
 
-The prod container mounts `data.nosync/*.db` via a Docker **bind mount** (macOS
-host ↔ Linux VM). SQLite coordinates multi-process access with POSIX advisory
-(`fcntl`) locks, and **those locks do NOT propagate across that bind-mount
-boundary**. So if a host process (e.g. any `scripts/scrape-digimon-*.ts`,
-`sqlite3`, a migration) writes a DB in WAL mode while the container has it open,
-the two connections get inconsistent WAL/shm views and the container starts
-throwing `SQLITE_CORRUPT: database disk image is malformed` — even though
-`PRAGMA integrity_check` on the file is still `ok`. (Happened 2026-07-24 while
-back-filling promo cards; recovered by stopping the container + `wal_checkpoint`,
-no data lost — but don't rely on that.)
+SQLite coordinates multi-process access with POSIX advisory (`fcntl`) locks,
+and **those locks do NOT propagate across a macOS↔VM bind mount**. A host
+process (a scraper, `sqlite3`, a migration) writing a WAL-mode database that a
+container also has open gives the two connections inconsistent WAL/shm views,
+and the container starts throwing `SQLITE_CORRUPT: database disk image is
+malformed` — while `PRAGMA integrity_check` on the file still says `ok`.
+(Happened 2026-07-24 while back-filling promo cards; recovered by stopping the
+container + `wal_checkpoint`, no data lost — but don't rely on that.)
 
-**Safe procedure for any DB write (scrapers, migrations, manual SQL):**
-```
-docker stop card-deck-builder
-# … run the scraper / sqlite3 / migration on the host now (single process) …
-sqlite3 data.nosync/digimon.db      "PRAGMA wal_checkpoint(TRUNCATE);"
-sqlite3 data.nosync/digimon-user.db "PRAGMA wal_checkpoint(TRUNCATE);"
-docker start card-deck-builder
-```
-Data-only changes still don't need a git push (the container reads the mounted
-DB live once it's the only writer) — they just need the container **stopped**
-during the write.
+This is why the deployment is a Linux host with a local disk, where locking
+works as designed and the daemon writes the live file directly. It still
+matters here: if you ever run a container against `data.nosync/` on this Mac,
+stop it before touching those files from the shell, and
+`PRAGMA wal_checkpoint(TRUNCATE);` afterwards.
+
+On the NAS the equivalent rule is simpler — **don't reach into the dataset from
+the TrueNAS shell while the container is up.** Use the app, or stop the
+container first.
 
 ## Card data: the shape is NOT uniform
 
@@ -413,13 +390,15 @@ Read-only. Three-way (us / EN / JA), because two-way can't tell a bug from a
 decision. Run it after a refresh — it is the only thing that can answer "is
 anything else wrong?" with a number instead of a guess.
 
-### Manual Docker operations (rarely needed — CI does this automatically)
+### Manual Docker operations on the NAS (rarely needed — CI does this)
 
-- Rebuild + redeploy by hand: `docker compose build && docker compose up -d`
-- Logs: `docker compose logs -f`
-- The runner service: `cd ~/actions-runner && ./svc.sh status|start|stop`
-- **Known gap**: Docker Desktop's own "Start Docker Desktop when you log in"
-  setting is OFF. A full reboot will NOT bring the container back until
-  someone opens Docker Desktop (or flips that toggle in Docker Desktop →
-  Settings → General). Login-only restarts are unaffected — Docker Desktop
-  itself keeps running across those.
+Run these in the TrueNAS shell, from the directory holding
+`docker-compose.nas.yml` and its `.env`:
+
+- Take a new image now: `docker compose -f docker-compose.nas.yml pull && docker compose -f docker-compose.nas.yml up -d`
+- Apply a compose CHANGE (mounts, `user:`, `TZ`, `init`): the same command.
+  Watchtower alone will not — it reuses the running container's configuration.
+- Logs: `docker compose -f docker-compose.nas.yml logs -f` (the entrypoint, both
+  daemons and Litestream all log to stdout).
+- One-off refresh: `docker exec card-deck-builder node /app/scripts-dist/refresh-daemon.js --once cards sets`
+- Verify a restore: `docker exec card-deck-builder node /app/scripts-dist/backup-daemon.js --verify`

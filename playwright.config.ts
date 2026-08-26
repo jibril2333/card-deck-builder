@@ -22,6 +22,24 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 // ────────────────────────────────────────────────────────────────────────
 
 const E2E_DIR = path.join(os.tmpdir(), `cdb-e2e-${Date.now()}-${process.pid}`);
+
+// This file is evaluated more than once per run (the runner and the worker each
+// load it), so every run leaves one fixture directory behind that the teardown
+// — which only knows the last one — never removes. 425 of them were sitting in
+// /tmp when the disk filled up. Anything older than an hour cannot belong to a
+// live run.
+try {
+  for (const name of fs.readdirSync(os.tmpdir())) {
+    if (!name.startsWith("cdb-e2e-")) continue;
+    const dir = path.join(os.tmpdir(), name);
+    if (dir === E2E_DIR) continue;
+    if (Date.now() - fs.statSync(dir).mtimeMs > 60 * 60 * 1000) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+} catch {
+  // Housekeeping; never a reason to fail a run.
+}
 const FIXTURE_PATHS = {
   CDB_DIGIMON_DB: path.join(E2E_DIR, "digimon.db"),
   CDB_DIGIMON_USER_DB: path.join(E2E_DIR, "digimon-user.db"),

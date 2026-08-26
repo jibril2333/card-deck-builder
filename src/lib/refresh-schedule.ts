@@ -7,11 +7,14 @@
  * a nightly hour of scraping nobody asked for — and they want different
  * failure handling, so they no longer share one hardcoded plist.
  *
- * All of the arithmetic here is LOCAL time, and it is only ever evaluated on
- * the HOST. The container runs in UTC while the machine is on JST, so a "04:30"
- * computed inside the app would be six and a half hours off. `scripts/
- * refresh-tick.ts` runs this on the host and writes the resulting timestamps
- * out for the UI to display; the UI never computes them.
+ * All of the arithmetic here is LOCAL time — `setHours` on a Date — so "04:30"
+ * means 04:30 wherever this code is evaluated. That is the HOST on the macOS
+ * deployment — the CONTAINER, in scripts/refresh-daemon.ts. A container's
+ * local time is UTC unless
+ * something sets TZ. Both compose files therefore set `TZ` (default
+ * Asia/Tokyo), and the settings panel prints the zone it is scheduling in
+ * next to the time — a schedule that silently means something else is worse
+ * than one that says so.
  */
 
 export type RefreshFrequency = "daily" | "weekly";
@@ -23,7 +26,7 @@ export type RefreshSchedule = {
   weekday: number;
   hour: number;
   minute: number;
-  /** Stages the automatic run passes to refresh-cards.sh; empty = all of them. */
+  /** Stages the automatic run passes to the daemon; empty = all of them. */
   stages: string[];
 };
 

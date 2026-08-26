@@ -44,7 +44,14 @@ services:
     user: "${CDB_UID:-568}:${CDB_GID:-568}"
     ports:
       - "${CDB_PORT:-3001}:3001"
+    # Zombie reaping: the entrypoint keeps two daemons alive next to the
+    # server, and PID 1 (the server) does not reap the children they leave.
+    init: true
     environment:
+      # The refresh schedule is arithmetic in LOCAL time, and a container's
+      # local time is UTC unless this is set — "04:30" in the settings page
+      # would then be 13:30 here. Node reads TZ directly.
+      TZ: "${CDB_TZ:-Asia/Tokyo}"
       CDB_ADMIN_EMAILS: "${CDB_ADMIN_EMAILS:-}"
       # Run the card-data refresh inside this container: the schedule from the
       # admin page, and the 立即更新 button. Correct HERE and wrong on the Mac

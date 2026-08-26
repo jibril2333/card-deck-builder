@@ -4,7 +4,7 @@
  *   npx tsx scripts/notify-refresh.ts ok '<summary json>' [cardsBefore] [cardsAfter]
  *   npx tsx scripts/notify-refresh.ts failed '<stage>' [exitCode]
  *
- * Called by refresh-cards.sh at the very end of a run. It NEVER fails the
+ * Called by the refresh daemon at the very end of a run. It NEVER fails the
  * refresh: a scraped, validated, swapped-in database is not worth throwing
  * away because a notification didn't send, so every error path here logs and
  * exits 0.

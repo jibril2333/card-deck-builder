@@ -2,7 +2,9 @@
  * High-level auth API for Server Components and Server Actions.
  *
  * Cookie strategy:
- *   - HttpOnly + SameSite=Lax + Secure(in prod via Cloudflare Tunnel HTTPS).
+ *   - HttpOnly + SameSite=Lax + Secure. `Secure` is dropped only when
+ *     CDB_INSECURE_COOKIES=1, which is how a LAN install over plain http can
+ *     log in at all — see `sessionCookieSecure`.
  *   - Stores the session token (a random base64url string). Server-side
  *     state (user_id, expiry) lives in user.sessions; cookie itself is
  *     opaque so leakage doesn't leak the user_id.
@@ -18,7 +20,12 @@ import {
   findSession,
   findUserById,
 } from "./repo";
-import { SESSION_COOKIE, SESSION_TTL_MS, type User } from "./types";
+import {
+  SESSION_COOKIE,
+  SESSION_TTL_MS,
+  sessionCookieSecure,
+  type User,
+} from "./types";
 
 export async function setSessionCookie(userId: string): Promise<void> {
   const session = repoCreateSession(userId);
@@ -26,7 +33,7 @@ export async function setSessionCookie(userId: string): Promise<void> {
   jar.set(SESSION_COOKIE, session.id, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(),
     path: "/",
     expires: new Date(session.expires_at),
   });

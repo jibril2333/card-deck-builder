@@ -2,7 +2,7 @@
  * Apply pending schema migrations to a cards DB, outside the Next.js app.
  *
  * Why it exists: the app runs migrations on startup (src/lib/db/connection.ts),
- * but `scripts/refresh-cards.sh` scrapes into a COPY of the DB, and the
+ * but the refresh used to scrape into a COPY of the DB, and the
  * scrapers open that copy directly with better-sqlite3 — they never go through
  * the app, so nothing migrates it. That was fine while every new column
  * happened to reach production before the next refresh; it stops being fine

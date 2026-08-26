@@ -13,7 +13,7 @@
  *   npx tsx scripts/diff-refresh.ts <before.db> <after.db> [--run-at=ISO]
  *
  * Prints a one-line summary and writes it as JSON to stdout's last line, which
- * refresh-cards.sh folds into refresh-status.json.
+ * the refresh daemon folds into refresh-status.json.
  */
 
 import Database from "better-sqlite3";

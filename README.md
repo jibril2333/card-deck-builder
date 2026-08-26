@@ -47,12 +47,12 @@ npm run init-db          # 建 schema,跑完全部迁移;不会覆盖已存在�
 然后拉卡表 —— 这一步会访问官方站点,约 20 分钟:
 
 ```bash
-scripts/refresh-cards.sh cards sets text art keywords rulings restrictions
-scripts/refresh-cards.sh prices      # 价格另跑,约 1 小时
+npx tsx scripts/refresh-daemon.ts --once cards sets text art keywords rulings restrictions
+npx tsx scripts/refresh-daemon.ts --once prices   # 价格另跑,约 1 小时
 ```
 
-之后 `npm run dev` 就能用了。要看这套刷新流水线是怎么组织的(它跑在宿主机上
-而不是容器里,以及为什么),见 AGENTS.md。
+之后 `npm run dev` 就能用了。跑镜像的话这一步不用做:容器启动时会自己建库,刷新
+守护进程按设置页里的计划把卡表填上。
 
 ## 配置
 
@@ -159,8 +159,8 @@ scripts/
   scrape-ua-metadata.ts
   fill-missing-digimon-cards.ts
   restore-user-db.ts
-  refresh-cards.sh      # 更新编排：副本抓取 → 校验 → 秒级换库
-  refresh-on-request.sh # 后台按钮触发桥接（宿主机侧）
+  refresh-daemon.ts     # 容器内的刷新:定时 / 按钮 / --once
+  backup-daemon.ts      # 看着 Litestream,并每周真的恢复一次验证
 tests/
   *.test.ts             # vitest 单元测试
   e2e/

@@ -11,6 +11,22 @@ set -e
 DATA_DIR="${CDB_DATA_DIR:-/app/data.nosync}"
 SCRIPTS="${CDB_SCRIPTS_DIR:-/app/scripts-dist}"
 
+# Both daemons run BESIDE the server, which is PID 1, and nothing else is
+# watching them. An uncaught exception in either one is invisible: the health
+# check only knows about /api/health, so the site stays green while the backup
+# has been stopped for three weeks and the panel shows an ever-staler "正在
+# 复制". Restart them, with a pause so a daemon that fails instantly (bad
+# config, missing binary) doesn't spin.
+keep_alive() {
+  name="$1"
+  shift
+  while :; do
+    "$@"
+    echo "[entrypoint] $name exited ($?), restarting in 5s"
+    sleep 5
+  done
+}
+
 # A command given on the command line runs INSTEAD of the server, with none of
 # the bootstrap below — `docker run <image> ls scripts-dist`, or a one-off
 # `docker run <image> node /app/scripts-dist/refresh-daemon.js --once sets`.
@@ -36,7 +52,9 @@ fi
 # keeps its launchd pipeline. See scripts/refresh-daemon.ts.
 if [ "${CDB_REFRESH_IN_CONTAINER:-0}" = "1" ]; then
   echo "[entrypoint] starting refresh daemon"
-  CDB_DATA_DIR="$DATA_DIR" CDB_SCRIPTS_DIR="$SCRIPTS" node "$SCRIPTS/refresh-daemon.js" &
+  keep_alive "refresh daemon" \
+    env CDB_DATA_DIR="$DATA_DIR" CDB_SCRIPTS_DIR="$SCRIPTS" \
+      node "$SCRIPTS/refresh-daemon.js" &
 fi
 
 # Continuous backup (Litestream). Unconditional, unlike the refresh daemon:
@@ -45,7 +63,8 @@ fi
 # matters. With nothing configured it replicates to the local directory only;
 # the settings page adds the off-site copy.
 echo "[entrypoint] starting backup daemon"
-CDB_DATA_DIR="$DATA_DIR" node "$SCRIPTS/backup-daemon.js" &
+keep_alive "backup daemon" env CDB_DATA_DIR="$DATA_DIR" \
+  node "$SCRIPTS/backup-daemon.js" &
 
 # exec: the server becomes PID 1, so `docker stop` reaches it directly and
 # Next.js gets its SIGTERM instead of the shell swallowing it.

@@ -17,7 +17,7 @@
  * after that — the same runner the app uses on startup, so a fresh database
  * and a four-year-old one converge on exactly the same schema.
  *
- * It does NOT fetch any card data; that's `scripts/refresh-cards.sh`, and the
+ * It does NOT fetch any card data; that's the refresh daemon, and the
  * closing message says so. Two separate concerns, and one of them takes 20
  * minutes of somebody else's bandwidth.
  *
@@ -95,9 +95,9 @@ function main() {
   console.log(`[init-db] migrated to ${now} · ${tables} tables`);
   console.log(
     `\n下一步 — 把卡表拉下来(这一步会访问官方站点,约 20 分钟,不含价格):\n` +
-      `  scripts/refresh-cards.sh cards sets text art keywords rulings restrictions\n` +
+      `  node scripts-dist/refresh-daemon.js --once cards sets text art keywords rulings restrictions\n` +
       `价格另跑(约 1 小时):\n` +
-      `  scripts/refresh-cards.sh prices\n`,
+      `  node scripts-dist/refresh-daemon.js --once prices\n`,
   );
 }
 
