@@ -95,3 +95,32 @@ describe("toLitestreamYaml", () => {
     expect(yaml).toContain('secret-access-key: "$NOT_A_VARIABLE"');
   });
 });
+
+/**
+ * The daemon pipes Litestream's stdout into `backup.log`. Litestream logs a
+ * line per sync interval — one a second — so the filter that keeps those out
+ * of the file is the difference between a log and 180 MB a month. The regex
+ * lives in scripts/backup-daemon.ts; this pins its behaviour on real lines.
+ */
+describe("the litestream log filter", () => {
+  const noise = (l: string) => /msg="(replica sync|sync)"/.test(l);
+
+  it("drops the per-second heartbeat", () => {
+    expect(
+      noise(
+        'time=2026-08-26T17:01:05.148Z level=INFO msg="replica sync" system=store db=digimon-user.db replica=file txid.replica=000000000000000a txid.db=000000000000000a',
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps everything that says something", () => {
+    for (const line of [
+      'time=… level=INFO msg="snapshot complete" system=store db=digimon-user.db txid=1 size=70867',
+      'time=… level=INFO msg="compaction complete" system=store level=1',
+      'time=… level=ERROR msg="monitor error" error="write ltx file: mkdir /app/backups: permission denied"',
+      'time=… level=WARN msg="cannot connect to replica"',
+    ]) {
+      expect(noise(line), line).toBe(false);
+    }
+  });
+});

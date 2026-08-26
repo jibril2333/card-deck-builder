@@ -248,7 +248,15 @@ function startChild(yaml: string) {
   const pipe = (buf: Buffer) => {
     const text = buf.toString().trimEnd();
     if (!text) return;
-    log(`litestream: ${text}`);
+    // Litestream logs a "replica sync" line every sync interval — one a
+    // second, forever, whether or not anything changed. Piping those into a
+    // file grew backup.log by 27k lines in two hours (~180 MB a month) and
+    // told nobody anything: the panel already reports freshness from the
+    // replica itself. Keep the lifecycle lines and everything unusual.
+    const keep = text
+      .split("\n")
+      .filter((l) => !/msg="(replica sync|sync)"/.test(l));
+    if (keep.length) log(`litestream: ${keep.join("\n")}`);
     // An off-site replica that can't be reached says so here and nowhere else
     // — the process keeps running and the local replica keeps working, which
     // is exactly the failure that would otherwise go unnoticed.
