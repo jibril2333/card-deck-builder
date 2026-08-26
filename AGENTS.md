@@ -247,7 +247,12 @@ by `scripts/backup-daemon.ts`. Two replicas:
 
 - **local**, always on, no configuration: `/app/backups`, which compose maps to
   `CDB_BACKUP_DIR`. **Point that at a different dataset from the databases** —
-  a copy that dies with the thing it copies is decoration.
+  a copy that dies with the thing it copies is decoration. The container runs
+  as **uid 1001**, so that directory must be writable by it
+  (`chown -R 1001:1001 "$CDB_BACKUP_DIR"`); a new dataset belongs to root and
+  Litestream fails every sync with `mkdir …: permission denied`. The daemon
+  checks this itself and puts the fix in the status line rather than letting
+  the panel show a raw error every 32 seconds.
 - **off-site (Cloudflare R2 or any S3 bucket)**, configured in 设置 → 备份. The
   page writes `data.nosync/backup.json` (0600, holds a key pair); the daemon
   turns it into `litestream.yml` and restarts replication. Same

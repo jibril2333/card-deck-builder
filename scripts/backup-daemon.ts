@@ -98,6 +98,34 @@ function readConfig(): BackupConfig {
   }
 }
 
+/**
+ * Can we actually write the replica?
+ *
+ * `/app/backups` is a bind mount, and the container runs as uid 1001. A host
+ * directory owned by root is the normal state of a freshly created dataset, so
+ * this is the first thing that goes wrong on a new deployment — and Litestream
+ * reports it as `mkdir …: permission denied` every 32 seconds forever while
+ * the panel says nothing useful. Checked here so the status line can say what
+ * to do about it, and rechecked every tick so fixing it on the host recovers
+ * on its own within a minute.
+ */
+function replicaDirProblem(dir: string): string | null {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const probe = path.join(dir, ".write-probe");
+    fs.writeFileSync(probe, "");
+    fs.rmSync(probe, { force: true });
+    return null;
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    const uid = typeof process.getuid === "function" ? process.getuid() : "?";
+    if (code === "EACCES" || code === "EPERM") {
+      return `备份目录不可写:${dir}(容器里是 uid ${uid});在宿主机上 chown -R 1001:1001`;
+    }
+    return `备份目录用不了:${dir} — ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
 function haveBinary(): boolean {
   const r = spawnSync(LITESTREAM, ["version"], { stdio: "ignore" });
   return r.status === 0;
@@ -154,7 +182,6 @@ function stopChild() {
 }
 
 function startChild(yaml: string) {
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
   // 0600: the file holds the R2 secret.
   fs.writeFileSync(YAML_FILE, yaml, { mode: 0o600 });
   fs.chmodSync(YAML_FILE, 0o600);
@@ -311,6 +338,28 @@ function tick() {
       ...status,
       state: "off",
       message: "还没有用户数据库",
+      checkedAt: new Date().toISOString(),
+    };
+    writeJsonAtomic(STATUS_FILE, status);
+    return;
+  }
+
+  const localDir = path.join(BACKUP_DIR, path.basename(USER_DB, ".db"));
+  const problem = replicaDirProblem(localDir);
+  if (problem) {
+    // Don't start a process whose every sync will fail; say what's wrong once,
+    // and pick it up again as soon as the host side is fixed.
+    stopChild();
+    if (status.message !== problem) {
+      log(problem);
+      void notify("备份没在跑", problem);
+    }
+    status = {
+      ...status,
+      state: "failed",
+      message: problem,
+      since: null,
+      localLatest: null,
       checkedAt: new Date().toISOString(),
     };
     writeJsonAtomic(STATUS_FILE, status);
