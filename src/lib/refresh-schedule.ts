@@ -26,11 +26,32 @@ export type RefreshSchedule = {
   weekday: number;
   hour: number;
   minute: number;
-  /** IANA zone the hour/minute are in. "" = the evaluating process's zone. */
+  /** IANA zone the hour/minute are in. Never empty — see DEFAULT_TIMEZONE. */
   timezone: string;
   /** Stages the automatic run passes to the daemon; empty = all of them. */
   stages: string[];
 };
+
+/**
+ * Where the person reading the schedule lives. A schedule with no zone would
+ * mean "wherever the daemon happens to run", which is UTC in a container and
+ * is exactly the surprise this field exists to remove.
+ */
+export const DEFAULT_TIMEZONE = "Asia/Tokyo";
+
+/** The zones the panel offers, in the order it offers them. */
+export const TIMEZONE_CHOICES: { id: string; label: string }[] = [
+  { id: "Asia/Tokyo", label: "日本" },
+  { id: "Asia/Shanghai", label: "中国" },
+  { id: "Asia/Taipei", label: "台北" },
+  { id: "Asia/Seoul", label: "首尔" },
+  { id: "Asia/Singapore", label: "新加坡" },
+  { id: "Europe/London", label: "伦敦" },
+  { id: "Europe/Paris", label: "巴黎" },
+  { id: "America/New_York", label: "纽约" },
+  { id: "America/Los_Angeles", label: "洛杉矶" },
+  { id: "UTC", label: "UTC" },
+];
 
 /** What the pipeline did before it was configurable: Mondays at 04:30, everything. */
 export const DEFAULT_SCHEDULE: RefreshSchedule = {
@@ -39,7 +60,7 @@ export const DEFAULT_SCHEDULE: RefreshSchedule = {
   weekday: 1,
   hour: 4,
   minute: 30,
-  timezone: "",
+  timezone: DEFAULT_TIMEZONE,
   stages: [],
 };
 
@@ -80,13 +101,13 @@ export function parseSchedule(
     minute: Number.isFinite(o.minute as number)
       ? clamp(o.minute as number, 0, 59)
       : DEFAULT_SCHEDULE.minute,
-    // An unknown zone would throw on every tick deep inside Intl; "" falls
-    // back to the evaluating process's own zone, which is what this meant
-    // before the field existed.
+    // An unknown zone would throw on every tick deep inside Intl. A schedule
+    // written before this field existed gets the default rather than the
+    // container's idea of local time, which was the bug.
     timezone:
       typeof o.timezone === "string" && isKnownTimezone(o.timezone)
         ? o.timezone
-        : "",
+        : DEFAULT_TIMEZONE,
     stages: [...new Set(stages)],
   };
 }
@@ -102,9 +123,9 @@ export function isKnownTimezone(tz: string): boolean {
   }
 }
 
-/** The zone a schedule is written in — its own, or wherever this is running. */
+/** The zone a schedule is written in. */
 export function zoneOf(s: RefreshSchedule): string {
-  return s.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return s.timezone || DEFAULT_TIMEZONE;
 }
 
 type Wall = { y: number; mo: number; d: number; weekday: number };

@@ -78,44 +78,21 @@ test("turning it off disables the controls, and that survives a reload", async (
   await expect(after.getByRole("button", { name: "新卡" })).toBeDisabled();
 });
 
-test("says which time zone it is scheduling in", async ({ page }) => {
-  // "04:30" is arithmetic in the DAEMON's local time, and a container is on UTC
-  // unless TZ says otherwise — a schedule that doesn't name its zone is a
-  // schedule that silently means something else on someone else's machine.
+test("carries its own time zone", async ({ page }) => {
+  // "04:00" used to mean 04:00 wherever the daemon ran — UTC in a container,
+  // so a schedule typed as 04:00 fired at 13:00 JST. The zone is part of the
+  // schedule now, and it defaults to Japan.
   await page.goto("/digimon/settings");
   const box = page.getByRole("region", { name: "自动更新" });
-  const zone = await page.evaluate(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-  );
-  await expect(box).toContainText(zone);
-});
-
-test("schedules in a zone of its own, and says what that is on the server", async ({
-  page,
-}) => {
-  await page.goto("/digimon/settings");
-  const box = page.getByRole("region", { name: "自动更新" });
-  // The spec above leaves the schedule switched off; turn it back on so the
-  // controls are usable.
   await box.getByRole("checkbox").first().check();
   const zone = box.getByLabel("时区");
-  await expect(zone).toBeVisible();
+  await expect(zone).toHaveValue("Asia/Tokyo");
 
-  // Pick a zone that is deliberately not this machine's.
-  const server = await page.evaluate(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-  );
-  const other = server === "UTC" ? "Asia/Tokyo" : "UTC";
-  await box.getByLabel("小时").selectOption("4");
-  await box.getByLabel("分钟").selectOption("0");
-  await zone.selectOption(other);
-
-  // The equivalent on the server's clock is spelled out — that difference is
-  // what used to be silent.
-  await expect(box.getByText(/= 服务器 \d\d:\d\d/)).toBeVisible();
-
+  await zone.selectOption("UTC");
   await box.getByRole("button", { name: "保存" }).click();
   await expect(box.getByText(/已保存/)).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("region", { name: "自动更新" }).getByLabel("时区")).toHaveValue(other);
+  await expect(
+    page.getByRole("region", { name: "自动更新" }).getByLabel("时区"),
+  ).toHaveValue("UTC");
 });

@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { REFRESH_STAGES } from "@/lib/refresh-stages";
-import { DEFAULT_SCHEDULE, type RefreshSchedule } from "@/lib/refresh-schedule";
+import {
+  DEFAULT_SCHEDULE,
+  TIMEZONE_CHOICES,
+  type RefreshSchedule,
+} from "@/lib/refresh-schedule";
 
 type State = {
   describe?: string;
@@ -35,57 +39,6 @@ function fmt(iso?: string | null) {
 export function RefreshSchedulePanel() {
   const [schedule, setSchedule] = useState<RefreshSchedule>(DEFAULT_SCHEDULE);
   const [state, setState] = useState<State>({});
-  /** The zone the DAEMON runs in — see the schedule route. */
-  const [timezone, setTimezone] = useState("");
-
-  /**
-   * Zones to choose from. `supportedValuesOf` is every zone this browser
-   * knows (~400); the server's and the reader's are lifted to the top because
-   * those are the two anyone actually picks.
-   */
-  const zoneOptions = useMemo(() => {
-    const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const all =
-      typeof Intl.supportedValuesOf === "function"
-        ? Intl.supportedValuesOf("timeZone")
-        : [here, "UTC"];
-    const first = [timezone, here, "UTC"].filter(
-      (z, i, a): z is string => !!z && a.indexOf(z) === i,
-    );
-    return [...first, ...all.filter((z) => !first.includes(z))];
-  }, [timezone]);
-
-  /**
-   * The same instant on the SERVER's clock, when the two zones differ. This is
-   * the number that used to be silently wrong, so it is the one worth showing.
-   */
-  const serverEquivalent = useMemo(() => {
-    const zone = schedule?.timezone || timezone;
-    if (!zone || !timezone || zone === timezone) return "";
-    try {
-      // Any date will do — pick today, so DST is reflected as it is now.
-      const d = new Date();
-      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      const wall = new Date(
-        `${iso}T${String(schedule.hour).padStart(2, "0")}:${String(schedule.minute).padStart(2, "0")}:00`,
-      );
-      // Shift the naive wall time by the difference between the two zones.
-      const asZone = new Date(wall.toLocaleString("en-US", { timeZone: zone }));
-      const asServer = new Date(
-        wall.toLocaleString("en-US", { timeZone: timezone }),
-      );
-      const shifted = new Date(
-        wall.getTime() + (asServer.getTime() - asZone.getTime()),
-      );
-      return shifted.toLocaleTimeString("zh-CN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
-    } catch {
-      return "";
-    }
-  }, [schedule, timezone]);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -101,7 +54,6 @@ export function RefreshSchedulePanel() {
         if (!alive) return;
         setSchedule(j.schedule);
         setState(j.state ?? {});
-        setTimezone(typeof j.timezone === "string" ? j.timezone : "");
         setLoaded(true);
       })
       .catch(() => alive && setError("读取排程失败"));
@@ -230,31 +182,23 @@ export function RefreshSchedulePanel() {
                   </option>
                 ))}
               </select>
-              {/* The zone the time is written in. It rides along in the
-                  schedule, so it means the same thing wherever the daemon
-                  happens to run — and when that is a different zone from the
-                  server's, the equivalent is spelled out rather than left as
-                  a nine-hour surprise. */}
+              {/* The zone the time is written in — it rides along in the
+                  schedule, so 04:00 means 04:00 there wherever the daemon
+                  runs. A list of places, not of IANA identifiers: nobody
+                  schedules a card scrape by picking America/Argentina. */}
               <select
-                // A zone list is ~400 entries long and the widest of them
-                // would otherwise set the width of this row.
-                className={`${field} max-w-[11rem]`}
-                value={schedule.timezone || timezone}
+                className={field}
+                value={schedule.timezone}
                 onChange={(e) => patch({ timezone: e.target.value })}
                 disabled={!schedule.enabled}
                 aria-label="时区"
               >
-                {zoneOptions.map((z) => (
-                  <option key={z} value={z}>
-                    {z}
+                {TIMEZONE_CHOICES.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.label}
                   </option>
                 ))}
               </select>
-              {serverEquivalent ? (
-                <span className="text-xs text-[var(--color-muted-fg)]">
-                  = 服务器 {serverEquivalent}
-                </span>
-              ) : null}
             </span>
           </div>
 

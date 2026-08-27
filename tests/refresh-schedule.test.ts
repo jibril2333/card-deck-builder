@@ -5,6 +5,9 @@ import {
   dueSlot,
   nextRun,
   describeSchedule,
+  isKnownTimezone,
+  DEFAULT_TIMEZONE,
+  TIMEZONE_CHOICES,
   type RefreshSchedule,
 } from "@/lib/refresh-schedule";
 
@@ -188,30 +191,20 @@ describe("timezones", () => {
     expect(due.toISOString()).toBe("2026-08-28T00:00:00.000Z");
   });
 
-  it("refuses a zone this runtime doesn't know", () => {
-    expect(parseSchedule({ timezone: "Mars/Olympus" }).timezone).toBe("");
-    expect(parseSchedule({ timezone: 42 }).timezone).toBe("");
-    expect(parseSchedule({ timezone: "Asia/Tokyo" }).timezone).toBe(
-      "Asia/Tokyo",
-    );
+  it("falls back to the default zone rather than to the machine's", () => {
+    // A schedule from before this field existed, or with nonsense in it, is
+    // read as Japan — not as "whatever the container thinks local time is",
+    // which is UTC and was the bug.
+    for (const raw of [{}, { timezone: "Mars/Olympus" }, { timezone: 42 }]) {
+      expect(parseSchedule(raw).timezone).toBe(DEFAULT_TIMEZONE);
+    }
+    expect(parseSchedule({ timezone: "UTC" }).timezone).toBe("UTC");
   });
 
-  it("an empty zone means wherever it is evaluated", () => {
-    const local = {
-      ...DEFAULT_SCHEDULE,
-      frequency: "daily" as const,
-      hour: 4,
-      minute: 0,
-      timezone: "",
-    };
-    const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    expect(
-      nextRun(local, new Date("2026-08-27T06:00:00Z"))!.toISOString(),
-    ).toBe(
-      nextRun(
-        { ...local, timezone: here },
-        new Date("2026-08-27T06:00:00Z"),
-      )!.toISOString(),
-    );
+  it("every zone the panel offers is one Intl accepts", () => {
+    for (const z of TIMEZONE_CHOICES) {
+      expect(isKnownTimezone(z.id), z.id).toBe(true);
+      expect(z.label.length, z.id).toBeGreaterThan(0);
+    }
   });
 });

@@ -16,10 +16,6 @@ import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
  * GET also returns the state the CLOCK computed (next run, last run) rather
  * than working it out here: whichever process owns the schedule is the one
  * whose local time "04:30" means, and it isn't necessarily this one.
- *
- * It also returns that process's time zone, because the panel is asking someone
- * to type a time and the answer is meaningless without it. In the container
- * that zone is whatever `TZ` says (compose sets it; unset would mean UTC).
  */
 export const dynamic = "force-dynamic";
 
@@ -46,14 +42,7 @@ export async function GET() {
     lastStartedAt?: string;
     checkedAt?: string;
   };
-  return Response.json({
-    schedule,
-    state,
-    // Both daemons run in this container, so this process's zone IS the
-    // schedule's zone. On the Mac deployment the host clock owns it, and the
-    // two are the same machine anyway.
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  });
+  return Response.json({ schedule, state });
 }
 
 export async function PUT(req: Request) {
