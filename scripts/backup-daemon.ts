@@ -116,6 +116,30 @@ function readConfig(): BackupConfig {
   }
 }
 
+/**
+ * Litestream's own bookkeeping, next to the database.
+ *
+ * It records which LTX files the replica already has. Point the config at a
+ * DIFFERENT replica and that bookkeeping is about a place that no longer
+ * exists: every sync then fails with "open ltx file …: no such file or
+ * directory", forever, while the process stays up and looks healthy. Deleting
+ * it makes Litestream start the new replica from a fresh snapshot, which for
+ * a 400 KB database costs nothing.
+ */
+function stateDir(): string {
+  return path.join(
+    path.dirname(USER_DB),
+    `.${path.basename(USER_DB)}-litestream`,
+  );
+}
+
+function resetLitestreamState(why: string): void {
+  stopChild();
+  fs.rmSync(stateDir(), { recursive: true, force: true });
+  lastReset = Date.now();
+  log(`reset litestream state — ${why}`);
+}
+
 /** Is this path a mount of its own, or just a directory in the image? */
 function isMountpoint(dir: string): boolean {
   try {
@@ -214,6 +238,17 @@ let crashNotified = false;
 let lastSnapshotCheck = 0;
 let lastDrillAt = 0;
 let lastSnapshotTaken = 0;
+/** The replica the last run was writing to, read back from the status file. */
+let lastTarget: string = (() => {
+  try {
+    return (
+      (JSON.parse(fs.readFileSync(STATUS_FILE, "utf8")) as Status).target ?? ""
+    );
+  } catch {
+    return "";
+  }
+})();
+let lastReset = 0;
 const startedRunning = Date.now();
 let status: Status = {
   state: "off",
@@ -280,6 +315,14 @@ function startChild(yaml: string) {
         at: new Date().toISOString(),
         text: bad.slice(0, 300),
       };
+    // Self-heal the one error that never clears on its own. Rate-limited, so
+    // a genuinely broken replica doesn't turn into a reset loop.
+    if (
+      text.includes("LTX file is missing") &&
+      Date.now() - lastReset > 10 * 60_000
+    ) {
+      resetLitestreamState("replica state pointed at files that are gone");
+    }
   };
   proc.stdout?.on("data", pipe);
   proc.stderr?.on("data", pipe);
@@ -495,6 +538,14 @@ function tick() {
     return;
   }
 
+  const target = r2Ready(config)
+    ? `R2 ${config.r2.bucket}/${config.r2.prefix}`
+    : localDir;
+  if (lastTarget && lastTarget !== target) {
+    resetLitestreamState(`replica moved: ${lastTarget} → ${target}`);
+  }
+  lastTarget = target;
+
   // Config changed (or nothing is running): restart onto the new one.
   if (!child || wantYaml !== childYaml) {
     if (child) log("config changed — restarting replication");
@@ -550,9 +601,7 @@ function tick() {
     since: startedAt,
     restarts,
     r2: r2Ready(config) ? "on" : "off",
-    target: r2Ready(config)
-      ? `R2 ${config.r2.bucket}/${config.r2.prefix}`
-      : localDir,
+    target,
     snapshotLatest: snaps.latest,
     snapshotCount: snaps.count,
     checkedAt: new Date().toISOString(),
