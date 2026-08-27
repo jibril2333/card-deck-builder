@@ -226,36 +226,28 @@ The user database — decks, collection, prices, accounts — is replicated
 continuously by **Litestream**, started by `docker/entrypoint.sh` and supervised
 by `scripts/backup-daemon.ts`. Two replicas:
 
-- **local**, always on, no configuration. It has to work for someone who just
-  pulled the image, so the daemon picks the directory itself every tick
-  (`pickReplicaDir`), in three cases:
-  - **`/app/backups` is mounted and writable** → use it. Compose defaults it to
-    a NAMED VOLUME, because Docker copies the image's ownership onto a fresh
-    named volume rather than leaving it root-owned.
-  - **mounted but not writable** (a bind mount at a new dataset — the normal
-    first mistake) → replicate into the data volume instead and put the fix in
-    the status line, with the uid the container is ACTUALLY running as. Both
-    compose files override it (`user: "${CDB_UID:-568}:${CDB_GID:-568}"` on the
-    NAS — TrueNAS's apps user), so the 1001 in the image is not the answer;
-    `/app/backups` is 1777 in the image for the same reason. A stranger who
-    never opens the settings page still ends up with a backup.
-  - **nothing mounted** (`docker run` with only a data volume) →
-    `<data>/backups/litestream`, and say that the copy shares a disk with the
-    database. Replicating into the image's own filesystem would be a backup
-    that disappears on the next redeploy.
+**Litestream 0.5 allows exactly ONE replica per database** — configure two and
+it refuses to start with "multiple replicas on a single database are no longer
+supported", which is a dead backup, not a warning. So:
 
-  Setting `CDB_BACKUP_DIR` to a path on a **different dataset** is still the
-  right answer for a real deployment; the defaults exist so the feature is
-  never silently off.
-- **off-site (Cloudflare R2 or any S3 bucket)**, configured in 设置 → 备份. The
-  page writes `data.nosync/backup.json` (0600, holds a key pair); the daemon
-  turns it into `litestream.yml` and restarts replication. Same
-  app-writes-a-file, daemon-reads-it arrangement as the ntfy settings, and for
-  the same reason: this container has no Docker socket and can't restart a
-  sidecar.
+- **The replica is R2** when 设置 → 备份 has a bucket and a key pair, and a
+  local directory otherwise. Off-site wins, because same-machine is what the
+  snapshots below already cover.
+- **The local directory** (`/app/backups`, mapped by compose to
+  `CDB_BACKUP_DIR`) is picked by the daemon every tick (`pickReplicaDir`): the
+  mount if it is writable, otherwise `<data>/backups/litestream` with the fix
+  in the status line. It has to work for someone who just pulled the image, so
+  compose defaults it to a NAMED VOLUME — a fresh one takes the image
+  directory's mode (1777) and is writable whatever uid `user:` runs as.
+- **Hourly `VACUUM INTO` snapshots**, kept every hour for two days then one a
+  day for a month (~30 MB), in `<replica dir>/snapshots`. These are the copies
+  that need no credentials, no network and no Litestream to restore — `cp` is
+  enough — and they are what stands behind the off-site replica when the
+  off-site replica is the broken thing.
 
-Timings live in `src/lib/backup-config.ts`. Sync is per replica (1s local, 10s
-R2 — that caps R2 at ~26k PUTs/month against a free tier of a million).
+Timings live in `src/lib/backup-config.ts`. Sync depends on where the replica
+is (1s local, 10s R2 — that caps R2 at ~26k PUTs/month against a free tier of a
+million).
 **Snapshot interval and retention are global in Litestream 0.5**, not per
 replica, so both share one policy: 12h snapshots, 30 days kept.
 

@@ -1,16 +1,21 @@
 /**
  * Where the continuous backup goes, and by what right.
  *
- * Litestream watches the user database's WAL and copies every change to one or
- * more replicas. Two of them here:
+ * Litestream watches the user database's WAL and copies every change to ONE
+ * replica — 0.5 refuses to start with more than one ("multiple replicas on a
+ * single database are no longer supported"), which is how the first version of
+ * this shipped: it wrote a file replica AND an s3 replica, and the moment R2
+ * was configured the process died on startup.
  *
- *   · a LOCAL one, always on, no configuration — a directory on the host that
- *     the compose file maps somewhere outside the database's own dataset. It
- *     is the copy you can restore without credentials, a network, or a working
- *     Cloudflare account.
- *   · an OFF-SITE one on Cloudflare R2 (or any S3-compatible bucket), which is
- *     the only layer that survives losing the machine. It needs an endpoint, a
- *     bucket and a key pair, and those are the only things this file holds.
+ * So the replica is R2 when there is an R2 to write to, and a local directory
+ * otherwise — off-site beats same-machine, because same-machine is what the
+ * hourly snapshots below already cover.
+ *
+ * The snapshots are the other half: `backup-daemon.ts` also takes a plain
+ * `VACUUM INTO` copy every hour and keeps a month of them. Those need no
+ * credentials, no network and no Litestream to restore — `cp` is enough — and
+ * they are what stands behind the off-site replica when the off-site replica
+ * is the thing that's broken.
  *
  * Written by the settings page into `data.nosync/backup.json`, read by
  * scripts/backup-daemon.ts, which turns it into litestream.yml and supervises
@@ -47,7 +52,7 @@ export const EMPTY_BACKUP: BackupConfig = {
 /**
  * The agreed timings.
  *
- * `sync-interval` is per replica: the local copy is a file write, so it may as
+ * `sync-interval` depends on where the replica is: a local file write may as
  * well be every second; R2 is a billed PUT, so ten seconds — that caps it at
  * ~26k writes a month against a free tier of a million, and still means the
  * off-site copy is never more than ten seconds behind.
@@ -153,23 +158,27 @@ export function toLitestreamYaml(
     `  retention: ${SNAPSHOT_RETENTION}`,
     "dbs:",
     `  - path: ${q(paths.db)}`,
-    "    replicas:",
-    "      - type: file",
-    `        path: ${q(paths.localDir)}`,
-    `        sync-interval: ${LOCAL_SYNC_INTERVAL}`,
   ];
   if (r2Ready(config)) {
     const r = config.r2;
     lines.push(
-      "      - type: s3",
-      `        endpoint: ${q(r.endpoint)}`,
-      `        bucket: ${q(r.bucket)}`,
-      `        path: ${q(r.prefix)}`,
+      "    replica:",
+      "      type: s3",
+      `      endpoint: ${q(r.endpoint)}`,
+      `      bucket: ${q(r.bucket)}`,
+      `      path: ${q(r.prefix)}`,
       // R2 has one region and calls it this; a wrong region here is a 400.
-      '        region: "auto"',
-      `        access-key-id: ${q(r.accessKeyId)}`,
-      `        secret-access-key: ${q(r.secretAccessKey)}`,
-      `        sync-interval: ${R2_SYNC_INTERVAL}`,
+      '      region: "auto"',
+      `      access-key-id: ${q(r.accessKeyId)}`,
+      `      secret-access-key: ${q(r.secretAccessKey)}`,
+      `      sync-interval: ${R2_SYNC_INTERVAL}`,
+    );
+  } else {
+    lines.push(
+      "    replica:",
+      "      type: file",
+      `      path: ${q(paths.localDir)}`,
+      `      sync-interval: ${LOCAL_SYNC_INTERVAL}`,
     );
   }
   return lines.join("\n") + "\n";

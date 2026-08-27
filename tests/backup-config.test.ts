@@ -61,19 +61,29 @@ describe("maskSecret", () => {
 describe("toLitestreamYaml", () => {
   const paths = { db: "/app/data.nosync/digimon-user.db", localDir: "/app/backups/user" };
 
-  it("always writes the local replica, R2 only when it can connect", () => {
+  it("writes exactly ONE replica — 0.5 refuses more", () => {
+    // "multiple replicas on a single database are no longer supported" is a
+    // startup error, not a warning: with both a file and an s3 replica the
+    // process dies and the backup silently stops.
+    for (const yaml of [toLitestreamYaml(EMPTY_BACKUP, paths), toLitestreamYaml(full, paths)]) {
+      expect(yaml.match(/^\s*replicas?:/gm)).toHaveLength(1);
+      expect(yaml.match(/^\s+type: (file|s3)$/gm)).toHaveLength(1);
+    }
+  });
+
+  it("prefers R2 when it can connect, a directory when it can't", () => {
     const local = toLitestreamYaml(EMPTY_BACKUP, paths);
     expect(local).toContain("type: file");
+    expect(local).toContain("sync-interval: 1s");
     expect(local).not.toContain("type: s3");
 
-    const both = toLitestreamYaml(full, paths);
-    expect(both).toContain("type: s3");
-    expect(both).toContain('bucket: "cdb-backup"');
-    // The two agreed sync intervals, one per replica.
-    expect(both).toContain("sync-interval: 1s");
-    expect(both).toContain("sync-interval: 10s");
-    // Snapshot policy is global in Litestream 0.5 — one block, both replicas.
-    expect(both).toContain("snapshot:\n  interval: 12h\n  retention: 720h");
+    const off = toLitestreamYaml(full, paths);
+    expect(off).toContain("type: s3");
+    expect(off).toContain('bucket: "cdb-backup"');
+    expect(off).toContain("sync-interval: 10s");
+    expect(off).not.toContain("type: file");
+    // Snapshot policy is global in Litestream 0.5, not per replica.
+    expect(off).toContain("snapshot:\n  interval: 12h\n  retention: 720h");
   });
 
   it("keeps a hostile value inside its quotes", () => {

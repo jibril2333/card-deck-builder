@@ -61,6 +61,8 @@ const LITESTREAM = process.env.CDB_LITESTREAM_BIN ?? "litestream";
 
 const TICK_MS = 60_000;
 const SNAPSHOT_CHECK_MS = 60 * 60_000;
+/** How often the plain `VACUUM INTO` copy is taken. */
+const SNAPSHOT_EVERY_MS = 60 * 60_000;
 const DRILL_MS = 7 * 24 * 60 * 60_000;
 /** How long a fresh start gets before its first drill. A container that came
  *  up thirty seconds ago has nothing to restore yet, and shouting about that
@@ -77,8 +79,13 @@ type Status = {
   since: string | null;
   restarts: number;
   r2: "off" | "on";
-  /** Newest LTX file in the local replica — the freshness of the backup. */
-  localLatest: string | null;
+  /** Where the replica goes: the bucket, or a directory on this machine. */
+  target: string;
+  /** Newest LTX file in the replica — how far behind the off-site copy is. */
+  replicaLatest: string | null;
+  /** Newest plain `VACUUM INTO` copy, and how many are kept. */
+  snapshotLatest: string | null;
+  snapshotCount: number;
   /** Last ERROR Litestream logged, which is where an unreachable R2 shows up. */
   lastError: { at: string; text: string } | null;
   lastDrill: { at: string; ok: boolean; message: string } | null;
@@ -206,6 +213,7 @@ let recentCrashes: number[] = [];
 let crashNotified = false;
 let lastSnapshotCheck = 0;
 let lastDrillAt = 0;
+let lastSnapshotTaken = 0;
 const startedRunning = Date.now();
 let status: Status = {
   state: "off",
@@ -213,7 +221,10 @@ let status: Status = {
   since: null,
   restarts: 0,
   r2: "off",
-  localLatest: null,
+  target: "",
+  replicaLatest: null,
+  snapshotLatest: null,
+  snapshotCount: 0,
   lastError: null,
   lastDrill: null,
   checkedAt: new Date().toISOString(),
@@ -296,21 +307,21 @@ function startChild(yaml: string) {
 }
 
 /**
- * How fresh the local replica is, straight from Litestream.
+ * How fresh the replica is, straight from Litestream.
  *
  * `litestream ltx` lists the files that make up a replica, and the `created`
  * column is the only end-to-end evidence that bytes actually left this
- * process. Asked by REPLICA URL rather than by database path, because that
- * form reads the replica itself — and note it refuses `-config` when given a
- * URL ("cannot specify a replica URL and the -config flag").
+ * process. Asked by DATABASE path with `-config`, which reads whichever
+ * replica is configured — R2 or a directory — rather than by replica URL,
+ * which refuses `-config` and so has no credentials for a bucket.
  *
  * (0.5 dropped the old `snapshots` command; asking for it returns "unknown
  * command", which is how this first shipped reporting nothing at all.)
  */
-function readLocalLatest(localDir: string): string | null {
+function readReplicaLatest(): string | null {
   const r = spawnSync(
     LITESTREAM,
-    ["ltx", "-level", "all", `file://${localDir}`],
+    ["ltx", "-config", YAML_FILE, "-no-expand-env", "-level", "all", USER_DB],
     { encoding: "utf8" },
   );
   if (r.status !== 0) return null;
@@ -322,6 +333,74 @@ function readLocalLatest(localDir: string): string | null {
     .filter((t) => /^\d{4}-\d{2}-\d{2}T/.test(t))
     .sort();
   return times.length ? times[times.length - 1] : null;
+}
+
+/**
+ * A plain copy of the database, kept next to the machine.
+ *
+ * Litestream can only have ONE replica per database, and when that replica is
+ * R2 the local copy it used to write is gone. This is what stands in: a
+ * `VACUUM INTO` every hour, which needs no credentials, no network and no
+ * Litestream to restore — `cp` is enough — and is therefore the thing that
+ * still works when the off-site replica is what's broken.
+ *
+ * Kept: every hour for two days, then one a day for a month. At ~400 KB a
+ * copy that is about 30 MB.
+ */
+function takeSnapshot(dir: string): void {
+  fs.mkdirSync(dir, { recursive: true });
+  const now = new Date();
+  const stamp = now.toISOString().slice(0, 13).replace(/[:T]/g, "-"); // YYYY-MM-DD-HH
+  const dest = path.join(dir, `${stamp}.db`);
+  if (fs.existsSync(dest)) return;
+  const db = new Database(USER_DB, { readonly: true });
+  try {
+    db.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`);
+  } finally {
+    db.close();
+  }
+  pruneSnapshots(dir, now);
+}
+
+function pruneSnapshots(dir: string, now: Date): void {
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".db"))
+    .sort();
+  const keepDaily = new Set<string>();
+  for (const f of files) keepDaily.add(f.slice(0, 10)); // first of each day wins
+  const firstOfDay = new Set<string>();
+  for (const f of files) {
+    const day = f.slice(0, 10);
+    if (!firstOfDay.has(day)) firstOfDay.add(day + "|" + f);
+  }
+  const keep = new Set([...firstOfDay].map((k) => k.split("|")[1]));
+  for (const f of files) {
+    const age =
+      now.getTime() -
+      Date.parse(f.slice(0, 13).replace(/-(\d\d)$/, "T$1") + ":00:00Z");
+    const isDaily = keep.has(f);
+    const tooOld = isDaily ? age > 30 * 86_400_000 : age > 2 * 86_400_000;
+    if (tooOld) fs.rmSync(path.join(dir, f), { force: true });
+  }
+  void keepDaily;
+}
+
+function snapshotState(dir: string): { latest: string | null; count: number } {
+  try {
+    const files = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".db"))
+      .sort();
+    if (!files.length) return { latest: null, count: 0 };
+    const newest = files[files.length - 1];
+    return {
+      latest: fs.statSync(path.join(dir, newest)).mtime.toISOString(),
+      count: files.length,
+    };
+  } catch {
+    return { latest: null, count: 0 };
+  }
 }
 
 /**
@@ -409,7 +488,7 @@ function tick() {
       state: "failed",
       message: blocked,
       since: null,
-      localLatest: null,
+      replicaLatest: null,
       checkedAt: new Date().toISOString(),
     };
     writeJsonAtomic(STATUS_FILE, status);
@@ -427,17 +506,30 @@ function tick() {
   // Hourly once it is answering, but every tick until it does: the first
   // check runs before Litestream has written anything, and waiting an hour to
   // ask again leaves the panel saying "还没有备份" for an hour after a restart.
-  if (!status.localLatest || now - lastSnapshotCheck > SNAPSHOT_CHECK_MS) {
+  if (!status.replicaLatest || now - lastSnapshotCheck > SNAPSHOT_CHECK_MS) {
     lastSnapshotCheck = now;
-    status.localLatest = readLocalLatest(localDir);
+    status.replicaLatest = readReplicaLatest();
   }
+
+  // The plain copy, hourly. Independent of Litestream on purpose — it is what
+  // is left when the replica, the credentials or the network is the problem.
+  const snapDir = path.join(picked.dir, "snapshots");
+  if (now - lastSnapshotTaken > SNAPSHOT_EVERY_MS) {
+    lastSnapshotTaken = now;
+    try {
+      takeSnapshot(snapDir);
+    } catch (e) {
+      log(`snapshot failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  const snaps = snapshotState(snapDir);
   // Only drill against a replica that has something in it, and never in the
   // first half hour of a run.
   const drillDue =
     lastDrillAt === 0
       ? now - startedRunning > FIRST_DRILL_MS
       : now - lastDrillAt > DRILL_MS;
-  if (drillDue && status.localLatest) {
+  if (drillDue && status.replicaLatest) {
     lastDrillAt = now;
     const drill = runDrill();
     status.lastDrill = { at: new Date().toISOString(), ...drill };
@@ -451,13 +543,18 @@ function tick() {
     ...status,
     state: child ? "running" : "failed",
     message: child
-      ? picked.note
-        ? `正在复制 —— ${picked.note}`
-        : "正在复制"
+      ? r2Ready(config) || !picked.note
+        ? "正在复制"
+        : `正在复制 —— ${picked.note}`
       : "litestream 没在跑",
     since: startedAt,
     restarts,
     r2: r2Ready(config) ? "on" : "off",
+    target: r2Ready(config)
+      ? `R2 ${config.r2.bucket}/${config.r2.prefix}`
+      : localDir,
+    snapshotLatest: snaps.latest,
+    snapshotCount: snaps.count,
     checkedAt: new Date().toISOString(),
   };
   writeJsonAtomic(STATUS_FILE, status);

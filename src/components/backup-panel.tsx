@@ -21,7 +21,10 @@ type Status = {
   since: string | null;
   restarts: number;
   r2: "off" | "on";
-  localLatest: string | null;
+  target: string;
+  replicaLatest: string | null;
+  snapshotLatest: string | null;
+  snapshotCount: number;
   lastError: { at: string; text: string } | null;
   lastDrill: { at: string; ok: boolean; message: string } | null;
   checkedAt: string;
@@ -145,16 +148,18 @@ export function BackupPanel() {
         <span className="inline-flex items-center gap-1.5 text-xs text-[var(--color-muted-fg)]">
           <span className={`w-2 h-2 rounded-full ${dot}`} />
           {status ? status.message : "读取中…"}
-          {status?.state === "running" && status.r2 === "off"
-            ? "(仅本机)"
-            : null}
         </span>
       </div>
 
       {/* What the daemon has actually seen. Nothing here is typed by anyone. */}
       {status ? (
         <div className="text-xs text-[var(--color-muted-fg)] space-y-0.5">
-          <div>本机副本 · {when(status.localLatest)}</div>
+          <div>
+            {status.target || "副本"} · {when(status.replicaLatest)}
+          </div>
+          <div>
+            本地快照 {status.snapshotCount} 份 · {when(status.snapshotLatest)}
+          </div>
           {status.lastError ? (
             <div className="text-amber-600 dark:text-amber-400">
               {when(status.lastError.at)} · {status.lastError.text}
