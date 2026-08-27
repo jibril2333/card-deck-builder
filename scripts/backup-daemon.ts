@@ -290,6 +290,10 @@ function startChild(yaml: string) {
   child = proc;
   childYaml = yaml;
   startedAt = new Date().toISOString();
+  // Ask the replica how fresh it is on the next tick rather than in an hour:
+  // a restart is exactly when the answer changes (new target, fresh state).
+  lastSnapshotCheck = 0;
+  status.replicaLatest = null;
 
   const pipe = (buf: Buffer) => {
     const text = buf.toString().trimEnd();
