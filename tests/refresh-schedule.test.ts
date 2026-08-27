@@ -47,7 +47,9 @@ describe("parseSchedule", () => {
 
 describe("dueSlot", () => {
   it("returns nothing while the schedule is off", () => {
-    expect(dueSlot(weekly({ enabled: false }), at("2026-08-14T12:00"))).toBeNull();
+    expect(
+      dueSlot(weekly({ enabled: false }), at("2026-08-14T12:00")),
+    ).toBeNull();
   });
 
   it("weekly: finds this week's slot once it has passed", () => {
@@ -62,7 +64,9 @@ describe("dueSlot", () => {
   });
 
   it("weekly: mid-week points back at Monday", () => {
-    expect(dueSlot(weekly(), at("2026-08-13T23:00"))).toEqual(at("2026-08-10T04:30"));
+    expect(dueSlot(weekly(), at("2026-08-13T23:00"))).toEqual(
+      at("2026-08-10T04:30"),
+    );
   });
 
   it("weekly: Sunday is weekday 7, not 0", () => {
@@ -91,7 +95,9 @@ describe("dueSlot", () => {
 
 describe("nextRun", () => {
   it("weekly advances by seven days", () => {
-    expect(nextRun(weekly(), at("2026-08-10T12:00"))).toEqual(at("2026-08-17T04:30"));
+    expect(nextRun(weekly(), at("2026-08-10T12:00"))).toEqual(
+      at("2026-08-17T04:30"),
+    );
   });
 
   it("daily advances by one", () => {
@@ -100,12 +106,18 @@ describe("nextRun", () => {
   });
 
   it("is null while off", () => {
-    expect(nextRun(weekly({ enabled: false }), at("2026-08-14T06:00"))).toBeNull();
+    expect(
+      nextRun(weekly({ enabled: false }), at("2026-08-14T06:00")),
+    ).toBeNull();
   });
 
   it("is always in the future", () => {
     const s = weekly();
-    for (const t of ["2026-08-10T04:29", "2026-08-10T04:30", "2026-08-10T04:31"]) {
+    for (const t of [
+      "2026-08-10T04:29",
+      "2026-08-10T04:30",
+      "2026-08-10T04:31",
+    ]) {
       expect(nextRun(s, at(t))!.getTime()).toBeGreaterThan(at(t).getTime());
     }
   });
@@ -119,5 +131,87 @@ describe("describeSchedule", () => {
     );
     expect(describeSchedule(weekly({ frequency: "daily" }))).toBe("每天 04:30");
     expect(describeSchedule(weekly({ enabled: false }))).toBe("已关闭");
+  });
+});
+
+/**
+ * The zone the schedule is written in.
+ *
+ * The daemon runs in a container, and a container is on UTC unless TZ says
+ * otherwise — a schedule typed as 04:00 fired at 13:30 JST. Carrying the zone
+ * in the schedule makes it mean what it says on any machine, and lets someone
+ * schedule in a zone that isn't the server's at all.
+ */
+describe("timezones", () => {
+  const daily = (tz: string, hour = 4): RefreshSchedule => ({
+    ...DEFAULT_SCHEDULE,
+    frequency: "daily",
+    hour,
+    minute: 0,
+    timezone: tz,
+  });
+
+  it("fires at the wall-clock time OF ITS ZONE", () => {
+    // 04:00 in Tokyo is 19:00 UTC the day before.
+    const next = nextRun(
+      daily("Asia/Tokyo"),
+      new Date("2026-08-27T06:00:00Z"),
+    )!;
+    expect(next.toISOString()).toBe("2026-08-27T19:00:00.000Z");
+    // The same schedule written in UTC is a different instant.
+    const utc = nextRun(daily("UTC"), new Date("2026-08-27T06:00:00Z"))!;
+    expect(utc.toISOString()).toBe("2026-08-28T04:00:00.000Z");
+  });
+
+  it("keeps the wall time across a DST change", () => {
+    // US DST ends 2026-11-01. A 04:00 schedule stays 04:00 local on both
+    // sides of it — 08:00Z before, 09:00Z after — rather than drifting.
+    const tz = "America/New_York";
+    const before = nextRun(daily(tz), new Date("2026-10-30T12:00:00Z"))!;
+    expect(before.toISOString()).toBe("2026-10-31T08:00:00.000Z");
+    const after = nextRun(daily(tz), new Date("2026-11-02T12:00:00Z"))!;
+    expect(after.toISOString()).toBe("2026-11-03T09:00:00.000Z");
+  });
+
+  it("picks the right weekday in the schedule's zone, not the machine's", () => {
+    // 2026-08-27T15:00Z is still Thursday in UTC but already Friday in Tokyo.
+    const friday: RefreshSchedule = {
+      ...DEFAULT_SCHEDULE,
+      frequency: "weekly",
+      weekday: 5,
+      hour: 9,
+      minute: 0,
+      timezone: "Asia/Tokyo",
+    };
+    const due = dueSlot(friday, new Date("2026-08-28T01:00:00Z"))!;
+    // Friday 09:00 JST = Friday 00:00Z.
+    expect(due.toISOString()).toBe("2026-08-28T00:00:00.000Z");
+  });
+
+  it("refuses a zone this runtime doesn't know", () => {
+    expect(parseSchedule({ timezone: "Mars/Olympus" }).timezone).toBe("");
+    expect(parseSchedule({ timezone: 42 }).timezone).toBe("");
+    expect(parseSchedule({ timezone: "Asia/Tokyo" }).timezone).toBe(
+      "Asia/Tokyo",
+    );
+  });
+
+  it("an empty zone means wherever it is evaluated", () => {
+    const local = {
+      ...DEFAULT_SCHEDULE,
+      frequency: "daily" as const,
+      hour: 4,
+      minute: 0,
+      timezone: "",
+    };
+    const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(
+      nextRun(local, new Date("2026-08-27T06:00:00Z"))!.toISOString(),
+    ).toBe(
+      nextRun(
+        { ...local, timezone: here },
+        new Date("2026-08-27T06:00:00Z"),
+      )!.toISOString(),
+    );
   });
 });

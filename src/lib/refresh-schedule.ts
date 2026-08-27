@@ -26,6 +26,8 @@ export type RefreshSchedule = {
   weekday: number;
   hour: number;
   minute: number;
+  /** IANA zone the hour/minute are in. "" = the evaluating process's zone. */
+  timezone: string;
   /** Stages the automatic run passes to the daemon; empty = all of them. */
   stages: string[];
 };
@@ -37,6 +39,7 @@ export const DEFAULT_SCHEDULE: RefreshSchedule = {
   weekday: 1,
   hour: 4,
   minute: 30,
+  timezone: "",
   stages: [],
 };
 
@@ -51,17 +54,22 @@ const clamp = (n: number, lo: number, hi: number) =>
  * would stop the automatic refresh entirely, which is a worse failure than
  * running at the default time.
  */
-export function parseSchedule(raw: unknown, allowedStages?: string[]): RefreshSchedule {
+export function parseSchedule(
+  raw: unknown,
+  allowedStages?: string[],
+): RefreshSchedule {
   const o = (raw ?? {}) as Partial<Record<keyof RefreshSchedule, unknown>>;
   const freq: RefreshFrequency = o.frequency === "daily" ? "daily" : "weekly";
   const stages = Array.isArray(o.stages)
     ? o.stages.filter(
         (s): s is string =>
-          typeof s === "string" && (!allowedStages || allowedStages.includes(s)),
+          typeof s === "string" &&
+          (!allowedStages || allowedStages.includes(s)),
       )
     : DEFAULT_SCHEDULE.stages;
   return {
-    enabled: typeof o.enabled === "boolean" ? o.enabled : DEFAULT_SCHEDULE.enabled,
+    enabled:
+      typeof o.enabled === "boolean" ? o.enabled : DEFAULT_SCHEDULE.enabled,
     frequency: freq,
     weekday: Number.isFinite(o.weekday as number)
       ? clamp(o.weekday as number, 1, 7)
@@ -72,19 +80,117 @@ export function parseSchedule(raw: unknown, allowedStages?: string[]): RefreshSc
     minute: Number.isFinite(o.minute as number)
       ? clamp(o.minute as number, 0, 59)
       : DEFAULT_SCHEDULE.minute,
+    // An unknown zone would throw on every tick deep inside Intl; "" falls
+    // back to the evaluating process's own zone, which is what this meant
+    // before the field existed.
+    timezone:
+      typeof o.timezone === "string" && isKnownTimezone(o.timezone)
+        ? o.timezone
+        : "",
     stages: [...new Set(stages)],
   };
 }
 
-/** `Date` at today's date with the schedule's wall-clock time. */
-function atTime(d: Date, s: RefreshSchedule): Date {
-  const x = new Date(d);
-  x.setHours(s.hour, s.minute, 0, 0);
-  return x;
+/** True if `tz` is a zone this runtime knows. Anything else is refused. */
+export function isKnownTimezone(tz: string): boolean {
+  if (!tz) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-/** JS `getDay()` (0 = Sunday) for an ISO weekday (7 = Sunday). */
-const jsDay = (isoWeekday: number) => isoWeekday % 7;
+/** The zone a schedule is written in — its own, or wherever this is running. */
+export function zoneOf(s: RefreshSchedule): string {
+  return s.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+type Wall = { y: number; mo: number; d: number; weekday: number };
+
+const partsOf = (date: Date, tz: string) =>
+  Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      weekday: "short",
+    })
+      .formatToParts(date)
+      .map((p) => [p.type, p.value]),
+  ) as Record<string, string>;
+
+const ISO_WEEKDAY: Record<string, number> = {
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+  Sun: 7,
+};
+
+/** What day it is in `tz` at this instant. */
+function wallDate(date: Date, tz: string): Wall {
+  const p = partsOf(date, tz);
+  return {
+    y: Number(p.year),
+    mo: Number(p.month),
+    d: Number(p.day),
+    weekday: ISO_WEEKDAY[p.weekday] ?? 1,
+  };
+}
+
+/** How far `tz` is from UTC at this instant, in ms. */
+function offsetMs(date: Date, tz: string): number {
+  const p = partsOf(date, tz);
+  // `hour` is 00–23 here, except that some runtimes render midnight as 24.
+  const asUtc = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour) % 24,
+    Number(p.minute),
+    Number(p.second),
+  );
+  return asUtc - date.getTime();
+}
+
+/**
+ * The instant when `tz`'s clocks read this wall time.
+ *
+ * Two passes: guess by treating the wall time as UTC and subtracting the
+ * offset, then re-read the offset AT that instant — which is what makes the
+ * hour after a DST change land on the right side of it.
+ */
+function instantOf(
+  w: { y: number; mo: number; d: number },
+  hour: number,
+  minute: number,
+  tz: string,
+): Date {
+  const guess = Date.UTC(w.y, w.mo - 1, w.d, hour, minute, 0, 0);
+  const first = guess - offsetMs(new Date(guess), tz);
+  const second = guess - offsetMs(new Date(first), tz);
+  return new Date(second);
+}
+
+/** Calendar arithmetic on the wall date, never on the instant. */
+function shiftDays(w: Wall, days: number): Wall {
+  const t = new Date(Date.UTC(w.y, w.mo - 1, w.d) + days * 86_400_000);
+  return {
+    y: t.getUTCFullYear(),
+    mo: t.getUTCMonth() + 1,
+    d: t.getUTCDate(),
+    weekday: ((t.getUTCDay() + 6) % 7) + 1,
+  };
+}
 
 /**
  * The most recent scheduled instant at or before `now`, or null when disabled.
@@ -96,28 +202,33 @@ const jsDay = (isoWeekday: number) => isoWeekday % 7;
  */
 export function dueSlot(s: RefreshSchedule, now: Date): Date | null {
   if (!s.enabled) return null;
-  const today = atTime(now, s);
+  const tz = zoneOf(s);
+  const at = (w: Wall) => instantOf(w, s.hour, s.minute, tz);
+  const today = wallDate(now, tz);
+
   if (s.frequency === "daily") {
-    if (today <= now) return today;
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    return yesterday;
+    const t = at(today);
+    return t <= now ? t : at(shiftDays(today, -1));
   }
-  const back = (today.getDay() - jsDay(s.weekday) + 7) % 7;
-  const candidate = new Date(today);
-  candidate.setDate(candidate.getDate() - back);
-  if (candidate <= now) return candidate;
-  candidate.setDate(candidate.getDate() - 7);
-  return candidate;
+  const back = (today.weekday - s.weekday + 7) % 7;
+  const candidate = shiftDays(today, -back);
+  const t = at(candidate);
+  return t <= now ? t : at(shiftDays(candidate, -7));
 }
 
 /** The next scheduled instant strictly after `from`, or null when disabled. */
 export function nextRun(s: RefreshSchedule, from: Date): Date | null {
   const due = dueSlot(s, from);
   if (!due) return null;
-  const next = new Date(due);
-  next.setDate(next.getDate() + (s.frequency === "daily" ? 1 : 7));
-  return next;
+  const tz = zoneOf(s);
+  // A day later on the CALENDAR, not 86,400,000 ms later: across a DST change
+  // those differ by an hour, and the schedule means the wall clock.
+  return instantOf(
+    shiftDays(wallDate(due, tz), s.frequency === "daily" ? 1 : 7),
+    s.hour,
+    s.minute,
+    tz,
+  );
 }
 
 const WEEKDAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];

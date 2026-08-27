@@ -89,3 +89,33 @@ test("says which time zone it is scheduling in", async ({ page }) => {
   );
   await expect(box).toContainText(zone);
 });
+
+test("schedules in a zone of its own, and says what that is on the server", async ({
+  page,
+}) => {
+  await page.goto("/digimon/settings");
+  const box = page.getByRole("region", { name: "自动更新" });
+  // The spec above leaves the schedule switched off; turn it back on so the
+  // controls are usable.
+  await box.getByRole("checkbox").first().check();
+  const zone = box.getByLabel("时区");
+  await expect(zone).toBeVisible();
+
+  // Pick a zone that is deliberately not this machine's.
+  const server = await page.evaluate(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
+  const other = server === "UTC" ? "Asia/Tokyo" : "UTC";
+  await box.getByLabel("小时").selectOption("4");
+  await box.getByLabel("分钟").selectOption("0");
+  await zone.selectOption(other);
+
+  // The equivalent on the server's clock is spelled out — that difference is
+  // what used to be silent.
+  await expect(box.getByText(/= 服务器 \d\d:\d\d/)).toBeVisible();
+
+  await box.getByRole("button", { name: "保存" }).click();
+  await expect(box.getByText(/已保存/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("region", { name: "自动更新" }).getByLabel("时区")).toHaveValue(other);
+});
