@@ -54,6 +54,14 @@ test.describe("a narrow window with a mouse", () => {
     await page.setViewportSize({ width: 700, height: 900 });
     await page.goto("/digimon");
     await expect(page.getByRole("button", { name: "打开菜单" })).toBeVisible();
+
+    // And the drawer shows the WORDS. Only the 56px rail is icons-only; a
+    // drawer is 256px that exists solely while you are reading it, so
+    // shortening it buys nothing.
+    await page.getByRole("button", { name: "打开菜单" }).click();
+    await expect(
+      page.getByRole("link", { name: "我的卡组" }).getByText("我的卡组"),
+    ).toBeVisible();
   });
 
   test("keeps the filters out of the sheet, whatever the width", async ({

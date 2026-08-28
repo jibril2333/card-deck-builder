@@ -122,9 +122,23 @@ export function SidebarBody({
     </Link>
   );
 
-  const navList = (
+  /**
+   * The nav, in two forms.
+   *
+   * `rail` is the 56px column: icons only, labels as tooltips. The DRAWER is
+   * not that — it is 256px of empty space that only exists while you are
+   * looking at it, so it shows the words. They can't share one form gated on
+   * width: both live below `lg`, and a media query cannot tell "in the rail"
+   * from "in the drawer".
+   */
+  const navList = (rail: boolean) => (
     <nav className="flex flex-col gap-0.5">
-      <div className="hidden lg:block px-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--color-muted-fg)]">
+      <div
+        className={cn(
+          "px-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--color-muted-fg)]",
+          rail && "hidden lg:block",
+        )}
+      >
         选单
       </div>
       {items.map((n) => {
@@ -135,12 +149,14 @@ export function SidebarBody({
             href={hrefFor(n.id, game)}
             onClick={() => setOpen(false)}
             aria-current={isActive ? "page" : undefined}
-            // The label is a tooltip in the rail; this branch always has a
-            // pointer, so a tooltip is a thing that can actually be reached.
-            title={n.label}
+            // Only useful in the rail, and that branch always has a pointer —
+            // a tooltip is a thing that can actually be reached there.
+            title={rail ? n.label : undefined}
             className={cn(
               "flex items-center gap-2.5 h-10 rounded-lg text-sm transition-colors",
-              "justify-center px-0 lg:justify-start lg:px-2.5",
+              rail
+                ? "justify-center px-0 lg:justify-start lg:px-2.5"
+                : "px-2.5",
               isActive
                 ? "bg-[var(--color-accent)]/12 text-[var(--color-accent)] font-medium"
                 : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:bg-[var(--color-muted)]",
@@ -152,7 +168,7 @@ export function SidebarBody({
             >
               {n.icon}
             </span>
-            <span className="hidden lg:inline">{n.label}</span>
+            <span className={rail ? "hidden lg:inline" : ""}>{n.label}</span>
           </Link>
         );
       })}
@@ -222,7 +238,7 @@ export function SidebarBody({
         {/* min-h-0 so this actually shrinks-and-scrolls in a short window
             rather than overflowing the column and hiding the footer. */}
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-          {navList}
+          {navList(true)}
         </div>
         {railFooter}
       </aside>
@@ -269,7 +285,9 @@ export function SidebarBody({
             </div>
             {/* min-h-0: without it a flex child refuses to shrink below its
                 content height and never scrolls. */}
-            <div className="flex-1 min-h-0 overflow-y-auto">{navList}</div>
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {navList(false)}
+            </div>
             {footer}
           </div>
         </div>
