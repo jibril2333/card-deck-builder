@@ -17,6 +17,10 @@ import Link from "next/link";
  * wrapped onto a second line — so below `sm` the arrows lose their text and a
  * shorter window is swapped in. Both windows are rendered and one is hidden in
  * CSS: the server has no idea how wide the screen is.
+ *
+ * The bottom margin is for the filter FAB, which floats over this corner on a
+ * phone and was sitting exactly on top of 下一页 once the page was scrolled to
+ * the end.
  */
 export function Pagination({
   page,
@@ -65,7 +69,7 @@ export function Pagination({
 
   return (
     <nav
-      className={`mt-8 flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap ${className}`}
+      className={`mt-8 touch:mb-20 flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap ${className}`}
       aria-label="分页"
     >
       {page > 1 ? (
