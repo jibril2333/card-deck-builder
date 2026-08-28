@@ -69,3 +69,31 @@ describe("pageWindow", () => {
     expect(pageWindow(73, 73).slice(-6)).toEqual([68, 69, 70, 71, 72, 73]);
   });
 });
+
+/**
+ * The phone form. It is the same function with a shorter run — the point of
+ * the parameter is that everything above still holds, on a control that fits
+ * a 360px screen with the arrows stripped down to their glyphs.
+ */
+describe("pageWindow, narrow", () => {
+  it("keeps one width at every position", () => {
+    const widths = new Set<number>();
+    for (let page = 1; page <= 73; page++) widths.add(pageWindow(page, 73, 5).length);
+    expect([...widths]).toEqual([7]);
+  });
+
+  it("still shows the current page, its neighbours, and both ends", () => {
+    for (let page = 2; page <= 72; page++) {
+      const n = nums(pageWindow(page, 73, 5));
+      expect(n).toContain(page);
+      expect(n).toContain(page - 1);
+      expect(n).toContain(page + 1);
+      expect(n[0]).toBe(1);
+      expect(n[n.length - 1]).toBe(73);
+    }
+  });
+
+  it("is shorter than the desktop window wherever there is a gap to hide", () => {
+    expect(pageWindow(40, 73, 5).length).toBeLessThan(pageWindow(40, 73).length);
+  });
+});

@@ -12,6 +12,11 @@ import Link from "next/link";
  * The window is a FIXED width at every position, including the ends. Sizing it
  * to whatever happens to be nearby makes the control change width as you page
  * through it, and the buttons move under the cursor you are clicking with.
+ *
+ * A phone is too narrow for that window plus two labelled buttons — the row
+ * wrapped onto a second line — so below `sm` the arrows lose their text and a
+ * shorter window is swapped in. Both windows are rendered and one is hidden in
+ * CSS: the server has no idea how wide the screen is.
  */
 export function Pagination({
   page,
@@ -33,53 +38,75 @@ export function Pagination({
   const enabled = `${step} hover:bg-[var(--color-muted)]`;
   const disabled = `${step} text-[var(--color-muted-fg)] opacity-40 cursor-not-allowed`;
 
+  const numbers = (window: (number | null)[]) =>
+    window.map((p, i) =>
+      p === null ? (
+        <span
+          key={`gap-${i}`}
+          className="px-1 text-[var(--color-muted-fg)] select-none"
+          aria-hidden
+        >
+          …
+        </span>
+      ) : p === page ? (
+        <span
+          key={p}
+          aria-current="page"
+          className={`${step} bg-[var(--color-accent)] text-[var(--color-accent-fg)] border-[var(--color-accent)] font-semibold tabular-nums`}
+        >
+          {p}
+        </span>
+      ) : (
+        <Link key={p} href={hrefFor(p)} className={`${enabled} tabular-nums`}>
+          {p}
+        </Link>
+      ),
+    );
+
   return (
     <nav
-      className={`mt-8 flex items-center justify-center gap-1.5 flex-wrap ${className}`}
+      className={`mt-8 flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap ${className}`}
       aria-label="分页"
     >
       {page > 1 ? (
-        <Link href={hrefFor(page - 1)} className={enabled} rel="prev">
-          ← 上一页
+        <Link
+          href={hrefFor(page - 1)}
+          className={enabled}
+          rel="prev"
+          aria-label="上一页"
+        >
+          <span aria-hidden>←</span>
+          <span className="hidden sm:inline ml-1">上一页</span>
         </Link>
       ) : (
-        <span className={disabled}>← 上一页</span>
+        <span className={disabled} aria-label="上一页">
+          <span aria-hidden>←</span>
+          <span className="hidden sm:inline ml-1">上一页</span>
+        </span>
       )}
 
-      {pageWindow(page, totalPages).map((p, i) =>
-        p === null ? (
-          <span
-            key={`gap-${i}`}
-            className="px-1 text-[var(--color-muted-fg)] select-none"
-            aria-hidden
-          >
-            …
-          </span>
-        ) : p === page ? (
-          <span
-            key={p}
-            aria-current="page"
-            className={`${step} bg-[var(--color-accent)] text-[var(--color-accent-fg)] border-[var(--color-accent)] font-semibold tabular-nums`}
-          >
-            {p}
-          </span>
-        ) : (
-          <Link
-            key={p}
-            href={hrefFor(p)}
-            className={`${enabled} tabular-nums`}
-          >
-            {p}
-          </Link>
-        ),
-      )}
+      <span className="flex items-center gap-1 sm:hidden">
+        {numbers(pageWindow(page, totalPages, 5))}
+      </span>
+      <span className="hidden sm:flex items-center gap-1.5">
+        {numbers(pageWindow(page, totalPages))}
+      </span>
 
       {page < totalPages ? (
-        <Link href={hrefFor(page + 1)} className={enabled} rel="next">
-          下一页 →
+        <Link
+          href={hrefFor(page + 1)}
+          className={enabled}
+          rel="next"
+          aria-label="下一页"
+        >
+          <span className="hidden sm:inline mr-1">下一页</span>
+          <span aria-hidden>→</span>
         </Link>
       ) : (
-        <span className={disabled}>下一页 →</span>
+        <span className={disabled} aria-label="下一页">
+          <span className="hidden sm:inline mr-1">下一页</span>
+          <span aria-hidden>→</span>
+        </span>
       )}
     </nav>
   );
@@ -89,15 +116,19 @@ export function Pagination({
  * The page numbers to draw: always first and last, a run around `page`, and
  * `null` wherever a gap was skipped.
  *
- * MID is the number of SLOTS between the two ends, counting the ellipses, so
+ * `mid` is the number of SLOTS between the two ends, counting the ellipses, so
  * the control is the same width at every position. That is the point of the
  * arithmetic below: near an end there is no gap on that side, and the slot it
  * would have taken is given back to the run instead of just disappearing —
  * otherwise the control is a button narrower on the first three pages than in
  * the middle, and the numbers shift under the cursor as you page through.
  */
-export function pageWindow(page: number, total: number): (number | null)[] {
-  const MID = 7;
+export function pageWindow(
+  page: number,
+  total: number,
+  mid = 7,
+): (number | null)[] {
+  const MID = mid;
   if (total <= MID + 2) {
     return Array.from({ length: total }, (_, i) => i + 1);
   }
