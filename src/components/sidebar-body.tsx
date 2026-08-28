@@ -62,7 +62,9 @@ function activeFor(pathname: string, game: string): NavId {
  * Left sidebar shell (uptcg-style): brand, game switcher, section nav with
  * icons, and — pinned to the bottom — the card-language switcher and user
  * menu. On desktop it's a sticky full-height column; on phones it collapses
- * to a top bar with a slide-in drawer.
+ * to a top bar with a slide-in drawer — "phone" here meaning `desktop:`
+ * (see globals.css): not narrow, but narrow AND touch-driven. A browser
+ * window on half a laptop screen keeps the column.
  */
 export function SidebarBody({
   game,
@@ -153,7 +155,7 @@ export function SidebarBody({
   return (
     <>
       {/* Desktop: sticky full-height column */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-[var(--color-border)] bg-[var(--color-card)] px-3 py-4 gap-4">
+      <aside className="hidden desktop:flex desktop:flex-col desktop:w-60 desktop:shrink-0 desktop:h-screen desktop:sticky desktop:top-0 border-r border-[var(--color-border)] bg-[var(--color-card)] px-3 py-4 gap-4">
         <div className="px-1">{brand}</div>
         {/* min-h-0 so this actually shrinks-and-scrolls in a short window
             rather than overflowing the column and hiding the footer. */}
@@ -164,7 +166,7 @@ export function SidebarBody({
       </aside>
 
       {/* Mobile: sticky top bar */}
-      <div className="lg:hidden sticky top-0 z-30 backdrop-blur bg-[var(--color-bg)]/85 border-b border-[var(--color-border)]">
+      <div className="desktop:hidden sticky top-0 z-30 backdrop-blur bg-[var(--color-bg)]/85 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2 h-14 px-3">
           <button
             type="button"
@@ -183,7 +185,7 @@ export function SidebarBody({
 
       {/* Mobile: slide-in drawer */}
       {open ? (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="desktop:hidden fixed inset-0 z-50 flex">
           <div
             className="absolute inset-0 bg-black/60"
             onClick={() => setOpen(false)}

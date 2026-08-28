@@ -1,6 +1,25 @@
 @import "tailwindcss";
 
 /**
+ * `desktop:` — "there is room AND there is a mouse".
+ *
+ * Width alone gets this wrong in the case people actually hit: a browser
+ * window on half a laptop screen is 700–900px and gets handed the phone
+ * chrome, hamburger and all, while the pointer is a trackpad and the screen is
+ * enormous. And width alone can't be dropped either, because a tablet in
+ * landscape is wide with no mouse at all.
+ *
+ * So: a fine pointer needs only `sm`-and-a-half to get the desktop layout,
+ * and anything ≥64rem gets it regardless — a big touch screen has the room
+ * either way.
+ */
+@custom-variant desktop {
+  @media (min-width: 64rem), (pointer: fine) and (min-width: 48rem) {
+    @slot;
+  }
+}
+
+/**
  * ONE theme, and it's dark.
  *
  * This file used to carry a light `@theme` plus a dark one wrapped in
@@ -187,7 +206,10 @@ body::before {
   gap: 0.75rem;
 }
 
-/* Every card grid, on a phone.
+/* Every card grid, on a phone — a narrow window AND a coarse pointer. A
+ * desktop window dragged this narrow keeps the auto-fill sizing above, which
+ * at 500px is three ordinary tiles rather than four tiny ones with 9px
+ * captions.
  *
  * The auto-fill sizing above fits two 150px tiles across a 390px screen, so a
  * 50-card deck was 25 rows of scrolling and a page of search results showed
@@ -198,7 +220,7 @@ body::before {
  * The captions come down with the tile. At 85px the shared sizes leave the
  * name at nearly a third of the card's width and truncate it anyway
  * ("DemiDevi…"), which reads as broken rather than dense. */
-@media (max-width: 639px) {
+@media (max-width: 639px) and (pointer: coarse) {
   .card-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.375rem;

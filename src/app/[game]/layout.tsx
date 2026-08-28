@@ -22,7 +22,7 @@ export default async function GameLayout({
   const { game } = await params;
   if (!isGameId(game)) notFound();
   return (
-    <div className="lg:flex lg:items-start">
+    <div className="desktop:flex desktop:items-start">
       <Sidebar game={game} />
       <div className="flex-1 min-w-0">{children}</div>
     </div>
