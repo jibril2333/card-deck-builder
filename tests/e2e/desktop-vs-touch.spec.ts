@@ -97,3 +97,49 @@ test.describe("a touch screen", () => {
     expect(await sidebarShown(page)).toBe("none");
   });
 });
+
+test.describe("a tablet in landscape", () => {
+  test.use({
+    viewport: { width: 1180, height: 820 },
+    hasTouch: true,
+    isMobile: true,
+  });
+
+  test("is a desktop: fingers, but plenty of room", async ({ page }) => {
+    // Touch alone doesn't mean "phone". At 1180px the column fits, and a
+    // sheet sliding up over a screen this size answers a question nobody
+    // asked.
+    await page.goto("/digimon");
+    expect(await sidebarShown(page)).not.toBe("none");
+    await expect(page.getByPlaceholder("名称 / 编号 · 空格分词")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "筛选", exact: true }),
+    ).toBeHidden();
+  });
+});
+
+test.describe("a phone on its side", () => {
+  test.use({
+    viewport: { width: 844, height: 390 },
+    hasTouch: true,
+    isMobile: true,
+  });
+
+  test("keeps the sheet, and lets it use the short screen", async ({
+    page,
+  }) => {
+    // Wide but 390px tall: the column would leave nothing, so this is still
+    // the phone treatment — with the sheet allowed most of the height, since
+    // height is the scarce thing here.
+    await page.goto("/digimon");
+    await expect(
+      page.getByRole("button", { name: "筛选", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "筛选", exact: true }).click();
+    const sheet = page.locator(".filter-sheet");
+    const height = await sheet.evaluate(
+      (el) => el.getBoundingClientRect().height,
+    );
+    expect(height).toBeGreaterThan(390 * 0.8);
+  });
+});

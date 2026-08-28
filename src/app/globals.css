@@ -14,14 +14,17 @@
  * either way.
  */
 /**
- * `touch:` — a coarse pointer, at any width.
+ * `touch:` — fingers, and not enough room for the column.
  *
- * The bottom sheet is for fingers, not for narrow windows: a desktop browser
- * dragged to 600px still has a mouse, and a control that slides up over the
- * page is the wrong answer there. Deliberately NOT the negation of `desktop:`.
+ * Both halves matter. A desktop browser dragged to 600px has a mouse, so a
+ * panel that slides up over the page is the wrong answer there; a tablet in
+ * landscape has fingers but also 1024px, which is enough for the column, and
+ * it gets the desktop layout like any other wide screen.
+ *
+ * What lands here: phones either way up, and tablets in portrait.
  */
 @custom-variant touch {
-  @media (pointer: coarse) {
+  @media (pointer: coarse) and (max-width: 63.99rem) {
     @slot;
   }
 }
@@ -251,13 +254,16 @@ body::before {
   }
 }
 
-@media (pointer: coarse) {
+@media (pointer: coarse) and (max-width: 63.99rem) {
   .filter-sheet {
     position: fixed;
     inset-inline: 0;
     bottom: 0;
     z-index: 50;
-    max-height: 75vh;
+    /* dvh, not vh: on a phone the browser's own bars come and go, and vh is
+       measured against the tallest state — a 75vh sheet is taller than the
+       screen while the address bar is showing. */
+    max-height: 75dvh;
     overflow-y: auto;
     border-top: 1px solid var(--color-border);
     border-radius: 1rem 1rem 0 0;
@@ -271,6 +277,16 @@ body::before {
   .filter-sheet[data-open] {
     transform: translateY(0);
     visibility: visible;
+  }
+}
+
+/* A phone on its side: 390px of height, and the sheet is competing with it.
+   Take more of the screen and give the padding back to the controls — there
+   is no room to spare vertically and plenty across. */
+@media (pointer: coarse) and (max-height: 30rem) {
+  .filter-sheet {
+    max-height: 88dvh;
+    padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom));
   }
 }
 
