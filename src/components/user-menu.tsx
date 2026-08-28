@@ -14,7 +14,14 @@ import type { User } from "@/lib/auth/types";
  * this in the same sidebar. A menu whose only entry duplicates a link already
  * on screen is a menu that exists to hold 登出.
  */
-export function UserMenu({ user }: { user: User }) {
+export function UserMenu({
+  user,
+  /** Sidebar rail: 56px of room, so the name goes and the menu opens right. */
+  compact = false,
+}: {
+  user: User;
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -55,7 +62,9 @@ export function UserMenu({ user }: { user: User }) {
         >
           {initial}
         </span>
-        <span className="hidden sm:inline truncate max-w-[120px]">
+        <span
+          className={`${compact ? "hidden lg:inline" : "hidden sm:inline"} truncate max-w-[120px]`}
+        >
           {user.display_name}
         </span>
       </button>
@@ -65,7 +74,9 @@ export function UserMenu({ user }: { user: User }) {
         // footer — desktop column and mobile drawer both — so "below the
         // button" is below the viewport: it used to render 128px tall starting
         // 12px from the bottom edge, i.e. 116px of it off-screen.
-        <div className="absolute bottom-full right-0 mb-1 w-56 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg overflow-hidden z-50">
+        <div
+          className={`absolute bottom-full mb-1 w-56 ${compact ? "left-0 lg:left-auto lg:right-0" : "right-0"} rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-lg overflow-hidden z-50`}
+        >
           <div className="px-3 py-2 border-b border-[var(--color-border)]">
             <div className="text-sm font-medium truncate">
               {user.display_name}

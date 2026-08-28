@@ -62,9 +62,14 @@ function activeFor(pathname: string, game: string): NavId {
  * Left sidebar shell (uptcg-style): brand, game switcher, section nav with
  * icons, and — pinned to the bottom — the card-language switcher and user
  * menu. On desktop it's a sticky full-height column; on phones it collapses
- * to a top bar with a slide-in drawer — "phone" here meaning `desktop:`
- * (see globals.css): not narrow, but narrow AND touch-driven. A browser
- * window on half a laptop screen keeps the column.
+ * Three states, not two:
+ *   · ≥64rem — the full column, icons and labels.
+ *   · a mouse and ≥48rem — the same column narrowed to an ICON RAIL. A window
+ *     on half a laptop screen has room for 56px of nav and not for 240px, and
+ *     taking the nav away entirely (which is what it used to do) is a worse
+ *     trade than dropping the words. The labels come back as tooltips, which
+ *     only works because this branch is the one with a pointer.
+ *   · anything else — a top bar with a slide-in drawer.
  */
 export function SidebarBody({
   game,
@@ -87,6 +92,23 @@ export function SidebarBody({
   const base = NAV.filter((n) => loggedIn || n.id !== "collection");
   const items = loggedIn ? [...base, SETTINGS_NAV] : base;
 
+  /** In the rail there is no room for the name — the dot is the mark. */
+  const railBrand = (
+    <Link
+      href="/"
+      className="flex items-center gap-2 min-w-0 justify-center lg:justify-start"
+    >
+      <span
+        aria-hidden
+        className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+        style={{ background: GAMES[game].accent }}
+      />
+      <span className="hidden lg:inline font-semibold tracking-tight truncate">
+        DCG Deck Builder
+      </span>
+    </Link>
+  );
+
   const brand = (
     <Link href="/" className="flex items-center gap-2 min-w-0">
       <span
@@ -102,7 +124,7 @@ export function SidebarBody({
 
   const navList = (
     <nav className="flex flex-col gap-0.5">
-      <div className="px-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--color-muted-fg)]">
+      <div className="hidden lg:block px-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--color-muted-fg)]">
         选单
       </div>
       {items.map((n) => {
@@ -113,8 +135,12 @@ export function SidebarBody({
             href={hrefFor(n.id, game)}
             onClick={() => setOpen(false)}
             aria-current={isActive ? "page" : undefined}
+            // The label is a tooltip in the rail; this branch always has a
+            // pointer, so a tooltip is a thing that can actually be reached.
+            title={n.label}
             className={cn(
-              "flex items-center gap-2.5 px-2.5 h-10 rounded-lg text-sm transition-colors",
+              "flex items-center gap-2.5 h-10 rounded-lg text-sm transition-colors",
+              "justify-center px-0 lg:justify-start lg:px-2.5",
               isActive
                 ? "bg-[var(--color-accent)]/12 text-[var(--color-accent)] font-medium"
                 : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:bg-[var(--color-muted)]",
@@ -126,13 +152,14 @@ export function SidebarBody({
             >
               {n.icon}
             </span>
-            <span>{n.label}</span>
+            <span className="hidden lg:inline">{n.label}</span>
           </Link>
         );
       })}
     </nav>
   );
 
+  /** The drawer's footer: always the full-width version. */
   const footer = (
     <div className="flex flex-col gap-2">
       <CardLangSwitcher current={cardLang} />
@@ -147,24 +174,58 @@ export function SidebarBody({
           <span aria-hidden>👤</span> 登录
         </Link>
       )}
-      {/* Last line in the column, smallest thing on the page. */}
       <BuildStamp info={build} />
+    </div>
+  );
+
+  /**
+   * The column's footer, which has to survive being 56px wide: the language
+   * buttons stack, the account name disappears behind its avatar, and the
+   * build stamp goes entirely — it is the least useful thing here and the
+   * only one that can't be shortened.
+   */
+  const railFooter = (
+    <div className="flex flex-col gap-2">
+      <CardLangSwitcher
+        current={cardLang}
+        className="flex-col lg:flex-row items-stretch lg:items-center"
+      />
+      {user ? (
+        <UserMenu user={user} compact />
+      ) : (
+        <Link
+          href="/login"
+          title="登录"
+          className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] border border-[var(--color-border)] rounded-lg h-9 flex items-center justify-center lg:justify-start gap-2 lg:px-3"
+        >
+          <span aria-hidden>👤</span>
+          <span className="hidden lg:inline">登录</span>
+        </Link>
+      )}
+      <div className="hidden lg:block">
+        <BuildStamp info={build} />
+      </div>
     </div>
   );
 
   return (
     <>
-      {/* Desktop: sticky full-height column */}
-      <aside className="hidden desktop:flex desktop:flex-col desktop:w-60 desktop:shrink-0 desktop:h-screen desktop:sticky desktop:top-0 border-r border-[var(--color-border)] bg-[var(--color-card)] px-3 py-4 gap-4">
-        <div className="px-1">{brand}</div>
+      {/* Desktop: sticky full-height column, narrowed to an icon rail when
+          there isn't room for the labels.
+
+          `w-14` is a BASE utility rather than `desktop:w-14`: two variants
+          that both match at 1280px are resolved by source order, and a custom
+          variant is emitted after `lg:` — the column would stay 56px wide
+          forever. */}
+      <aside className="hidden desktop:flex desktop:flex-col w-14 lg:w-60 desktop:shrink-0 desktop:h-screen desktop:sticky desktop:top-0 border-r border-[var(--color-border)] bg-[var(--color-card)] px-2 lg:px-3 py-4 gap-4">
+        <div className="px-1">{railBrand}</div>
         {/* min-h-0 so this actually shrinks-and-scrolls in a short window
             rather than overflowing the column and hiding the footer. */}
         <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
           {navList}
         </div>
-        {footer}
+        {railFooter}
       </aside>
-
       {/* Mobile: sticky top bar */}
       <div className="desktop:hidden sticky top-0 z-30 backdrop-blur bg-[var(--color-bg)]/85 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2 h-14 px-3">
@@ -182,7 +243,6 @@ export function SidebarBody({
           </div>
         </div>
       </div>
-
       {/* Mobile: slide-in drawer */}
       {open ? (
         <div className="desktop:hidden fixed inset-0 z-50 flex">

@@ -13,7 +13,14 @@ import {
  * preference cookie and refreshes — every server component re-reads the
  * cookie and re-renders with the chosen language.
  */
-export function CardLangSwitcher({ current }: { current: CardLang }) {
+export function CardLangSwitcher({
+  current,
+  /** Extra classes — the sidebar rail stacks the three buttons vertically. */
+  className,
+}: {
+  current: CardLang;
+  className?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -27,7 +34,7 @@ export function CardLangSwitcher({ current }: { current: CardLang }) {
     <div
       className={`flex items-center gap-0.5 rounded-lg border border-[var(--color-border)] p-0.5 bg-[var(--color-card)] ${
         pending ? "opacity-60" : ""
-      }`}
+      } ${className ?? ""}`}
       title="卡牌文字语言(数码宝贝)"
     >
       {(Object.keys(CARD_LANG_LABELS) as CardLang[]).map((lang) => (

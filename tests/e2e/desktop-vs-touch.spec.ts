@@ -22,6 +22,27 @@ test.describe("a narrow window with a mouse", () => {
     await expect(page.getByRole("button", { name: "打开菜单" })).toBeHidden();
   });
 
+  test("narrows the column to an icon rail instead of hiding it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 880, height: 900 });
+    await page.goto("/digimon");
+    const aside = page.locator("aside").first();
+    const railWidth = () =>
+      aside.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    await expect.poll(railWidth).toBe(56);
+    // Icons only — the words are tooltips at this width.
+    const decks = aside.getByRole("link", { name: "我的卡组" });
+    await expect(decks).toBeVisible();
+    await expect(decks.getByText("我的卡组")).toBeHidden();
+    await expect(decks).toHaveAttribute("title", "我的卡组");
+
+    // And the full column comes back when there is room for it.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect.poll(railWidth).toBe(240);
+    await expect(decks.getByText("我的卡组")).toBeVisible();
+  });
+
   test("still gets the phone layout when it's actually narrow", async ({
     page,
   }) => {
