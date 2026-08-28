@@ -56,17 +56,29 @@ test.describe("a narrow window with a mouse", () => {
     await expect(page.getByRole("button", { name: "打开菜单" })).toBeVisible();
   });
 
-  test("shows the filters as a column, with no button to open them", async ({
+  test("keeps the filters out of the sheet, whatever the width", async ({
     page,
   }) => {
-    // The phone's filter sheet is the same element; with a pointer it is a
-    // plain part of the page, so there is nothing to open and nothing hidden.
-    await page.setViewportSize({ width: 900, height: 800 });
+    const search = page.getByPlaceholder("名称 / 编号 · 空格分词");
+    const fab = page.getByRole("button", { name: "筛选", exact: true });
+    const bar = page.getByRole("button", { name: /🔍 筛选/ });
+
+    // Room for the column: it is simply there, with nothing to press.
+    await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/digimon");
-    await expect(page.getByPlaceholder("名称 / 编号 · 空格分词")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "筛选", exact: true }),
-    ).toBeHidden();
+    await expect(search).toBeVisible();
+    await expect(fab).toBeHidden();
+    await expect(bar).toBeHidden();
+
+    // No room, but still a mouse: the old bar, collapsed. NOT the sheet —
+    // 600px used to get the floating button and a panel sliding over the page.
+    await page.setViewportSize({ width: 600, height: 800 });
+    await page.goto("/digimon");
+    await expect(fab).toBeHidden();
+    await expect(bar).toBeVisible();
+    await expect(search).toBeHidden();
+    await bar.click();
+    await expect(search).toBeVisible();
   });
 });
 

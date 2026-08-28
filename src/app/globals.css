@@ -13,6 +13,33 @@
  * and anything ≥64rem gets it regardless — a big touch screen has the room
  * either way.
  */
+/**
+ * `touch:` — a coarse pointer, at any width.
+ *
+ * The bottom sheet is for fingers, not for narrow windows: a desktop browser
+ * dragged to 600px still has a mouse, and a control that slides up over the
+ * page is the wrong answer there. Deliberately NOT the negation of `desktop:`.
+ */
+@custom-variant touch {
+  @media (pointer: coarse) {
+    @slot;
+  }
+}
+
+/**
+ * `narrow:` — a mouse, but not enough room for the sidebar column.
+ *
+ * The middle case between the two the app is designed for. The filters can't
+ * stay open (they would push the results off the screen) and they shouldn't
+ * become a touch sheet (there are no fingers), so they collapse in place
+ * behind a bar, which is what this shows.
+ */
+@custom-variant narrow {
+  @media (pointer: fine) and (max-width: 63.99rem) {
+    @slot;
+  }
+}
+
 @custom-variant desktop {
   @media (min-width: 64rem), (pointer: fine) and (min-width: 48rem) {
     @slot;
@@ -200,48 +227,49 @@ body::before {
    (Kept as a real class rather than a Tailwind arbitrary value: the nested
    parens/commas in `grid-cols-[repeat(auto-fill,minmax(150px,1fr))]` hung the
    production build.) */
-/* The search filters: a bottom sheet on a phone, a plain column with a mouse.
+/* The search filters: a plain column, except on a touch screen where they are
+ * a bottom sheet.
  *
- * Written here rather than as a pile of `desktop:` utilities because the two
- * states differ in nine properties and the desktop one has to win all of them.
- * One media block placed after the base rule is easier to keep honest than
- * nine variant utilities racing the cascade — `desktop:visible` lost to
- * `invisible` and the whole sidebar disappeared.
+ * Written here rather than as a pile of variant utilities because the two
+ * forms differ in nine properties and one of them has to win all of them —
+ * `desktop:visible` lost to `invisible` once and took the whole sidebar with
+ * it. The base is the ordinary column; the sheet is the exception, and it is
+ * keyed on the POINTER, not on the width. A desktop window dragged narrow
+ * keeps the column (stacked above the results, as it always did); only fingers
+ * get the sheet.
  *
- * The sheet is `visibility: hidden` while closed, not merely translated off
- * the bottom: an off-screen panel still takes tab stops, and tabbing through
- * the results would drop you into controls you can't see. */
-.filter-sheet {
-  position: fixed;
-  inset-inline: 0;
-  bottom: 0;
-  z-index: 50;
-  max-height: 75vh;
-  overflow-y: auto;
-  border-top: 1px solid var(--color-border);
-  border-radius: 1rem 1rem 0 0;
-  background: var(--color-card);
-  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
-  box-shadow: 0 -10px 36px rgb(0 0 0 / 0.35);
-  transform: translateY(100%);
-  visibility: hidden;
-  transition: transform 0.2s ease;
-}
-.filter-sheet[data-open] {
-  transform: translateY(0);
-  visibility: visible;
-}
-@media (min-width: 64rem), (pointer: fine) and (min-width: 48rem) {
+ * Closed, the sheet is `visibility: hidden` rather than merely translated off
+ * the bottom: an off-screen panel still takes tab stops. */
+/* A mouse, but no room for the column: collapse in place. Open/closed is the
+   same `data-open` the sheet uses, so there is one piece of state. */
+@media (pointer: fine) and (max-width: 63.99rem) {
   .filter-sheet {
-    position: static;
-    max-height: none;
-    overflow: visible;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    padding: 0;
-    box-shadow: none;
-    transform: none;
+    display: none;
+  }
+  .filter-sheet[data-open] {
+    display: block;
+  }
+}
+
+@media (pointer: coarse) {
+  .filter-sheet {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 50;
+    max-height: 75vh;
+    overflow-y: auto;
+    border-top: 1px solid var(--color-border);
+    border-radius: 1rem 1rem 0 0;
+    background: var(--color-card);
+    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 36px rgb(0 0 0 / 0.35);
+    transform: translateY(100%);
+    visibility: hidden;
+    transition: transform 0.2s ease;
+  }
+  .filter-sheet[data-open] {
+    transform: translateY(0);
     visibility: visible;
   }
 }

@@ -35,6 +35,8 @@ test("opens over the results and says how many filters are on", async ({
   // The badge counts what is actually filtered — it used to be the number of
   // chip definitions, i.e. "15" forever.
   await expect(fab(page)).toContainText("1");
+  // And the desktop's collapse bar is not also here.
+  await expect(page.getByRole("button", { name: /🔍 筛选/ })).toBeHidden();
 
   await fab(page).click();
   const sheet = page.getByPlaceholder("名称 / 编号 · 空格分词");

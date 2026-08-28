@@ -16,8 +16,12 @@ import { useEffect, useState } from "react";
  * carrying the number of active filters, a dimmed backdrop, and a panel that
  * comes up from the bottom edge and stops at 75% of the screen.
  *
- * `desktop:` (see globals.css) is the switch, not a width — a browser window
- * on half a laptop screen has a pointer and gets the sidebar.
+ * Three forms, and the pointer decides which two are even on the table:
+ *   · room for the column — it is just there, open, no control at all;
+ *   · a mouse without the room (`narrow:`) — the old bar above the results,
+ *     collapsed by default;
+ *   · fingers (`touch:`) — the sheet, whatever the width, because a tablet in
+ *     landscape is wide and still has no cursor to hover with.
  */
 export function FilterPanel({
   activeCount,
@@ -45,6 +49,25 @@ export function FilterPanel({
 
   return (
     <>
+      {/* A mouse in a narrow window: the old bar, in place, above the results.
+          No sheet — nothing here is being reached with a thumb. */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="hidden narrow:flex w-full h-10 mb-3 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] items-center justify-between text-sm cursor-pointer"
+      >
+        <span className="flex items-center gap-2 font-medium">
+          🔍 筛选
+          {activeCount > 0 ? (
+            <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-xs font-bold">
+              {activeCount}
+            </span>
+          ) : null}
+        </span>
+        <span className="text-[var(--color-muted-fg)]">{open ? "▲" : "▼"}</span>
+      </button>
+
       {/* The opener. Bottom-right, thumb height, and it says how many filters
           are on — that count is the reason to open it. */}
       <button
@@ -52,7 +75,7 @@ export function FilterPanel({
         onClick={() => setOpen(true)}
         aria-label="筛选"
         aria-expanded={open}
-        className="desktop:hidden fixed right-4 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-40 w-13 h-13 rounded-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-xl shadow-lg flex items-center justify-center cursor-pointer"
+        className="hidden touch:flex fixed right-4 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-40 w-13 h-13 rounded-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-xl shadow-lg items-center justify-center cursor-pointer"
       >
         🔍
         {activeCount > 0 ? (
@@ -65,7 +88,7 @@ export function FilterPanel({
       {open ? (
         <div
           onClick={() => setOpen(false)}
-          className="desktop:hidden fixed inset-0 z-40 bg-black/40"
+          className="hidden touch:block fixed inset-0 z-40 bg-black/40"
         />
       ) : null}
 
@@ -77,7 +100,7 @@ export function FilterPanel({
             bottom", even though it is the backdrop and Escape that close it. */}
         <div
           aria-hidden
-          className="desktop:hidden mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--color-border)]"
+          className="hidden touch:block mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--color-border)]"
         />
         {children}
       </div>
