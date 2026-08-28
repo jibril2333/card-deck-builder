@@ -290,9 +290,24 @@ body::before {
   }
 }
 
+/* Both paginated pages show 60 cards, and 60 is divisible by every column
+   count from 1 to 6 — so capping the columns at six is what keeps the last row
+   full instead of trailing four empty cells across a wide screen. The cap is
+   the 16% in the clamp (100/16 = 6.25), not a media query, so it holds at any
+   container width: the same grid is 908px wide on the search page and 1300px
+   on the deck list.
+
+   The floor keeps tiles readable when the container is small. The ceiling is
+   400px rather than something tighter because a ceiling BREAKS the cap: once
+   16% exceeds it the tracks stop growing and a seventh column appears, which
+   is how a 2560px monitor got its four empty cells back. 400px keeps six
+   columns up to a 2500px-wide grid. */
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(clamp(150px, 16%, 400px), 1fr)
+  );
   gap: 0.75rem;
 }
 
