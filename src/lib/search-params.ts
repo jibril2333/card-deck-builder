@@ -91,3 +91,26 @@ export function toggleListValue(
     page: undefined,
   });
 }
+
+/**
+ * How many filters are actually on.
+ *
+ * The badge on the phone's filter button used to be handed the number of chip
+ * DEFINITIONS, so it read "15" on a page with nothing filtered — a count that
+ * never changed, next to a button whose whole job is to say whether anything
+ * is set.
+ *
+ * Pagination doesn't count: `?page=3` is where you are, not what you asked
+ * for. Everything else does, including the sort, because it is in the same
+ * panel and it does change what comes back first.
+ */
+export function countActiveFilters(sp: SearchParamsRecord): number {
+  let n = 0;
+  for (const [key, value] of Object.entries(sp)) {
+    if (key === "page") continue;
+    if (value === undefined) continue;
+    const values = Array.isArray(value) ? value : [value];
+    if (values.some((v) => v !== "")) n += 1;
+  }
+  return n;
+}

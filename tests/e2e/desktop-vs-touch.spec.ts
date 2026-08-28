@@ -10,7 +10,10 @@
 import { expect, test } from "@playwright/test";
 
 const sidebarShown = (p: import("@playwright/test").Page) =>
-  p.locator("aside").first().evaluate((el) => getComputedStyle(el).display);
+  p
+    .locator("aside")
+    .first()
+    .evaluate((el) => getComputedStyle(el).display);
 
 test.describe("a narrow window with a mouse", () => {
   test("keeps the sidebar", async ({ page }) => {
@@ -52,10 +55,27 @@ test.describe("a narrow window with a mouse", () => {
     await page.goto("/digimon");
     await expect(page.getByRole("button", { name: "打开菜单" })).toBeVisible();
   });
+
+  test("shows the filters as a column, with no button to open them", async ({
+    page,
+  }) => {
+    // The phone's filter sheet is the same element; with a pointer it is a
+    // plain part of the page, so there is nothing to open and nothing hidden.
+    await page.setViewportSize({ width: 900, height: 800 });
+    await page.goto("/digimon");
+    await expect(page.getByPlaceholder("名称 / 编号 · 空格分词")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "筛选", exact: true }),
+    ).toBeHidden();
+  });
 });
 
 test.describe("a touch screen", () => {
-  test.use({ viewport: { width: 900, height: 1200 }, hasTouch: true, isMobile: true });
+  test.use({
+    viewport: { width: 900, height: 1200 },
+    hasTouch: true,
+    isMobile: true,
+  });
 
   test("gets the drawer even when it is wide", async ({ page }) => {
     // A tablet in portrait is wider than the fine-pointer floor, and still

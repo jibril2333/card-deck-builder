@@ -9,6 +9,7 @@ import {
   pickList,
   pickNum,
   pickSort,
+  countActiveFilters,
   type SearchParamsRecord,
 } from "@/lib/search-params";
 import { CardThumb, type CardLite } from "@/components/card-thumb";
@@ -243,7 +244,7 @@ export default async function CardsPage({
     <>
       <main className="w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
         <aside>
-          <FilterPanel activeCount={chipSpecs.length}>
+          <FilterPanel activeCount={countActiveFilters(sp)}>
             <FilterForm
               basePath={`/${game}`}
               fields={fields}

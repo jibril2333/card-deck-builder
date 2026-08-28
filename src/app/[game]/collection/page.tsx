@@ -35,12 +35,14 @@ import {
   pickNum,
   pickSort,
   type SearchParamsRecord,
+  countActiveFilters,
 } from "@/lib/search-params";
 import {
   CollectionTile,
   type CollectionTileCard,
 } from "@/components/collection-tile";
 import { FilterForm, type FilterField } from "@/components/filter-form";
+import { FilterPanel } from "@/components/filter-panel";
 import { ActiveFilters, type ChipSpec } from "@/components/active-filters";
 import { requireUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
@@ -51,9 +53,10 @@ const PAGE_SIZE = 60;
 
 type TileRow = CollectionTileCard & {
   quantity: number;
-  restriction:
-    | { status: "banned" | "limited_1" | "limited_2"; max_count: number }
-    | null;
+  restriction: {
+    status: "banned" | "limited_1" | "limited_2";
+    max_count: number;
+  } | null;
 };
 
 export default async function CollectionPage({
@@ -222,7 +225,6 @@ export default async function CollectionPage({
     restriction: restrictionMap.get(c.id) ?? null,
   }));
   total = r.total;
-  
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -234,11 +236,16 @@ export default async function CollectionPage({
     <>
       <main className="w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
         <aside>
-          <FilterForm
-            basePath={`/${game}/collection`}
-            fields={fields}
-            sortOptions={sortOptions}
-          />
+          {/* Same sheet as the card browser — the filters here are the same
+              wall of controls, and on a phone they were pushing the whole
+              collection below the fold. */}
+          <FilterPanel activeCount={countActiveFilters(sp)}>
+            <FilterForm
+              basePath={`/${game}/collection`}
+              fields={fields}
+              sortOptions={sortOptions}
+            />
+          </FilterPanel>
         </aside>
 
         <section className="min-w-0">
@@ -254,10 +261,7 @@ export default async function CollectionPage({
             </div>
           </div>
 
-          <ActiveFilters
-            basePath={`/${game}/collection`}
-            specs={chipSpecs}
-          />
+          <ActiveFilters basePath={`/${game}/collection`} specs={chipSpecs} />
 
           {rows.length === 0 ? (
             <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">
@@ -297,9 +301,7 @@ export default async function CollectionPage({
               }
               if (n > 1) params.set("page", String(n));
               const qs = params.toString();
-              return qs
-                ? `/${game}/collection?${qs}`
-                : `/${game}/collection`;
+              return qs ? `/${game}/collection?${qs}` : `/${game}/collection`;
             }}
           />
         </section>
