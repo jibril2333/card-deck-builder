@@ -932,6 +932,24 @@ export function adjustCardCollection(
 }
 
 /**
+ * How many copies of each card the user owns, summed across printings.
+ *
+ * The collection is recorded per printing — a base art and its parallel are
+ * separate rows — but a deck slot doesn't care which art fills it, so the
+ * deck page wants one number per card. Hence the SUM.
+ */
+export function getOwnedCounts(currentUserId: string): Map<string, number> {
+  const rows = db()
+    .prepare(
+      `SELECT card_id, SUM(quantity) AS n FROM user.card_collection
+       WHERE user_id = ? AND quantity > 0
+       GROUP BY card_id`,
+    )
+    .all(currentUserId) as { card_id: string; n: number }[];
+  return new Map(rows.map((r) => [r.card_id, r.n]));
+}
+
+/**
  * All of the user's collection entries as a Map keyed by `${card_id}|${variant}`.
  * Used by the collection page to inject the owned-quantity into the grid in a
  * single query — instead of one lookup per displayed tile.

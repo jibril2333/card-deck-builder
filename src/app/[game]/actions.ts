@@ -389,6 +389,8 @@ export type CardPickerHit = {
   image_url: string | null;
   /** Copies already in the deck this picker belongs to (0 when unrelated). */
   in_deck: number;
+  /** Copies on the searcher's own shelf, summed over printings. */
+  collected: number;
 };
 
 /**
@@ -404,7 +406,7 @@ export async function searchCardsAction(
   q: string,
   opts?: { lang?: string; deckId?: string },
 ): Promise<CardPickerHit[]> {
-  await requireUser();
+  const me = await requireUser();
   if (!isGameId(game)) throw new Error("invalid game");
   const query = q.trim();
   if (!isSearchableQuery(query)) return [];
@@ -434,12 +436,15 @@ export async function searchCardsAction(
     }
   }
 
+  const owned = digimon.getOwnedCounts(me.id);
+
   return rows.map((r) => ({
     id: r.id,
     code: r.code,
     name: names?.get(r.code)?.name ?? r.name,
     image_url: r.image_url,
     in_deck: inDeck.get(r.id) ?? 0,
+    collected: owned.get(r.id) ?? 0,
   }));
 }
 

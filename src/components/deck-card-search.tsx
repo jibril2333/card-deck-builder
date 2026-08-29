@@ -189,8 +189,19 @@ export function DeckCardSearch({
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">{h.name}</div>
-                  <div className="text-[11px] font-mono text-[var(--color-muted-fg)]">
-                    {h.code}
+                  <div className="text-[11px] font-mono text-[var(--color-muted-fg)] flex items-center gap-1.5">
+                    <span className="truncate">{h.code}</span>
+                    {/* What the shelf holds — the same 📦 the deck tiles and
+                        the sidebar use. Silent when you own none: a row of
+                        "📦 0" says nothing you didn't assume. */}
+                    {h.collected > 0 ? (
+                      <span
+                        className="shrink-0 font-sans tabular-nums"
+                        title={`已收集 ${h.collected} 张`}
+                      >
+                        📦 {h.collected}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 {h.in_deck > 0 ? (

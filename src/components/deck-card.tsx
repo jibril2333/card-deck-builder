@@ -30,6 +30,11 @@ export type DeckCardData = {
   quantity: number;
   purchased: number;
   price: number | null;
+  /**
+   * Copies of this card in the VIEWER's collection, summed over printings.
+   * Undefined when nobody is signed in — a zero would claim something.
+   */
+  collected?: number;
 };
 
 export type DeckMode = "browse" | "build" | "purchase";
@@ -198,6 +203,14 @@ export function DeckCard({
 
           {card.rarity ? <RarityBadge rarity={card.rarity} /> : null}
 
+          {/* What the shelf holds against what the deck asks for. Not in
+              purchase mode: the bought-vs-wanted numbers already own every
+              overlay there, and two ratios on one tile read as one wrong
+              one. */}
+          {mode !== "purchase" && optimisticCard.collected !== undefined ? (
+            <CollectedBadge held={optimisticCard.collected} want={want} />
+          ) : null}
+
           {mine && (mode === "build" || mode === "browse") ? (
             <CoverToggleButton
               isCover={isCover}
@@ -275,6 +288,25 @@ export function DeckCard({
 // ────────────────────────────────────────────────────────────────────────
 // Image + image-overlay subcomponents
 // ────────────────────────────────────────────────────────────────────────
+
+/**
+ * "📦 2/4" — copies owned, copies the deck wants. The box is the icon the
+ * sidebar already uses for 已收集, so the number needs no label; amber when
+ * the deck asks for more than the shelf has.
+ */
+function CollectedBadge({ held, want }: { held: number; want: number }) {
+  const short = held < want;
+  return (
+    <span
+      title={`已收集 ${held} 张 · 这套需要 ${want} 张`}
+      className={`absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-medium tabular-nums shadow ${
+        short ? "bg-amber-500/90 text-white" : "bg-black/65 text-white"
+      }`}
+    >
+      📦 {held}/{want}
+    </span>
+  );
+}
 
 function CardImage({
   src,

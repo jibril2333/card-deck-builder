@@ -228,6 +228,9 @@ export default async function DeckEditPage({
   const deck = digimon.getDeck(id);
   if (!deck) notFound();
   const cards = digimon.getDeckCards(id);
+  // The viewer's own shelf, not the deck owner's — the question a tile answers
+  // is "do I have this one", and that stays interesting on a friend's deck.
+  const ownedCounts = me ? digimon.getOwnedCounts(me.id) : null;
   const cardLang = cardLangForPage;
   const tMap = digimon.getDisplayTranslations(
     cards.map((c) => c.code),
@@ -344,6 +347,8 @@ export default async function DeckEditPage({
         quantity: c.quantity,
         purchased: c.purchased,
         price: c.price,
+        // 0 is a real answer here — only a signed-out viewer gets nothing.
+        collected: ownedCounts ? (ownedCounts.get(c.id) ?? 0) : undefined,
       };
     }),
     // Search-target parsing relies on the EN effect wording — always feed
