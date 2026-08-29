@@ -73,6 +73,10 @@ export default async function CollectionPage({
   const page = Math.max(1, pickNum(sp, "page") ?? 1);
   const offset = (page - 1) * PAGE_SIZE;
   const sort = pickSort(sp);
+  // "1" own it, "0" don't, absent means the whole card pool.
+  const ownedRaw = pickStr(sp, "owned");
+  const ownedParam =
+    ownedRaw === "1" ? ("yes" as const) : ownedRaw === "0" ? ("no" as const) : undefined;
 
   let rows: TileRow[];
   let total: number;
@@ -101,6 +105,17 @@ export default async function CollectionPage({
       placeholder: "名称 / 编号 · 空格分词",
       wideKey: "q_all",
       wideLabel: "同时搜索效果和特征",
+    },
+    {
+      // The page lists every card so you can tick off what arrives; this is
+      // what turns it back into a view of the shelf, or of the holes in it.
+      type: "select",
+      key: "owned",
+      label: "拥有",
+      options: [
+        { value: "1", label: "已拥有" },
+        { value: "0", label: "未拥有" },
+      ],
     },
     {
       type: "multi",
@@ -153,6 +168,12 @@ export default async function CollectionPage({
 
   chipSpecs = [
     { kind: "terms", key: "q", label: "关键词" },
+    {
+      kind: "single",
+      key: "owned",
+      label: "拥有",
+      labelMap: { "1": "已拥有", "0": "未拥有" },
+    },
     { kind: "list", key: "color", label: "颜色" },
     { kind: "list", key: "card_type", label: "类型" },
     { kind: "list", key: "rarity", label: "稀有度" },
@@ -195,6 +216,8 @@ export default async function CollectionPage({
     dp_max: pickNum(sp, "dp_max"),
     has_inherited: pickStr(sp, "has_inherited") === "1",
     has_security: pickStr(sp, "has_security") === "1",
+    owned: ownedParam,
+    owned_by: me.id,
     show_alt_arts: true, // ← collection page forces alt-art expansion
     // The physical cards on the shelf are the Japanese printings, so this
     // page always shows those — independent of the site language toggle,

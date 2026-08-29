@@ -116,6 +116,19 @@ export type DigimonFilters = {
   limit?: number;
   offset?: number;
   /**
+   * Restrict to what this user does — or does not — physically own.
+   *
+   * The collection page browses all ~4,400 cards so you can tick off what
+   * arrives in the post, which leaves no way to look at the shelf itself, or
+   * at the holes in it. Needs `owned_by` to mean anything.
+   *
+   * Ownership is recorded per PRINTING, so with `show_alt_arts` on (which is
+   * how the collection page reads it) a parallel you own does not make the
+   * base art count as owned.
+   */
+  owned?: "yes" | "no";
+  owned_by?: string;
+  /**
    * What `q` is allowed to match.
    *   "all"  (default) — names, codes, every effect block and traits. What the
    *          card browser wants: you go there to find cards BY what they do.
@@ -318,7 +331,29 @@ export function searchCards(filters: DigimonFilters = {}): {
   );
   addRange("dp", filters.dp_min, filters.dp_max, "dp");
 
+  // Ownership is a property of the (card, printing) pair, so the predicate
+  // differs between the two branches below: collapsed rows count a card as
+  // owned when ANY of its printings is, expanded rows only when that exact
+  // one is. Both are spelled out here; the branches pick one.
+  const ownedFilter = filters.owned && filters.owned_by ? filters.owned : null;
+  if (ownedFilter) params.owned_by = filters.owned_by;
+  const ownsAny = `EXISTS (SELECT 1 FROM user.card_collection cc
+        WHERE cc.user_id = @owned_by AND cc.card_id = cards.id
+          AND cc.quantity > 0)`;
+  const ownsThisPrinting = `EXISTS (SELECT 1 FROM user.card_collection cc
+        WHERE cc.user_id = @owned_by AND cc.card_id = base.id
+          AND cc.variant = COALESCE(ci.variant, '') AND cc.quantity > 0)`;
+  const test = (predicate: string) =>
+    ownedFilter === "yes" ? predicate : `NOT ${predicate}`;
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  // Collapsed rows: fold it into the card-level WHERE. Expanded rows: it has
+  // to wait until after the join, where the printing is known.
+  const collapsedWhereSql = !ownedFilter
+    ? whereSql
+    : whereSql
+      ? `${whereSql} AND ${test(ownsAny)}`
+      : `WHERE ${test(ownsAny)}`;
+  const printingWhereSql = ownedFilter ? `WHERE ${test(ownsThisPrinting)}` : "";
 
   // Sort
   const sortField = filters.sort_field
@@ -385,12 +420,12 @@ export function searchCards(filters: DigimonFilters = {}): {
       .prepare(
         `SELECT *, '' AS variant, image_url AS display_image,
            ${VC} AS variant_count
-         FROM cards ${whereSql} ${orderSql} LIMIT @limit OFFSET @offset`,
+         FROM cards ${collapsedWhereSql} ${orderSql} LIMIT @limit OFFSET @offset`,
       )
       .all({ ...params, limit, offset }) as DigimonSearchRow[];
     total = (
       db()
-        .prepare(`SELECT COUNT(*) as n FROM cards ${whereSql}`)
+        .prepare(`SELECT COUNT(*) as n FROM cards ${collapsedWhereSql}`)
         .get(params) as { n: number }
     ).n;
   } else {
@@ -424,6 +459,7 @@ export function searchCards(filters: DigimonFilters = {}): {
                AND card_images.lang = @art_lang) AS variant_count
          FROM base LEFT JOIN card_images ci
            ON ci.code = base.code AND ci.lang = @art_lang
+         ${printingWhereSql}
          ${orderQualified} LIMIT @limit OFFSET @offset`,
       )
       .all({ ...params, limit, offset }) as DigimonSearchRow[];
@@ -432,7 +468,8 @@ export function searchCards(filters: DigimonFilters = {}): {
         .prepare(
           `SELECT COUNT(*) as n FROM (SELECT * FROM cards ${whereSql}) base
            LEFT JOIN card_images ci
-             ON ci.code = base.code AND ci.lang = @art_lang`,
+             ON ci.code = base.code AND ci.lang = @art_lang
+           ${printingWhereSql}`,
         )
         .get(params) as { n: number }
     ).n;

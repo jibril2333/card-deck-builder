@@ -40,7 +40,8 @@ export type FilterField =
       type: "select";
       key: string;
       label: string;
-      options: string[];
+      /** Plain strings when the value IS the label; pairs when it isn't. */
+      options: string[] | { value: string; label: string }[];
       placeholder?: string;
     }
   | {
@@ -171,11 +172,15 @@ export function FilterForm({ basePath, fields, sortOptions }: Props) {
             aria-label={f.label}
           >
             <option value="">{f.placeholder ?? "全部"}</option>
-            {f.options.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
+            {f.options.map((o) => {
+              const { value, label } =
+                typeof o === "string" ? { value: o, label: o } : o;
+              return (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              );
+            })}
           </Select>
         </div>
       );

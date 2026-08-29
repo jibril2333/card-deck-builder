@@ -6,7 +6,13 @@ import { colorHex } from "@/lib/games";
 import { splitTerms } from "@/lib/search-terms";
 
 export type ChipSpec =
-  | { kind: "single"; key: string; label: string }
+  | {
+      kind: "single";
+      key: string;
+      label: string;
+      /** For keys whose value is a code ("1") rather than a word. */
+      labelMap?: Record<string, string>;
+    }
   /** A free-text query that the search splits on whitespace — one chip per
    *  term, each removable on its own. Shown as one chip, "Imperialdramon
    *  Dragon" reads as a phrase, which is not how it is matched. */
@@ -65,7 +71,8 @@ export function ActiveFilters({
           key: `${spec.key}=${v}`,
           node: (
             <>
-              <span className="opacity-70">{spec.label}:</span> {v}
+              <span className="opacity-70">{spec.label}:</span>{" "}
+              {spec.labelMap?.[v] ?? v}
             </>
           ),
           onRemove: () => removeKeys(spec.key),
