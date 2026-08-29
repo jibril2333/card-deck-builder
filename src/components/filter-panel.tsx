@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * The search filters, which are a sidebar on a desktop and a bottom sheet on a
@@ -31,6 +31,7 @@ export function FilterPanel({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
 
   // Escape closes it, and the page behind stops scrolling while it is up —
   // otherwise a flick meant for the sheet's own list carries the results away
@@ -44,6 +45,82 @@ export function FilterPanel({
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  // Flick it back down to dismiss it, which is how every other sheet on a
+  // phone behaves — reaching back up to the backdrop is a stretch when the
+  // sheet takes three quarters of the screen.
+  //
+  // The gesture only starts when the sheet's own list is already at the top,
+  // so scrolling the filters still scrolls them, and the listener has to be
+  // native and non-passive: React's onTouchMove cannot preventDefault, and
+  // without that the browser scrolls the sheet while the finger is dragging
+  // it.
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el || !open) return;
+    // The same condition the CSS uses for the sheet. Anywhere else this
+    // element is a plain column, and a stray drag must not move it.
+    if (!matchMedia("(pointer: coarse) and (max-width: 63.99rem)").matches) {
+      return;
+    }
+    el.style.transform = "";
+    el.style.transition = "";
+
+    let startY = 0;
+    let startedAt = 0;
+    let dy = 0;
+    let tracking = false;
+    let dragging = false;
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      tracking = el.scrollTop <= 0;
+      startY = e.touches[0].clientY;
+      startedAt = e.timeStamp;
+      dy = 0;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!tracking) return;
+      dy = e.touches[0].clientY - startY;
+      // A few pixels of slop so a tap on a checkbox is still a tap.
+      if (!dragging && dy > 6) {
+        dragging = true;
+        el.style.transition = "none";
+      }
+      if (!dragging) return;
+      e.preventDefault();
+      el.style.transform = `translateY(${Math.max(0, dy)}px)`;
+    };
+    const onEnd = (e: TouchEvent) => {
+      tracking = false;
+      if (!dragging) return;
+      dragging = false;
+      const speed = dy / Math.max(1, e.timeStamp - startedAt);
+      const far = dy > el.getBoundingClientRect().height * 0.25;
+      el.style.transition = "";
+      if (far || speed > 0.5) {
+        // Hand it to the CSS mid-flight: `data-open` comes off on the next
+        // render and carries it the rest of the way down.
+        el.style.transform = "translateY(100%)";
+        setOpen(false);
+      } else {
+        el.style.transform = "";
+      }
+    };
+
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+      // The inline transform is left alone on purpose: on the way out it is
+      // what the closing slide starts from, and opening again clears it above.
     };
   }, [open]);
 
@@ -95,9 +172,13 @@ export function FilterPanel({
       {/* One panel, two lives: the sheet on a phone, the plain sidebar column
           from `desktop:` up (see `.filter-sheet` in globals.css). Kept as one
           element so the controls inside have one state, not two. */}
-      <div className="filter-sheet" data-open={open ? "" : undefined}>
-        {/* The grab handle is the affordance that says "this came up from the
-            bottom", even though it is the backdrop and Escape that close it. */}
+      <div
+        ref={sheetRef}
+        className="filter-sheet"
+        data-open={open ? "" : undefined}
+      >
+        {/* The grab handle: it says the sheet came up from the bottom, and now
+            it says the truth — drag it back down and it goes. */}
         <div
           aria-hidden
           className="hidden touch:block mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--color-border)]"

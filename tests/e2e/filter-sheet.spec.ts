@@ -48,3 +48,47 @@ test("opens over the results and says how many filters are on", async ({
   await page.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
 });
+
+/**
+ * Dragging the sheet back down closes it. The backdrop is a long reach when
+ * the sheet is three quarters of the screen, and every other sheet on a phone
+ * takes this gesture.
+ *
+ * CDP rather than page.touchscreen: the tap helper cannot move a finger, and
+ * the handler is a native non-passive touchmove listener, so synthetic mouse
+ * events would not reach it either.
+ */
+async function drag(page: import("@playwright/test").Page, from: { x: number; y: number }, by: number) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: from.x, y: from.y }],
+  });
+  for (let step = 1; step <= 6; step++) {
+    await cdp.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: from.x, y: from.y + (by * step) / 6 }],
+    });
+    await page.waitForTimeout(16);
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
+}
+
+test("a drag down closes it, a nudge does not", async ({ page }) => {
+  await page.goto("/digimon");
+  const sheet = page.locator(".filter-sheet");
+  const field = page.getByPlaceholder("名称 / 编号 · 空格分词");
+
+  await fab(page).click();
+  await expect(field).toBeVisible();
+
+  // A nudge: short, and the sheet stays. Slow, so it is not a flick either.
+  const box = (await sheet.boundingBox())!;
+  const grip = { x: box.x + box.width / 2, y: box.y + 8 };
+  await drag(page, grip, 24);
+  await expect(field).toBeVisible();
+
+  await drag(page, grip, 260);
+  await expect(field).toBeHidden();
+});
