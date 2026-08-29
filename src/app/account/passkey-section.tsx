@@ -85,10 +85,14 @@ export function PasskeySection({
 
       <div className="flex gap-2 items-end">
         <div className="flex-1 min-w-0">
-          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)] block mb-1">
+          <label
+            htmlFor="passkey-label"
+            className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)] block mb-1"
+          >
             名称(可选)
           </label>
           <input
+            id="passkey-label"
             type="text"
             value={label}
             onChange={(e) => setLabel(e.target.value)}

@@ -39,6 +39,24 @@ function db() {
 const RP_NAME = "DCG Deck Builder";
 const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Timestamps are written as ISO-8601 UTC, like the rest of auth/repo.ts —
+ * never left to the column's `DEFAULT CURRENT_TIMESTAMP`.
+ *
+ * SQLite writes that default as "2026-08-29 01:52:11": UTC, but with a space
+ * and no zone, which `new Date()` reads as LOCAL time. On a server set to
+ * Asia/Tokyo every challenge was born nine hours old and the TTL check below
+ * rejected it — "challenge expired or invalid" on the first tap, every time.
+ */
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+/** Parse a stored timestamp as UTC, whichever of the two shapes it is in. */
+function parsedUtc(ts: string): number {
+  return Date.parse(/[TZ]/.test(ts) ? ts : `${ts.replace(" ", "T")}Z`);
+}
+
 export type StoredCredential = {
   id: string;
   user_id: string;
@@ -121,10 +139,11 @@ function storeChallenge(
   const id = crypto.randomUUID();
   db()
     .prepare(
-      `INSERT INTO user.webauthn_challenges (id, user_id, type, challenge)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO user.webauthn_challenges
+         (id, user_id, type, challenge, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(id, userId, type, challenge);
+    .run(id, userId, type, challenge, nowIso());
   return id;
 }
 
@@ -147,7 +166,7 @@ function consumeChallenge(
     | undefined;
   if (!row) return null;
   if (row.type !== expectedType) return null;
-  if (Date.now() - new Date(row.created_at).getTime() > CHALLENGE_TTL_MS) {
+  if (Date.now() - parsedUtc(row.created_at) > CHALLENGE_TTL_MS) {
     db().prepare(`DELETE FROM user.webauthn_challenges WHERE id = ?`).run(id);
     return null;
   }
@@ -240,10 +259,20 @@ export async function finishRegistration(input: {
   db()
     .prepare(
       `INSERT INTO user.webauthn_credentials
-         (id, user_id, credential_id, public_key, counter, transports, label)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         (id, user_id, credential_id, public_key, counter, transports, label,
+          created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(id, userId, credentialId, publicKey, counter, transports, label);
+    .run(
+      id,
+      userId,
+      credentialId,
+      publicKey,
+      counter,
+      transports,
+      label,
+      nowIso(),
+    );
 
   return { ok: true, credentialId };
 }
@@ -318,10 +347,10 @@ export async function finishAuthentication(input: {
   db()
     .prepare(
       `UPDATE user.webauthn_credentials
-         SET counter = ?, last_used_at = CURRENT_TIMESTAMP
+         SET counter = ?, last_used_at = ?
        WHERE id = ?`,
     )
-    .run(verification.authenticationInfo.newCounter, stored.id);
+    .run(verification.authenticationInfo.newCounter, nowIso(), stored.id);
 
   return { ok: true, user_id: stored.user_id };
 }
