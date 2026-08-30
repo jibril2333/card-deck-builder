@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId } from "@/lib/games";
@@ -55,12 +54,12 @@ export default async function PlaytestPage({
           15rem level rail actually need — past that the extra width would go
           into the 卡名 column, which is stretching, not using. */}
       <main className="w-full mx-auto max-w-[1600px] px-4 sm:px-6 py-6">
-        <BackLink
-          fallback={`/${game}/decks/${id}`}
+        <Link
+          href={`/${game}/decks/${id}`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
         >
           ← 返回卡组
-        </BackLink>
+        </Link>
         <h1 className="text-2xl font-bold mb-4">{deckName} · 试玩</h1>
         <Playtest game={game} cards={cards} />
       </main>

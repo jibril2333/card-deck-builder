@@ -1,10 +1,11 @@
 /**
  * Coming back from a deck should land where you left, not at the top.
  *
- * The "← 全部卡组" link was a plain <Link>, i.e. a forward navigation to the
- * same URL, and the router scrolls those to the top by design — so opening a
- * deck from halfway down the list cost you your place. The browser's own back
- * button had been restoring it correctly the whole time.
+ * "← 全部卡组" is a plain forward navigation, which the router scrolls to the
+ * top by design — so the position is remembered separately (components/
+ * scroll-memory) and put back on arrival. It used to be `router.back()`
+ * instead, which restored the position for free but only landed on the list
+ * when the list was the previous entry; see deck-back-link.spec.
  */
 import { expect, test } from "@playwright/test";
 
@@ -57,8 +58,8 @@ test("returning from a deck lands where you left", async ({ page }) => {
 
 test("the back link still works with no history behind it", async ({ page }) => {
   // A deck opened as the first page in the tab — a shared link, a bookmark —
-  // has nothing to go back to, so the link has to fall back to a real
-  // navigation rather than doing nothing.
+  // has nothing behind it and no remembered position, and still has to land
+  // on the list.
   await page.goto("/digimon/decks");
   await page.getByPlaceholder("卡组名").fill("DIRECT " + Date.now());
   await page.getByRole("button", { name: /创建/ }).click();

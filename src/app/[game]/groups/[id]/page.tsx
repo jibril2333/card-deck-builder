@@ -1,6 +1,5 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
@@ -234,12 +233,12 @@ export default async function GroupPage({
   return (
     <>
       <main className="w-full mx-auto max-w-[1500px] px-4 sm:px-6 py-6">
-        <BackLink
-          fallback={`/${game}/decks`}
+        <Link
+          href={`/${game}/decks`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
         >
           ← 全部卡组
-        </BackLink>
+        </Link>
 
         <GroupEditor
           game={game}

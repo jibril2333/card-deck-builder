@@ -1,3 +1,4 @@
+import { ScrollMemory } from "@/components/scroll-memory";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, GAMES, type GameId } from "@/lib/games";
@@ -116,6 +117,9 @@ export default async function DecksPage({
 
   return (
     <>
+      {/* Remembers where you were in the list, so "← 全部卡组" on a deck can
+          be an honest link to this page and still put you back. */}
+      <ScrollMemory id={`${game}-decks`} />
       <main className="w-full px-4 sm:px-6 py-6">
         {/* Compact toolbar with create/import/diff/missing tools. For anon
             users we render just the title (no edit tools) — they can still

@@ -1,5 +1,5 @@
+import { RestoreScrollLink } from "@/components/scroll-memory";
 import Link from "next/link";
-import { BackLink } from "@/components/back-link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex, GAMES } from "@/lib/games";
@@ -529,12 +529,18 @@ export default async function DeckEditPage({
       ) : null}
       <main className="w-full px-4 sm:px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         <section className="min-w-0">
-          <BackLink
-            fallback={`/${game}/decks`}
+          {/* A link, not a back button: it names where it goes. Going "back"
+              lands on the deck list only when that is where you came from,
+              and arriving here from an import — card page, deck list, import,
+              deck — it landed on the card page instead. The list's scroll
+              position is remembered separately; see scroll-memory. */}
+          <RestoreScrollLink
+            id={`${game}-decks`}
+            href={`/${game}/decks`}
             className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
           >
             ← 全部卡组
-          </BackLink>
+          </RestoreScrollLink>
           <DeckHeader
             game={game}
             deck={loaded.deck}

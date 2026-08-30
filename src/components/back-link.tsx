@@ -6,6 +6,11 @@ import { hasInAppHistory } from "@/lib/nav-depth";
 /**
  * "Back" link that returns to wherever you actually came from.
  *
+ * Only for a link whose label says "back". A link that NAMES a destination
+ * ("← 全部卡组") has to be an ordinary `<Link>` to that destination: history
+ * is not a promise about where you were, and after card page → deck list →
+ * import → deck, "back" was the card page while the label said otherwise.
+ *
  * It prefers real browser history (`router.back()`), which restores the
  * previous page's scroll position and search filters and always lands on the
  * page you navigated from — deck, search, collection, whatever. It only falls
