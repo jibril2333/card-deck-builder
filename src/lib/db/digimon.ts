@@ -893,6 +893,28 @@ export function getCardCollectionQty(
   return r?.quantity ?? 0;
 }
 
+/**
+ * Copies of one card on the user's shelf, and how they are split between
+ * printings. The card page shows the total and names the parallels, which is
+ * the one place where "3 张,其中 P1 一张" is worth the words.
+ */
+export function getCardOwnership(
+  currentUserId: string,
+  cardId: string,
+): { total: number; byVariant: { variant: string; quantity: number }[] } {
+  const rows = db()
+    .prepare(
+      `SELECT variant, quantity FROM user.card_collection
+       WHERE user_id = ? AND card_id = ? AND quantity > 0
+       ORDER BY variant`,
+    )
+    .all(currentUserId, cardId) as { variant: string; quantity: number }[];
+  return {
+    total: rows.reduce((n, r) => n + r.quantity, 0),
+    byVariant: rows,
+  };
+}
+
 export function setCardCollectionQuantity(
   currentUserId: string,
   cardId: string,

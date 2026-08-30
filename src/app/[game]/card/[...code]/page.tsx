@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
@@ -84,6 +85,8 @@ export default async function CardPage({
   }
   // Cardrush per-illustrator market prices (each distinct printing).
   const listings = digimon.getExternalListings(card.id);
+  // What the reader's own shelf holds. Null for anon — nobody's shelf.
+  const owned = me ? digimon.getCardOwnership(meId, card.id) : null;
   return (
     <DetailShell game={game}>
       <DigimonDetail
@@ -96,11 +99,51 @@ export default async function CardPage({
         price={digimon.getCardPrice(meId, card.id)}
         marketListings={listings}
         rulings={digimon.getCardRulings(card.code)}
+        owned={owned}
         readonly={!me}
       />
     </DetailShell>
   );
   
+}
+
+/**
+ * How many of this card the reader owns, linked to the collection page filtered
+ * to it — the number is only half an answer if there is no way to correct it.
+ *
+ * The split across printings goes in the tooltip: the total is what anyone
+ * came for, and "2 张,其中 P1 一张" on the face of it is noise on every card
+ * anybody owns twice.
+ */
+function OwnedRow({
+  code,
+  owned,
+}: {
+  code: string;
+  owned: { total: number; byVariant: { variant: string; quantity: number }[] };
+}) {
+  const split =
+    owned.byVariant.length > 1
+      ? owned.byVariant
+          .map(
+            (v) => `${v.variant ? v.variant.replace(/^_/, "") : "原版"} ×${v.quantity}`,
+          )
+          .join(" · ")
+      : undefined;
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="font-medium text-[var(--color-muted-fg)] shrink-0">
+        已收集
+      </span>
+      <Link
+        href={`/digimon/collection?q=${encodeURIComponent(code)}`}
+        title={split}
+        className="tabular-nums hover:text-[var(--color-accent)] transition-colors"
+      >
+        {owned.total > 0 ? `📦 ${owned.total} 张` : "还没有"}
+      </Link>
+    </div>
+  );
 }
 
 function DetailShell({
@@ -390,6 +433,7 @@ function DigimonDetail({
   price,
   marketListings,
   rulings,
+  owned,
   readonly,
 }: {
   card: CardView;
@@ -412,6 +456,8 @@ function DigimonDetail({
   cardLang: string;
   price: number | null;
   marketListings: digimon.ExternalListing[];
+  /** The reader's own copies of this card; null when nobody is signed in. */
+  owned: { total: number; byVariant: { variant: string; quantity: number }[] } | null;
   /** Anon viewer: hide the editable price input + the AddToDeck widget. */
   readonly: boolean;
 }) {
@@ -442,6 +488,7 @@ function DigimonDetail({
             ) : null
           ) : (
             <>
+              {owned ? <OwnedRow code={card.code} owned={owned} /> : null}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-[var(--color-muted-fg)] shrink-0">
                   预期价格
