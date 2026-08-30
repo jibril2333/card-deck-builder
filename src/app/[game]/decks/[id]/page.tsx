@@ -737,7 +737,7 @@ export default async function DeckEditPage({
                     </span>
                   ) : totalWanted > 0 ? (
                     <span className="text-green-600 dark:text-green-400">
-                      · ✓ 凑齐
+                      · ✓ 已备齐
                     </span>
                   ) : null}
                 </div>
@@ -787,7 +787,7 @@ export default async function DeckEditPage({
                   </Link>
                 </div>
                 <span className="text-[10px] text-[var(--color-muted-fg)] whitespace-nowrap">
-                  绿=凑齐 · 橙=缺 · 灰=未买
+                  绿=已备齐 · 橙=缺 · 灰=未买
                 </span>
               </div>
             </div>
@@ -800,7 +800,7 @@ export default async function DeckEditPage({
             if (loaded.cards.length === 0) {
               return (
                 <div className="mt-6 p-12 text-sm text-center text-[var(--color-muted-fg)] border border-dashed border-[var(--color-border)] rounded-lg">
-                  空卡组。
+                  暂无卡片。
                   <Link
                     href={`/${game}`}
                     className="underline ml-1 hover:text-[var(--color-fg)]"
@@ -813,7 +813,7 @@ export default async function DeckEditPage({
             if (visibleCards.length === 0) {
               return (
                 <div className="mt-6 p-12 text-sm text-center text-[var(--color-muted-fg)] border border-dashed border-[var(--color-border)] rounded-lg">
-                  🎉 全部凑齐了！
+                  已全部备齐
                   <Link
                     href={`/${game}/decks/${loaded.deck.id}?mode=purchase&missing=0`}
                     replace

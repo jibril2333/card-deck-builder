@@ -251,7 +251,7 @@ export default async function GroupPage({
 
         {memberDecks.length === 0 ? (
           <p className="mt-6 text-sm text-[var(--color-muted-fg)]">
-            还没有成员卡组。点「管理成员」勾选要共享卡池的卡组。
+            暂无成员卡组,可在「管理成员」中选择。
           </p>
         ) : (
           <>

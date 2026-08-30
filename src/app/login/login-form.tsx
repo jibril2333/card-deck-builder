@@ -54,7 +54,7 @@ export function LoginForm({ next }: { next?: string }) {
     } catch (e) {
       const msg = (e as Error).message ?? "Passkey 登录失败";
       if (msg.includes("NotAllowedError") || msg.includes("aborted")) {
-        setError("取消了。");
+        setError("已取消");
       } else {
         setError(msg);
       }

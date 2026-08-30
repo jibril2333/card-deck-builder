@@ -30,14 +30,14 @@ export default async function LoginPage({
         <LoginForm next={next} />
 
         <div className="text-xs text-[var(--color-muted-fg)] pt-4 border-t border-[var(--color-border)]">
-          还没有账号?需要先有
+          没有账号?需要
           <Link
             href="/register"
             className="text-[var(--color-accent)] underline mx-1"
           >
             邀请码
           </Link>
-          才能注册。问管理员要一个。
+          才能注册,请向管理员申请。
         </div>
       </div>
     </main>

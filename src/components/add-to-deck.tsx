@@ -67,7 +67,7 @@ export function AddToDeck({
 
       {decks.length === 0 ? (
         <div className="text-xs text-[var(--color-muted-fg)] py-2">
-          还没有卡组，下面新建一个吧。
+          暂无卡组,可在下方新建。
         </div>
       ) : (
         <div className="-mx-3 border-y border-[var(--color-border)]">

@@ -212,7 +212,7 @@ export function MissingCardsTool({
 
           {totalKinds === 0 ? (
             <div className="text-xs text-green-600 dark:text-green-400 py-3 text-center">
-              ✓ 都凑齐了
+              已全部备齐
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">

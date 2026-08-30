@@ -426,7 +426,7 @@ function DoneCheckBadge() {
   return (
     <span
       className="absolute top-1.5 right-1.5 w-7 h-7 rounded-md flex items-center justify-center bg-green-500 text-white text-sm font-bold shadow"
-      title="已凑齐"
+      title="已备齐"
     >
       ✓
     </span>
@@ -605,7 +605,7 @@ function PurchaseControlsBar({
         }
         disabled={pending || done}
         className="w-10 h-8 hover:bg-green-500/10 text-green-600 text-xs cursor-pointer disabled:opacity-40"
-        title="凑齐（设为想要张数）"
+        title="备齐（设为所需张数）"
       >
         ✓
       </button>

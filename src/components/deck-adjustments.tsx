@@ -312,7 +312,7 @@ function Column({
       </div>
       {items.length === 0 ? (
         <div className="text-xs text-[var(--color-muted-fg)] border border-dashed border-[var(--color-border)] rounded-md py-6 text-center">
-          还没有
+          暂无
         </div>
       ) : (
         <ul className="space-y-1.5">

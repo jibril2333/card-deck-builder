@@ -49,7 +49,7 @@ test("registers a passkey, then signs in with it", async ({ browser }) => {
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
   await page.goto(`${BASE}/digimon/settings`);
-  await expect(page.getByText("还没注册 Passkey。")).toBeVisible();
+  await expect(page.getByText("暂无 Passkey。")).toBeVisible();
 
   await page.getByPlaceholder("如:Mac Touch ID / iPhone").fill("虚拟钥匙");
   await page.getByRole("button", { name: /添加 Passkey/ }).click();

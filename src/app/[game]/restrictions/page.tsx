@@ -140,7 +140,7 @@ export default async function RestrictionsPage({
 
         {rows.length === 0 && pairGroups.length === 0 ? (
           <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">
-            数据库里还没有禁卡/制限卡数据,等下一次 scraper 同步。
+            暂无禁制限卡数据,将在下次同步后显示。
           </div>
         ) : (
           <div className="space-y-8">

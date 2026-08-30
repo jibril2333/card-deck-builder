@@ -62,7 +62,7 @@ export function PasskeySection({
       // Browsers throw "NotAllowedError" when the user cancels — don't
       // make that look like a real error.
       if (msg.includes("NotAllowedError") || msg.includes("aborted")) {
-        setError("取消了。");
+        setError("已取消");
       } else {
         setError(msg);
       }
@@ -114,7 +114,7 @@ export function PasskeySection({
 
       {credentials.length === 0 ? (
         <div className="text-sm text-[var(--color-muted-fg)] py-4 text-center border border-dashed border-[var(--color-border)] rounded-md">
-          还没注册 Passkey。
+          暂无 Passkey。
         </div>
       ) : (
         <ul className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)] -mx-5">

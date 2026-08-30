@@ -81,7 +81,7 @@ export function RefreshChangesPanel() {
         <div className="text-xs text-[var(--color-muted-fg)]">读取中…</div>
       ) : runs.length === 0 ? (
         <div className="text-xs text-[var(--color-muted-fg)]">
-          还没有记录 —— 下一次刷新开始留。
+          暂无记录,下次刷新后生成。
         </div>
       ) : (
         <ul className="space-y-2">

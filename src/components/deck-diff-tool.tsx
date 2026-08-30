@@ -152,7 +152,7 @@ export function DeckDiffTool({
 
           {onlyA.length === 0 && onlyB.length === 0 && diffQty.length === 0 ? (
             <div className="text-xs text-green-600 dark:text-green-400 py-3 text-center">
-              🎉 两个卡组的卡完全相同
+              两副卡组完全相同
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-3">
