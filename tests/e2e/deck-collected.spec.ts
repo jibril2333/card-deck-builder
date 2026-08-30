@@ -39,4 +39,12 @@ test("a deck tile says how many copies you own", async ({ page }) => {
   const badge = deckTile.getByTitle("已收集 2 张 · 这套需要 4 张");
   await expect(badge).toHaveText("📦 2/4");
   await expect(badge).toHaveClass(/amber/);
+
+  // Purchase mode keeps the count and drops the ratio — the badge above the
+  // art is already showing bought-against-wanted there.
+  await page.getByRole("link", { name: /购买/ }).click();
+  await page.waitForURL(/mode=purchase/);
+  await expect(
+    page.locator(".card-grid > div").first().getByTitle(/^已收集 2 张/),
+  ).toHaveText("📦 2");
 });

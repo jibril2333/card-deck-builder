@@ -203,12 +203,16 @@ export function DeckCard({
 
           {card.rarity ? <RarityBadge rarity={card.rarity} /> : null}
 
-          {/* What the shelf holds against what the deck asks for. Not in
-              purchase mode: the bought-vs-wanted numbers already own every
-              overlay there, and two ratios on one tile read as one wrong
-              one. */}
-          {mode !== "purchase" && optimisticCard.collected !== undefined ? (
-            <CollectedBadge held={optimisticCard.collected} want={want} />
+          {/* What the shelf holds against what the deck asks for. In purchase
+              mode the count goes bare: the badge above already reads "2 / 4"
+              for bought-vs-wanted, and a second ratio beside it reads as one
+              wrong number rather than two right ones. */}
+          {optimisticCard.collected !== undefined ? (
+            <CollectedBadge
+              held={optimisticCard.collected}
+              want={want}
+              withWant={mode !== "purchase"}
+            />
           ) : null}
 
           {mine && (mode === "build" || mode === "browse") ? (
@@ -293,9 +297,21 @@ export function DeckCard({
  * "📦 2/4" — copies owned, copies the deck wants. The box is the icon the
  * sidebar already uses for 已收集, so the number needs no label; amber when
  * the deck asks for more than the shelf has.
+ *
+ * Purchase mode drops the second half (`withWant`) and stays neutral: amber
+ * there already means "partly bought", and the tile's own badge is carrying
+ * the ratio.
  */
-function CollectedBadge({ held, want }: { held: number; want: number }) {
-  const short = held < want;
+function CollectedBadge({
+  held,
+  want,
+  withWant,
+}: {
+  held: number;
+  want: number;
+  withWant: boolean;
+}) {
+  const short = withWant && held < want;
   return (
     <span
       title={`已收集 ${held} 张 · 这套需要 ${want} 张`}
@@ -303,7 +319,7 @@ function CollectedBadge({ held, want }: { held: number; want: number }) {
         short ? "bg-amber-500/90 text-white" : "bg-black/65 text-white"
       }`}
     >
-      📦 {held}/{want}
+      📦 {withWant ? `${held}/${want}` : held}
     </span>
   );
 }
