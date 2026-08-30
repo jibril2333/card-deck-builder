@@ -111,6 +111,10 @@ export default async function CardPage({
  * How many of this card the reader owns, linked to the collection page filtered
  * to it — the number is only half an answer if there is no way to correct it.
  *
+ * Zero is written as a zero. It is the same measurement as three, and a row
+ * that changes its wording at the bottom of the range reads as a different
+ * field rather than the same one.
+ *
  * The split across printings goes in the tooltip: the total is what anyone
  * came for, and "2 张,其中 P1 一张" on the face of it is noise on every card
  * anybody owns twice.
@@ -140,7 +144,7 @@ function OwnedRow({
         title={split}
         className="tabular-nums hover:text-[var(--color-accent)] transition-colors"
       >
-        {owned.total > 0 ? `📦 ${owned.total} 张` : "还没有"}
+        {`📦 ${owned.total} 张`}
       </Link>
     </div>
   );

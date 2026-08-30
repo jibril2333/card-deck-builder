@@ -8,8 +8,8 @@ const CARD = "BT2-030"; // untouched by the other specs in this run
 
 test("the card page shows what you own", async ({ page }) => {
   await page.goto(`/digimon/card/${CARD}`);
-  const owned = page.getByRole("link", { name: /📦|还没有/ });
-  await expect(owned).toHaveText("还没有");
+  const owned = page.getByRole("link", { name: /📦/ });
+  await expect(owned).toHaveText("📦 0 张");
 
   await page.goto(`/digimon/collection?q=${CARD}`);
   const tile = page.locator(".card-grid > div").first();
@@ -32,5 +32,5 @@ test("the card page shows what you own", async ({ page }) => {
   await expect(back.locator("span", { hasText: /^×\d+$/ })).toHaveCount(0);
 
   await page.goto(`/digimon/card/${CARD}`);
-  await expect(owned).toHaveText("还没有");
+  await expect(owned).toHaveText("📦 0 张");
 });
