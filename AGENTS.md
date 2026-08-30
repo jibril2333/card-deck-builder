@@ -382,6 +382,21 @@ Read-only. Three-way (us / EN / JA), because two-way can't tell a bug from a
 decision. Run it after a refresh — it is the only thing that can answer "is
 anything else wrong?" with a number instead of a guess.
 
+## 界面文案
+
+界面语言是中文,写法按产品文案,不按说话:
+
+- 数量为 0 就写 `0 张`,不要换成「还没有」。同一个字段在任何取值下保持同一种措辞和
+  格式 —— 在低值处换说法,读起来像换了一个字段,而不是同一个字段的另一个值。
+- 空状态统一「暂无…」(暂无卡组 / 暂无 Passkey / 暂无记录),不写「还没有…吧」。
+- 完成态只陈述事实(「已全部备齐」),不用感叹号、不用 🎉 之类的庆祝语。
+- 术语一处定下就全站一致(备齐、已收集、暂无),不要同义词轮换。
+- 表情符号只当图标用(📦 已收集、🔍 检索),不当情绪用。
+- 能用控件本身表达的就不写说明文字:用 placeholder、禁用态、勾选态说话,
+  实现细节和设计意图写进注释和 commit message,不写在页面上。
+
+改文案时注意 e2e 里可能断言的是那句话本身,一并改。
+
 ### Manual Docker operations on the NAS (rarely needed — CI does this)
 
 Run these in the TrueNAS shell, from the directory holding
