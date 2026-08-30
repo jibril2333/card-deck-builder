@@ -104,18 +104,19 @@ export function CollectionTile({
               ×{qty}
             </span>
           ) : null}
-          {variantLabel ? (
-            <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-purple-600/85 text-white font-bold">
-              {variantLabel}
-            </span>
-          ) : card.rarity ? (
+          {/* Rarity is always top-right and the printing is always
+              bottom-right. They used to share the corner — the parallel took
+              it and pushed the rarity down — so the same fact sat in two
+              different places depending on the card next to it, and a column
+              of rarities could not be read down. */}
+          {card.rarity ? (
             <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-black/65 text-white font-medium">
               {card.rarity}
             </span>
           ) : null}
-          {variantLabel && card.rarity ? (
-            <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-black/65 text-white font-medium">
-              {card.rarity}
+          {variantLabel ? (
+            <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-purple-600/85 text-white font-bold">
+              {variantLabel}
             </span>
           ) : null}
           {restriction ? (
