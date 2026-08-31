@@ -1,5 +1,6 @@
 "use client";
 
+import { cardImageSrc } from "@/lib/card-image";
 import {
   createContext,
   useCallback,
@@ -120,7 +121,7 @@ export function CardPreviewProvider({
           style={placement(preview.anchor)}
         >
           <img
-            src={preview.image_url}
+            src={cardImageSrc(preview.image_url)}
             alt={preview.name}
             referrerPolicy="no-referrer"
             className="w-full rounded-xl shadow-2xl border border-[var(--color-border)] bg-[var(--color-card)]"

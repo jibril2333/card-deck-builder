@@ -1,3 +1,4 @@
+import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { colorHex } from "@/lib/games";
@@ -46,7 +47,7 @@ export function CardThumb({
       <div className="card-thumb relative">
         {card.image_url ? (
           <img
-            src={card.image_url}
+            src={cardImageSrc(card.image_url)}
             alt={card.name}
             loading="lazy"
             referrerPolicy="no-referrer"

@@ -1,5 +1,6 @@
 "use client";
 
+import { cardImageSrc } from "@/lib/card-image";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -229,7 +230,7 @@ export function DeckAdjustments({
                 >
                   {h.image_url ? (
                     <img
-                      src={h.image_url}
+                      src={cardImageSrc(h.image_url)}
                       alt=""
                       loading="lazy"
                       referrerPolicy="no-referrer"
@@ -360,7 +361,7 @@ function Row({
       >
         {item.image_url ? (
           <img
-            src={item.image_url}
+            src={cardImageSrc(item.image_url)}
             alt={item.name}
             loading="lazy"
             referrerPolicy="no-referrer"

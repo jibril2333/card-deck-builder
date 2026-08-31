@@ -1,5 +1,6 @@
 "use client";
 
+import { cardImageSrc } from "@/lib/card-image";
 import { useEffect, useState } from "react";
 
 export type Variant = {
@@ -63,7 +64,7 @@ export function CardImageGallery({
            Filling the container (capped at 300px) keeps the box stable. */
         className="card-thumb w-full max-w-[300px] mx-auto md:mx-0 border border-[var(--color-border)] cursor-zoom-in block hover:border-[var(--color-fg)] transition-colors"
       >
-        <img src={cur.image_url} alt={name} referrerPolicy="no-referrer" />
+        <img src={cardImageSrc(cur.image_url)} alt={name} referrerPolicy="no-referrer" />
       </button>
 
       {variants.length > 1 ? (
@@ -104,7 +105,7 @@ export function CardImageGallery({
                   title={v.label ?? (v.variant ? `Parallel ${v.variant}` : "原版")}
                 >
                   <img
-                    src={v.image_url}
+                    src={cardImageSrc(v.image_url)}
                     alt={chip}
                     loading="lazy"
                     referrerPolicy="no-referrer"
@@ -231,7 +232,7 @@ function Lightbox({
 
       {/* Image — stopPropagation so clicking the image itself doesn't close. */}
       <img
-        src={cur.image_url}
+        src={cardImageSrc(cur.image_url)}
         alt={name}
         referrerPolicy="no-referrer"
         onClick={(e) => e.stopPropagation()}

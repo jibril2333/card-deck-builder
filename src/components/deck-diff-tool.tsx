@@ -1,5 +1,6 @@
 "use client";
 
+import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -340,7 +341,7 @@ function DiffColumn({
               <div className="w-8 shrink-0 aspect-[5/7] rounded overflow-hidden bg-[var(--color-muted)]">
                 {c.image_url ? (
                   <img
-                    src={c.image_url}
+                    src={cardImageSrc(c.image_url)}
                     alt={c.name}
                     loading="lazy"
                     referrerPolicy="no-referrer"

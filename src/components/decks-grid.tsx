@@ -1,5 +1,6 @@
 "use client";
 
+import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -299,7 +300,7 @@ export function DecksGrid({
               <div className="card-thumb relative pointer-events-none">
                 {d.cover_image_url ? (
                   <img
-                    src={d.cover_image_url}
+                    src={cardImageSrc(d.cover_image_url)}
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"

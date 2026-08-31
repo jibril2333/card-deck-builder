@@ -1,5 +1,6 @@
 "use client";
 
+import { cardImageSrc } from "@/lib/card-image";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 
@@ -101,7 +102,7 @@ export function PoolSwap({
         {c.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={c.image_url}
+            src={cardImageSrc(c.image_url)}
             alt={c.name}
             loading="lazy"
             referrerPolicy="no-referrer"

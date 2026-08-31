@@ -1,5 +1,6 @@
 "use client";
 
+import { cardImageSrc } from "@/lib/card-image";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -178,7 +179,7 @@ export function DeckCardSearch({
               >
                 {h.image_url ? (
                   <img
-                    src={h.image_url}
+                    src={cardImageSrc(h.image_url)}
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"
