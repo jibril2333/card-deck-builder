@@ -1,6 +1,7 @@
 import { getDB } from "./connection";
 import { createDeckRepo, DeckLockedError, OwnershipError } from "./deck-shared";
 import { splitTerms } from "@/lib/search-terms";
+import { kanaVariants } from "@/lib/kana";
 import type { CardTranslation } from "./translations-ddl";
 import type { CardRuling } from "./rulings-ddl";
 import type { CardLang } from "../card-lang";
@@ -226,26 +227,37 @@ export function searchCards(filters: DigimonFilters = {}): {
     // finds the card whatever the display language — that is still someone
     // typing a name, just not in English.
     terms.forEach((term, i) => {
-      const k = `@q${i}`;
+      // A kana term is looked for in both scripts: an IME hands you あぐもん
+      // and the card is named アグモン. `@q{i}` stays the term AS TYPED — the
+      // relevance ranking further down is written against it — and the other
+      // script, when there is one, comes in as `@q{i}k1`. A term with no kana
+      // produces exactly one placeholder, as before.
+      const keys = kanaVariants(term).map((v, j) => {
+        const key = j === 0 ? `q${i}` : `q${i}k${j}`;
+        params[key] = `%${v}%`;
+        return `@${key}`;
+      });
+      /** `col LIKE` against every form of this term. */
+      const any = (col: string) =>
+        keys.map((k) => `${col} LIKE ${k}`).join(" OR ");
       if (filters.q_mode === "name") {
         where.push(
-          `(name LIKE ${k} OR code LIKE ${k}
+          `(${any("name")} OR ${any("code")}
             OR EXISTS (
               SELECT 1 FROM card_translations t
-              WHERE t.code = cards.code AND t.name LIKE ${k}
+              WHERE t.code = cards.code AND (${any("t.name")})
             ))`,
         );
       } else {
         where.push(
-          `(name LIKE ${k} OR code LIKE ${k} OR main_effect LIKE ${k} OR inherited_effect LIKE ${k} OR security_effect LIKE ${k} OR digi_types LIKE ${k}
+          `(${any("name")} OR ${any("code")} OR ${any("main_effect")} OR ${any("inherited_effect")} OR ${any("security_effect")} OR ${any("digi_types")}
             OR EXISTS (
               SELECT 1 FROM card_translations t
               WHERE t.code = cards.code
-                AND (t.name LIKE ${k} OR t.effect_main LIKE ${k} OR t.traits LIKE ${k})
+                AND (${any("t.name")} OR ${any("t.effect_main")} OR ${any("t.traits")})
             ))`,
         );
       }
-      params[`q${i}`] = `%${term}%`;
     });
     params.q_exact = filters.q!.trim();
     params.q_prefix = `${terms[0]}%`;
