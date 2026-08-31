@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import { useMemo, useState } from "react";
 import { pAtLeastOne, expectedCount, pNone } from "@/lib/probability";
 
@@ -61,7 +60,7 @@ function CardFace({
       {card.image_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={cardImageSrc(card.image_url)}
+          src={card.image_url}
           alt={card.name}
           loading="lazy"
           referrerPolicy="no-referrer"
@@ -429,7 +428,7 @@ export function Playtest({
                         {r.card.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={cardImageSrc(r.card.image_url)}
+                            src={r.card.image_url}
                             alt=""
                             loading="lazy"
                             referrerPolicy="no-referrer"

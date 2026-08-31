@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -357,7 +356,7 @@ function CardImage({
       : "";
   return (
     <img
-      src={cardImageSrc(src)}
+      src={src}
       alt={alt}
       loading="lazy"
       referrerPolicy="no-referrer"

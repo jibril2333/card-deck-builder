@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -89,7 +88,7 @@ export function CollectionTile({
         <div className="card-thumb relative">
           {card.image_url ? (
             <img
-              src={cardImageSrc(card.image_url)}
+              src={card.image_url}
               alt={card.name}
               loading="lazy"
               referrerPolicy="no-referrer"

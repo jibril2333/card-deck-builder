@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -182,7 +181,7 @@ function PairCard({ game, card }: { game: string; card: JogressPairCard }) {
         {card.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={cardImageSrc(card.image_url)}
+            src={card.image_url}
             alt={card.name}
             loading="lazy"
             referrerPolicy="no-referrer"

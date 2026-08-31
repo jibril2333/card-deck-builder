@@ -3,10 +3,8 @@
  *
  * The names were already localized and the pictures weren't, which left a
  * Japanese title sitting over English art: the one combination that isn't any
- * language. Asserted on the site the art comes FROM, because each language's
- * scans come from a different one, and that is exactly what a name-only fix
- * leaves alone. Art is served through this app now, so that site is the first
- * segment of the path rather than the host — see lib/card-image.
+ * language. Asserted on the image HOST, because each language's scans come from
+ * a different site, and the host is exactly what a name-only fix leaves alone.
  *
  * The fixture restricts BT1-086 and gives it ja/zh rows (see fixtures/seed.ts);
  * every other seeded restriction points at a code the card table doesn't have,
@@ -23,14 +21,10 @@ async function tile(page: Page, lang: string) {
   await page.goto("/digimon/restrictions");
   const el = page.locator("section div.grid > a", { hasText: "BT1-086" }).first();
   await el.waitFor();
-  return el.evaluate((t) => {
-    const src = new URL((t.querySelector("img") as HTMLImageElement).src);
-    const proxied = src.pathname.match(/^\/card-img\/([^/]+)\//);
-    return {
-      name: (t.querySelector("div.font-medium")?.textContent ?? "").trim(),
-      host: proxied ? proxied[1] : src.host,
-    };
-  });
+  return el.evaluate((t) => ({
+    name: (t.querySelector("div.font-medium")?.textContent ?? "").trim(),
+    host: new URL((t.querySelector("img") as HTMLImageElement).src).host,
+  }));
 }
 
 test("banlist art and names both follow the card language", async ({ page }) => {

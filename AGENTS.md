@@ -382,28 +382,6 @@ Read-only. Three-way (us / EN / JA), because two-way can't tell a bug from a
 decision. Run it after a refresh — it is the only thing that can answer "is
 anything else wrong?" with a number instead of a guess.
 
-## 卡图不落盘,但也不外链
-
-卡图从来不存在本地(`public/` 只有脚手架的几个 SVG,`data.nosync/` 全是 SQLite),
-数据库里存的是源站 URL。但浏览器**不直接访问源站** —— 页面上的 `<img src>` 一律经
-`cardImageSrc()`(`src/lib/card-image.ts`)改写成同源路径:
-
-```
-https://world.digimoncard.com/images/cardlist/card/BT1-001.png
-→ /card-img/world.digimoncard.com/images/cardlist/card/BT1-001.png
-```
-
-`src/app/card-img/[...path]/route.ts` 按需拉取并**流式转发**,不写磁盘,回
-`Cache-Control: public, max-age=31536000, immutable` —— 记忆交给浏览器和前面的
-Cloudflare。保留上游 host 和扩展名是有意的:`.png` 结尾边缘缓存才会默认当图片缓存。
-
-- host 必须在 `CARD_IMAGE_HOSTS` 白名单里(6 个),否则 403。这个应用挂在公网隧道
-  上,一个能取任意 URL 的代理就是开放中继。
-- 这样做的三个理由:读者 IP 不再交给四个第三方站;不受源站防盗链和限流摆布;
-  卡组导出图片需要同源(那些 CDN 不发 CORS 头,画布被污染就导不出)。
-- 新加 `<img>` 时记得套 `cardImageSrc()`,`tests/e2e/card-image-proxy.spec.ts`
-  会扫三个页面上有没有漏网的外链。
-
 ## 界面文案
 
 界面语言是中文,写法按产品文案,不按说话:

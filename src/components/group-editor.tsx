@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -170,7 +169,7 @@ export function GroupEditor({
                   <div className="card-thumb relative">
                     {d.cover_image_url ? (
                       <img
-                        src={cardImageSrc(d.cover_image_url)}
+                        src={d.cover_image_url}
                         alt=""
                         loading="lazy"
                         referrerPolicy="no-referrer"

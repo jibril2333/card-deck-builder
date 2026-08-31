@@ -1,14 +1,12 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import { useState } from "react";
 
 /**
  * "导出图片" button: renders the deck as a single shareable PNG on a canvas
  * (header with name/color stripe/counts + card grid with ×N quantity badges)
- * and triggers a download. Card art comes through this app's own origin (see
- * lib/card-image), which is also what keeps the canvas un-tainted — the art
- * CDNs send no CORS headers, and a tainted canvas cannot be exported at all.
+ * and triggers a download. Card art is fetched through /api/card-image so the
+ * canvas stays un-tainted (the art CDNs don't send CORS headers).
  */
 export type ExportCard = {
   code: string;
@@ -45,7 +43,7 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
-    img.src = cardImageSrc(url) ?? url;
+    img.src = `/api/card-image?url=${encodeURIComponent(url)}`;
   });
 }
 

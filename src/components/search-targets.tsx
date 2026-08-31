@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -128,7 +127,7 @@ export function SearchTargets({
                       {t.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={cardImageSrc(t.image_url)}
+                          src={t.image_url}
                           alt={t.name}
                           loading="lazy"
                           referrerPolicy="no-referrer"

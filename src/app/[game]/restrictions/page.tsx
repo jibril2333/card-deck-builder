@@ -1,4 +1,3 @@
-import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
@@ -250,7 +249,7 @@ function RestrictionCard({ row, game }: { row: Row; game: string }) {
       <div className="relative aspect-[5/7] bg-[var(--color-muted)] overflow-hidden rounded-t-md">
         {row.card_image_url ? (
           <img
-            src={cardImageSrc(row.card_image_url)}
+            src={row.card_image_url}
             alt={row.card_name ?? row.identity}
             loading="lazy"
             referrerPolicy="no-referrer"
@@ -423,7 +422,7 @@ function PairCard({
       <div className="relative aspect-[5/7] bg-[var(--color-muted)] overflow-hidden rounded-t-md">
         {image_url ? (
           <img
-            src={cardImageSrc(image_url)}
+            src={image_url}
             alt={name ?? identity}
             loading="lazy"
             referrerPolicy="no-referrer"

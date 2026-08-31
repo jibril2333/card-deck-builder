@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDeckCoverVariantAction } from "@/app/[game]/actions";
@@ -71,7 +70,7 @@ export function CoverVariantPicker({
               }`}
             >
               <img
-                src={cardImageSrc(a.image_url)}
+                src={a.image_url}
                 alt={a.variant || "原版"}
                 loading="lazy"
                 referrerPolicy="no-referrer"

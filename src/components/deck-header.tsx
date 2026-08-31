@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateDeckMetaAction } from "@/app/[game]/actions";
@@ -78,7 +77,7 @@ export function DeckHeader({
         {cover?.image_url ? (
           <>
             <img
-              src={cardImageSrc(cover.image_url)}
+              src={cover.image_url}
               alt=""
               referrerPolicy="no-referrer"
               // Focus a quarter of the way down, not the middle. A card is
@@ -110,7 +109,7 @@ export function DeckHeader({
                 className="shrink-0 rounded-md overflow-hidden border-2 border-white/80 shadow-lg hover:border-[var(--color-accent)] transition-colors cursor-pointer"
               >
                 <img
-                  src={cardImageSrc(cover.image_url)}
+                  src={cover.image_url}
                   alt={cover.name}
                   referrerPolicy="no-referrer"
                   className="h-20 sm:h-28 aspect-[5/7] object-cover block"
@@ -118,7 +117,7 @@ export function DeckHeader({
               </button>
             ) : (
               <img
-                src={cardImageSrc(cover.image_url)}
+                src={cover.image_url}
                 alt={cover.name}
                 referrerPolicy="no-referrer"
                 title={editable ? "封面来自卡组里点了 ★ 的那张卡" : undefined}

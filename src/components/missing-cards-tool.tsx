@@ -1,6 +1,5 @@
 "use client";
 
-import { cardImageSrc } from "@/lib/card-image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -133,7 +132,7 @@ export function MissingCardsTool({
               <div className="card-thumb relative">
                 {d.cover_image_url ? (
                   <img
-                    src={cardImageSrc(d.cover_image_url)}
+                    src={d.cover_image_url}
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"
@@ -226,7 +225,7 @@ export function MissingCardsTool({
                   <div className="w-9 shrink-0 aspect-[5/7] rounded overflow-hidden bg-[var(--color-muted)]">
                     {c.image_url ? (
                       <img
-                        src={cardImageSrc(c.image_url)}
+                        src={c.image_url}
                         alt={c.name}
                         loading="lazy"
                         referrerPolicy="no-referrer"
