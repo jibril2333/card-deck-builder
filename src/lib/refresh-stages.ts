@@ -73,8 +73,9 @@ export const REFRESH_STAGES: RefreshStage[] = [
   },
   {
     id: "prices",
-    label: "价格",
-    hint: "cardrush 市场价（最慢，约 1 小时）",
+    label: "价格与读音",
+    // Both come off the same listing pages — see scraper/cardrush.
+    hint: "cardrush 市场价与日文卡名读音（最慢，约 1 小时）",
     scripts: ["scrape-cardrush-prices.ts"],
   },
   {
