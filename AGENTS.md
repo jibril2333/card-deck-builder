@@ -136,6 +136,26 @@ taken before every run as `.refresh-before.db`, which is both the changelog's
 The precondition is a filesystem whose locks are real — a Linux host with a
 local disk. See the warning below for what happens on a macOS bind mount.
 
+### The kana readings ride along with the price scrape
+
+Japanese card names print furigana over their kanji, and **no official source
+carries it** — the JP card list has no reading field, digimoncard.io is English
+only, and the CN API is Chinese. So 「やがみたいち」 could not find 八神太一 at
+all.
+
+The readings come from Cardrush, which puts a katakana spelling in each
+product's `model_number` for its own search — the same pages
+`scrape-cardrush-prices.ts` already downloads, so this costs no extra request.
+`parseCardrushNameKana()` strips the shop's noise (`〔状態A-〕`, `(パラレル)`)
+and takes the spelling most listings agree on, because hand-entered data has
+typos: BT10-090 is listed as both ツルギゼンジロウ and ツルギゼンシロウ.
+
+It lands in `card_translations.name_kana` (ja rows only, and only where a row
+already exists — this pass is about prices, not about inventing names). The
+search then matches it alongside `name`, together with the hiragana/katakana
+conversion in `lib/kana`. A fresh database has the column but no values until
+a price pass has run.
+
 ### Prices are resumable; a redeploy will interrupt a refresh
 
 `scrape-cardrush-prices.ts` skips cards priced within `--max-age` hours

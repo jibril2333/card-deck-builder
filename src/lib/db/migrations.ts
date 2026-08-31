@@ -1260,6 +1260,31 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 40,
+    name: "card_translations.name_kana",
+    up: (db) => {
+      // The reading of a card name in katakana, so やがみたいち finds 八神太一.
+      // Nothing official carries it — the JP card list has no furigana field
+      // even though the printed card does — so it is filled in from the shop
+      // listings the price scraper already downloads. See scraper/cardrush.
+      //
+      // A database created from the current DDL already has the column, so
+      // check before adding it: the same migration runs on both.
+      const cols = (
+        db.prepare("PRAGMA table_info(card_translations)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      if (!cols.includes("name_kana")) {
+        db.exec("ALTER TABLE card_translations ADD COLUMN name_kana TEXT");
+      }
+      db.exec(
+        `CREATE INDEX IF NOT EXISTS idx_card_translations_kana
+           ON card_translations(name_kana)`,
+      );
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

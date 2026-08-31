@@ -23,7 +23,10 @@
 
 import Database from "better-sqlite3";
 import { GAMES } from "../src/lib/games";
-import { parseCardrushSearchPage } from "../src/lib/scraper/cardrush";
+import {
+  parseCardrushNameKana,
+  parseCardrushSearchPage,
+} from "../src/lib/scraper/cardrush";
 import { findUserByEmail } from "../src/lib/auth/repo";
 
 const SEARCH_URL = "https://www.cardrush-digimon.jp/product-list";
@@ -106,6 +109,18 @@ async function main() {
   const dbPath = GAMES.digimon.dbPath;
   console.log(`Cards DB: ${dbPath}`);
   const db = new Database(dbPath);
+  // This script can run before the app has ever opened this database (the
+  // refresh daemon starts alongside the server, and migrations belong to the
+  // app), so the column it writes has to be ensured here too. ALTER is not
+  // idempotent — ask first.
+  const hasKana = (
+    db.prepare("PRAGMA table_info(card_translations)").all() as {
+      name: string;
+    }[]
+  ).some((c) => c.name === "name_kana");
+  if (!hasKana) {
+    db.exec("ALTER TABLE card_translations ADD COLUMN name_kana TEXT");
+  }
 
   let codes: string[];
   if (args.myCollection) {
@@ -195,6 +210,16 @@ async function main() {
        fetched_at = excluded.fetched_at`,
   );
 
+  // The card name's katakana reading, taken off the same page. Only ja rows
+  // have one, and only where a row already exists — this pass is about
+  // prices, and inventing translation rows for cards the JP scraper has not
+  // seen would be a second source of truth for the name itself.
+  const upsertKana = db.prepare(
+    `UPDATE card_translations SET name_kana = ?
+      WHERE code = ? AND lang = 'ja'
+        AND (name_kana IS NULL OR name_kana <> ?)`,
+  );
+
   // Per-illustrator detail table: wipe + reinsert per card so removed
   // illust groups don't linger from a previous scrape.
   const wipeListings = db.prepare(
@@ -256,6 +281,9 @@ async function main() {
               }
             });
             txListings();
+
+            const kana = parseCardrushNameKana(html);
+            if (kana) upsertKana.run(kana, code, kana);
           }
           const baseStr =
             summary.base_price == null

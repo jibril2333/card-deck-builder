@@ -15,6 +15,11 @@ export const CARD_TRANSLATIONS_DDL = `
     code        TEXT NOT NULL,
     lang        TEXT NOT NULL,           -- 'zh' | 'ja'
     name        TEXT,
+    -- Katakana reading of \`name\`, ja only. Card names print furigana over
+    -- their kanji and nothing in the official data carries it, so this comes
+    -- from the shop listings the price scraper already fetches (see
+    -- scraper/cardrush). It is what lets やがみたいち find 八神太一.
+    name_kana   TEXT,
     card_type   TEXT,                    -- 数码蛋 / 角色 / デジモン …
     series      TEXT,                    -- UA 作品名 (CODE GEASS 反叛的鲁路修)
     traits      TEXT,                    -- digimon 特征(タイプ) / UA 特征
@@ -41,12 +46,16 @@ export const CARD_TRANSLATIONS_DDL = `
   );
   CREATE INDEX IF NOT EXISTS idx_card_translations_name
     ON card_translations(name);
+  CREATE INDEX IF NOT EXISTS idx_card_translations_kana
+    ON card_translations(name_kana);
 `;
 
 export type CardTranslation = {
   code: string;
   lang: "zh" | "ja";
   name: string | null;
+  /** Katakana reading of `name` (ja rows only; null until scraped). */
+  name_kana?: string | null;
   card_type: string | null;
   series: string | null;
   traits: string | null;

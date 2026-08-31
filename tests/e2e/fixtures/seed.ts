@@ -140,12 +140,16 @@ const SEED_RESTRICTIONS: [
  * are the real per-language CDNs: the point of the fixture is that they DIFFER,
  * which is what tells a name-only localization apart from a full one.
  */
-const SEED_TRANSLATIONS: [string, "ja" | "zh", string, string][] = [
+/** code, lang, name, image, and — ja only — the katakana reading of the name. */
+const SEED_TRANSLATIONS: [string, "ja" | "zh", string, string, string?][] = [
   [
     "BT1-086",
     "ja",
     "石田ヤマト",
     "https://digimoncard.com/images/cardlist/card/BT1-086.png",
+    // What the price scraper lifts off the shop listing. The kanji half is
+    // unreachable without it: 「いしだ」 matches nothing in 石田ヤマト.
+    "イシダヤマト",
   ],
   ["BT1-086", "zh", "石田大和", "https://source.windoent.com/DTCG/BT1-086.png"],
 ];
@@ -437,11 +441,11 @@ export function seedDigimonDb(dbPath: string): void {
     }
     db.exec(CARD_TRANSLATIONS_DDL);
     const insertTranslation = db.prepare(
-      `INSERT INTO card_translations (code, lang, name, image_url)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO card_translations (code, lang, name, image_url, name_kana)
+       VALUES (?, ?, ?, ?, ?)`,
     );
-    for (const [code, lang, name, img] of SEED_TRANSLATIONS) {
-      insertTranslation.run(code, lang, name, img);
+    for (const [code, lang, name, img, kana] of SEED_TRANSLATIONS) {
+      insertTranslation.run(code, lang, name, img, kana ?? null);
     }
     const insertJogress = db.prepare(
       `INSERT INTO card_translations (code, lang, name, evo_req)

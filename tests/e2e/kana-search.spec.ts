@@ -10,6 +10,19 @@ import { expect, test } from "@playwright/test";
 const results = (p: import("@playwright/test").Page) =>
   p.locator(".card-grid > div, .card-grid > a");
 
+test("the reading finds a name written in kanji", async ({ page }) => {
+  // 石田ヤマト prints いしだ over its kanji, and nothing official carries that
+  // — the reading comes off the shop listings the price scraper already
+  // fetches, into card_translations.name_kana. Without it, いしだ matches
+  // nothing at all.
+  await page.goto("/digimon?q=" + encodeURIComponent("いしだ"));
+  await expect(results(page)).toHaveCount(1);
+  await expect(page.locator(".card-grid")).toContainText("BT1-086");
+
+  await page.goto("/digimon?q=" + encodeURIComponent("イシダヤマト"));
+  await expect(results(page)).toHaveCount(1);
+});
+
 test("hiragana finds a katakana name", async ({ page }) => {
   // Typed as it comes out of an IME, before conversion.
   await page.goto("/digimon?q=" + encodeURIComponent("やまと"));

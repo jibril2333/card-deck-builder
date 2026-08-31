@@ -228,7 +228,9 @@ export function searchCards(filters: DigimonFilters = {}): {
     // typing a name, just not in English.
     terms.forEach((term, i) => {
       // A kana term is looked for in both scripts: an IME hands you あぐもん
-      // and the card is named アグモン. `@q{i}` stays the term AS TYPED — the
+      // and the card is named アグモン. Together with `name_kana` — the
+      // reading of a name written in kanji — that is what makes やがみたいち
+      // find 八神太一. `@q{i}` stays the term AS TYPED — the
       // relevance ranking further down is written against it — and the other
       // script, when there is one, comes in as `@q{i}k1`. A term with no kana
       // produces exactly one placeholder, as before.
@@ -245,7 +247,8 @@ export function searchCards(filters: DigimonFilters = {}): {
           `(${any("name")} OR ${any("code")}
             OR EXISTS (
               SELECT 1 FROM card_translations t
-              WHERE t.code = cards.code AND (${any("t.name")})
+              WHERE t.code = cards.code
+                AND (${any("t.name")} OR ${any("t.name_kana")})
             ))`,
         );
       } else {
@@ -254,7 +257,7 @@ export function searchCards(filters: DigimonFilters = {}): {
             OR EXISTS (
               SELECT 1 FROM card_translations t
               WHERE t.code = cards.code
-                AND (${any("t.name")} OR ${any("t.effect_main")} OR ${any("t.traits")})
+                AND (${any("t.name")} OR ${any("t.name_kana")} OR ${any("t.effect_main")} OR ${any("t.traits")})
             ))`,
         );
       }

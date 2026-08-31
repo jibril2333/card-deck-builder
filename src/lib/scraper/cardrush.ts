@@ -227,3 +227,44 @@ export function parseCardrushSearchPage(
     listings,
   };
 }
+
+/**
+ * The katakana reading of the card's name, from the shop's own product data.
+ *
+ * Card names print furigana over their kanji — 石田(いしだ)ヤマト — and none of
+ * the official data carries it, so 「やがみたいち」 finds nothing. Cardrush
+ * lists every product with a kana spelling for its own search (the
+ * `model_number` field), which is the same page this file already parses for
+ * prices: no extra request, and it is hand-entered rather than guessed, so
+ * even 東御手洗清司郎 comes out right (ヒガシミタライキヨシロウ).
+ *
+ * The raw values carry shop noise — 〔状態A-〕 grades, a (パラレル) suffix —
+ * and the occasional typo: 剣ゼンジロウ is listed as both ツルギゼンジロウ and
+ * ツルギゼンシロウ. Hence: strip the noise, then take the spelling the most
+ * listings agree on.
+ */
+export function parseCardrushNameKana(html: string): string | null {
+  const $ = cheerio.load(html);
+  const votes = new Map<string, number>();
+  $(".model_number_value").each((_i, el) => {
+    const cleaned = $(el)
+      .text()
+      // Condition grade, and any parenthetical the shop appends.
+      .replace(/〔[^〕]*〕/g, "")
+      .replace(/[(（][^)）]*[)）]/g, "")
+      .trim();
+    // A reading is kana. Anything with kanji in it is a product code or a
+    // title that was never a reading in the first place.
+    if (!/[ァ-ヶ]/.test(cleaned) || /[一-鿿]/.test(cleaned)) return;
+    votes.set(cleaned, (votes.get(cleaned) ?? 0) + 1);
+  });
+  let best: string | null = null;
+  let bestN = 0;
+  for (const [k, n] of votes) {
+    if (n > bestN) {
+      best = k;
+      bestN = n;
+    }
+  }
+  return best;
+}
