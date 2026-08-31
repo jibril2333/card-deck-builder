@@ -689,13 +689,23 @@ export function listKeywordGlossary(): {
   ja: string | null;
   zh: string | null;
 }[] {
+  let official: string[];
   try {
-    const official = (
+    official = (
       db()
         .prepare(`SELECT keyword FROM card_keywords WHERE lang = 'en'`)
         .all() as { keyword: string }[]
     ).map((r) => keywordBase(r.keyword));
-    const names = new Map(
+  } catch {
+    // Table not created yet (fresh DB, scraper never run).
+    return [];
+  }
+  // Its own try: the names are filled by the same stage but a version behind
+  // it, and a database that has the vocabulary without the pairings should
+  // still list every keyword — just in English only.
+  let names = new Map<string, { ja: string | null; zh: string | null }>();
+  try {
+    names = new Map(
       (
         db().prepare(`SELECT official, ja, zh FROM keyword_names`).all() as {
           official: string;
@@ -704,6 +714,10 @@ export function listKeywordGlossary(): {
         }[]
       ).map((r) => [r.official, r]),
     );
+  } catch {
+    // Not scraped since this feature shipped; names stay empty.
+  }
+  {
     const seen = new Set<string>();
     const out: { official: string; ja: string | null; zh: string | null }[] = [];
     for (const k of official) {
@@ -713,9 +727,6 @@ export function listKeywordGlossary(): {
       out.push({ official: k, ja: n?.ja ?? null, zh: n?.zh ?? null });
     }
     return out.sort((a, b) => a.official.localeCompare(b.official));
-  } catch {
-    // Neither table exists yet (fresh DB, scraper never run).
-    return [];
   }
 }
 
