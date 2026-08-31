@@ -3,16 +3,16 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { KEYWORDS } from "@/lib/keywords";
+import { NON_KEYWORDS } from "@/lib/keyword-derive";
 
 /**
  * The keyword list on the game-knowledge page against the official one.
  *
  * `card_keywords` is scraped from the official site's own search dropdown, so
- * it gains a new set's keywords the day the set ships. The page's list is
- * written by hand from the comprehensive rules, so it does not. Comparing them
- * is what turns "the page is out of date" from something a user notices into
- * something a test says — which is how the page came to be missing 22 of the
- * 41 in the first place.
+ * it gains a new set's keywords the day the set ships, and the page now builds
+ * its rows from that list rather than from the hand-written file. What is
+ * still hand-written is the Chinese explanation — and a keyword with no
+ * explanation yet is a thin row, not a missing one.
  */
 const DB = path.join(process.cwd(), "data.nosync", "digimon.db");
 
@@ -82,27 +82,46 @@ describe("KEYWORDS", () => {
   // scrape. Skip rather than fail — this asserts about live data, not code.
   const dbIt = existsSync(DB) ? it : it.skip;
 
-  dbIt("covers every keyword the official list carries", () => {
+  dbIt("can show every keyword the official list carries", () => {
+    // The page no longer prints only what has been written up by hand: its
+    // rows come from this same scraped list, with the ja / zh spelling derived
+    // from the cards (lib/keyword-derive) and the Chinese explanation merged
+    // in where one exists. So the bar is no longer "documented" — it is
+    // "showable": a keyword must reach the page with at least a name.
     const db = new Database(DB, { readonly: true });
     try {
-      const rows = db
-        .prepare(`SELECT keyword FROM card_keywords WHERE lang = 'en'`)
-        .all() as { keyword: string }[];
-      // Two entries in the scraped list aren't keywords:
-      //   "Rule"          — the rules-note marker; section 16 doesn't define it.
-      //   "BlockerDraw 1" — two <option>s run together on the official page.
-      //                     Real keywords never concatenate like this, and
-      //                     both halves are already documented separately.
-      const NOT_KEYWORDS = new Set(["Rule", "BlockerDraw"]);
       const official = new Set(
-        rows.map((r) => base(r.keyword)).filter((k) => k && !NOT_KEYWORDS.has(k)),
+        (
+          db
+            .prepare(`SELECT keyword FROM card_keywords WHERE lang = 'en'`)
+            .all() as { keyword: string }[]
+        )
+          .map((r) => base(r.keyword))
+          .filter((k) => k && !NON_KEYWORDS.has(k)),
+      );
+      const named = new Map(
+        (
+          db.prepare(`SELECT official, ja, zh FROM keyword_names`).all() as {
+            official: string;
+            ja: string | null;
+            zh: string | null;
+          }[]
+        ).map((r) => [r.official, r]),
       );
       const documented = new Set(
         KEYWORDS.flatMap((k) => [k.official, ...(k.aka ?? [])]),
       );
 
-      const missing = [...official].filter((k) => !documented.has(k)).sort();
-      expect(missing, `官方有但页面没写: ${missing.join(", ")}`).toEqual([]);
+      const nameless = [...official]
+        .filter((k) => {
+          const n = named.get(k);
+          return !documented.has(k) && !n?.ja && !n?.zh;
+        })
+        .sort();
+      expect(
+        nameless,
+        `既没有写进 keywords.ts,也没能从卡面推出名字: ${nameless.join(", ")}`,
+      ).toEqual([]);
     } finally {
       db.close();
     }

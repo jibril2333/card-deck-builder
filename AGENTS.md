@@ -136,6 +136,26 @@ taken before every run as `.refresh-before.db`, which is both the changelog's
 The precondition is a filesystem whose locks are real — a Linux host with a
 local disk. See the warning below for what happens on a macOS bind mount.
 
+### The keyword table updates itself; only the write-up is by hand
+
+游戏知识 used to print a hand-written list, so a new set's keywords were
+missing until someone noticed. Now the rows come from `card_keywords` (scraped
+from the official search dropdown by the 关键词 stage), and the ja / zh
+spellings from `keyword_names`.
+
+Nothing joins the three official lists — the EN page says "Detach", the JA page
+says 分離《特徴「セブンコード」》 — so `lib/keyword-derive.ts` pairs them by
+reading the cards: the term that appears on the same cards, scored by F1 so a
+keyword printed on six cards is not matched to ≪ブロッカー≫ just because that is
+everywhere. Below 0.34 it returns nothing: a blank is a gap, a confident wrong
+translation is a lie, and this runs unattended. Measured against the 45
+hand-checked pairs in `lib/keywords.ts`: 40 exact, 5 blank, 0 wrong
+(`tests/keyword-derive.test.ts` fails on any wrong one).
+
+What is still hand-written is the Chinese explanation in `lib/keywords.ts`. A
+keyword with none renders as a row with its three spellings and no paragraph —
+which is why no test demands one.
+
 ### The kana readings ride along with the price scrape
 
 Japanese card names print furigana over their kanji, and **no official source

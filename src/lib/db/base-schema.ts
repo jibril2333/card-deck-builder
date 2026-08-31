@@ -25,6 +25,29 @@
 export const BASE_SCHEMA_VERSION = 6;
 
 /** Cards database: scraper output. Everything else is added by migrations. */
+/**
+ * The two tables the 关键词 refresh stage fills and the game-knowledge page
+ * reads: the official keyword vocabulary per language, and the pairing of an
+ * English keyword with the ja / zh term the cards print for it.
+ *
+ * Shared with the scraper (scripts/scrape-digimon-keywords.ts), which creates
+ * them too — it can run against a database the app has never opened.
+ */
+export const KEYWORD_TABLES_DDL = `
+  CREATE TABLE IF NOT EXISTS card_keywords (
+    lang       TEXT NOT NULL,
+    keyword    TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (lang, keyword)
+  );
+  CREATE TABLE IF NOT EXISTS keyword_names (
+    official   TEXT PRIMARY KEY,
+    ja         TEXT,
+    zh         TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+`;
+
 export const CARDS_BASE_DDL = `
   CREATE TABLE IF NOT EXISTS cards (
     id TEXT PRIMARY KEY,
@@ -68,6 +91,8 @@ export const CARDS_BASE_DDL = `
     PRIMARY KEY (code, variant)
   );
   CREATE INDEX IF NOT EXISTS idx_card_images_code ON card_images(code);
+
+  ${KEYWORD_TABLES_DDL}
 `;
 
 /**

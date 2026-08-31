@@ -100,6 +100,30 @@ const CARDS_SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS idx_refresh_changes_run ON refresh_changes(run_at DESC);
   CREATE INDEX IF NOT EXISTS idx_refresh_changes_code ON refresh_changes(code);
+
+  -- Written by the 关键词 refresh stage. The game-knowledge page builds its
+  -- keyword table from these two, so a fixture without them only ever
+  -- exercises the fallback.
+  CREATE TABLE IF NOT EXISTS card_keywords (
+    lang       TEXT NOT NULL,
+    keyword    TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (lang, keyword)
+  );
+  CREATE TABLE IF NOT EXISTS keyword_names (
+    official   TEXT PRIMARY KEY,
+    ja         TEXT,
+    zh         TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  -- Blocker is written up in lib/keywords; Detach is not, and stands in for
+  -- what a new set brings: on the page with its names, without an explanation.
+  INSERT OR IGNORE INTO card_keywords (lang, keyword) VALUES
+    ('en', 'Blocker'), ('en', 'Detach'), ('en', 'Rule'),
+    ('ja', 'ブロッカー'), ('ja', '分離《特徴「セブンコード」》');
+  INSERT OR IGNORE INTO keyword_names (official, ja, zh) VALUES
+    ('Blocker', 'ブロッカー', '阻挡者'),
+    ('Detach', '分離', '分离');
 `;
 
 /**

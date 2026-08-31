@@ -2,6 +2,7 @@ import { getDB } from "./connection";
 import { createDeckRepo, DeckLockedError, OwnershipError } from "./deck-shared";
 import { splitTerms } from "@/lib/search-terms";
 import { kanaVariants } from "@/lib/kana";
+import { keywordBase, NON_KEYWORDS } from "@/lib/keyword-derive";
 import type { CardTranslation } from "./translations-ddl";
 import type { CardRuling } from "./rulings-ddl";
 import type { CardLang } from "../card-lang";
@@ -668,6 +669,52 @@ export function listKeywords(lang: string): string[] {
     ).map((r) => r.keyword);
   } catch {
     // Table not created yet (fresh DB, scraper never run).
+    return [];
+  }
+}
+
+/**
+ * The keyword table the game-knowledge page prints: every keyword the official
+ * English list carries, with the ja / zh spelling worked out from the cards
+ * (see keyword-derive) where one could be.
+ *
+ * The list is scraped, so a new set's keywords are here the day it ships. The
+ * Chinese explanation is not scraped — the page merges that in from
+ * lib/keywords, and a keyword nobody has written up yet still gets a row.
+ *
+ * Empty until the 关键词 refresh stage has run.
+ */
+export function listKeywordGlossary(): {
+  official: string;
+  ja: string | null;
+  zh: string | null;
+}[] {
+  try {
+    const official = (
+      db()
+        .prepare(`SELECT keyword FROM card_keywords WHERE lang = 'en'`)
+        .all() as { keyword: string }[]
+    ).map((r) => keywordBase(r.keyword));
+    const names = new Map(
+      (
+        db().prepare(`SELECT official, ja, zh FROM keyword_names`).all() as {
+          official: string;
+          ja: string | null;
+          zh: string | null;
+        }[]
+      ).map((r) => [r.official, r]),
+    );
+    const seen = new Set<string>();
+    const out: { official: string; ja: string | null; zh: string | null }[] = [];
+    for (const k of official) {
+      if (!k || NON_KEYWORDS.has(k) || seen.has(k)) continue;
+      seen.add(k);
+      const n = names.get(k);
+      out.push({ official: k, ja: n?.ja ?? null, zh: n?.zh ?? null });
+    }
+    return out.sort((a, b) => a.official.localeCompare(b.official));
+  } catch {
+    // Neither table exists yet (fresh DB, scraper never run).
     return [];
   }
 }

@@ -18,6 +18,8 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
+import { deriveKeywordNames } from "../src/lib/keyword-derive";
+import { KEYWORD_TABLES_DDL } from "../src/lib/db/base-schema";
 
 const DB_PATH = path.join(
   process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync"),
@@ -44,15 +46,6 @@ const SOURCES = [
     label: "Keyword Effect",
   },
 ] as const;
-
-export const CARD_KEYWORDS_DDL = `
-  CREATE TABLE IF NOT EXISTS card_keywords (
-    lang       TEXT NOT NULL,
-    keyword    TEXT NOT NULL,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (lang, keyword)
-  )
-`;
 
 async function fetchOptions(
   url: string,
@@ -98,7 +91,7 @@ async function fetchOptions(
 async function main() {
   const db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
-  db.exec(CARD_KEYWORDS_DDL);
+  db.exec(KEYWORD_TABLES_DDL);
   const ins = db.prepare(
     `INSERT INTO card_keywords (lang, keyword) VALUES (?, ?)
      ON CONFLICT(lang, keyword) DO UPDATE SET updated_at = CURRENT_TIMESTAMP`,
@@ -123,6 +116,40 @@ async function main() {
     console.log(`[kw] ${s.lang}: ${list.length} keywords`);
     await new Promise((r) => setTimeout(r, 500));
   }
+
+  // Second half: pair the English names with the ja / zh ones by reading the
+  // cards. Local work on a database this process already has open — no
+  // requests, so it runs even if a fetch above failed.
+  const cards = db
+    .prepare(
+      `SELECT c.main_effect || ' ' || COALESCE(c.inherited_effect,'') || ' '
+             || COALESCE(c.security_effect,'') || ' ' || COALESCE(c.source_effect,'') AS en,
+              t.effect_main AS ja, z.effect_main AS zh
+         FROM cards c
+         LEFT JOIN card_translations t ON t.code = c.code AND t.lang = 'ja'
+         LEFT JOIN card_translations z ON z.code = c.code AND z.lang = 'zh'`,
+    )
+    .all() as { en: string; ja: string | null; zh: string | null }[];
+  const officialJa = (
+    db.prepare(`SELECT keyword FROM card_keywords WHERE lang = 'ja'`).all() as {
+      keyword: string;
+    }[]
+  ).map((r) => r.keyword);
+  const derived = deriveKeywordNames(cards, officialJa);
+  const insName = db.prepare(
+    `INSERT INTO keyword_names (official, ja, zh) VALUES (?, ?, ?)
+     ON CONFLICT(official) DO UPDATE SET
+       ja = excluded.ja, zh = excluded.zh, updated_at = CURRENT_TIMESTAMP`,
+  );
+  let named = 0;
+  db.transaction(() => {
+    for (const [official, n] of derived) {
+      if (!n.ja && !n.zh) continue;
+      insName.run(official, n.ja, n.zh);
+      named++;
+    }
+  })();
+  console.log(`[kw] names: ${named} of ${derived.size} keywords paired ja/zh`);
 
   const total = db
     .prepare("SELECT COUNT(*) n FROM card_keywords")

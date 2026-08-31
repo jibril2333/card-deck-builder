@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
-import { KEYWORDS, type Keyword } from "@/lib/keywords";
+import { KEYWORDS } from "@/lib/keywords";
+import * as digimon from "@/lib/db/digimon";
 
 export default async function AboutPage({
   params,
@@ -12,7 +13,7 @@ export default async function AboutPage({
   return (
     <>
       <main className="w-full mx-auto max-w-3xl px-4 py-8 prose prose-sm">
-        <DigimonAbout />
+        <DigimonAbout keywords={keywordRows()} />
       </main>
     </>
   );
@@ -82,7 +83,55 @@ function TermList({ items }: { items: [string, string][] }) {
   );
 }
 
-function KeywordList({ items }: { items: Keyword[] }) {
+type KeywordRow = {
+  official: string;
+  ja: string | null;
+  zhName: string | null;
+  /** How card text writes it, e.g. ＜Blocker＞. */
+  display: string;
+  /** The Chinese explanation, where one has been written. */
+  zh: string | null;
+};
+
+/**
+ * The rows the table prints: the official keyword list, with our own write-up
+ * merged in where there is one.
+ *
+ * The list comes from the database — it is scraped on every 关键词 refresh —
+ * so a keyword introduced by a new set shows up here with its three spellings
+ * the day the set ships, and only the explanation waits for a person. Before
+ * the first scrape there is nothing to read from, so the hand-written list is
+ * the whole table.
+ */
+function keywordRows(): KeywordRow[] {
+  const byName = new Map<string, (typeof KEYWORDS)[number]>();
+  for (const k of KEYWORDS) {
+    byName.set(k.official, k);
+    for (const a of k.aka ?? []) byName.set(a, k);
+  }
+  const official = digimon.listKeywordGlossary();
+  if (official.length === 0) {
+    return KEYWORDS.map((k) => ({
+      official: k.official,
+      ja: k.ja,
+      zhName: k.zhName,
+      display: k.display,
+      zh: k.zh,
+    }));
+  }
+  return official.map(({ official: name, ja, zh }) => {
+    const k = byName.get(name);
+    return {
+      official: name,
+      ja: k?.ja ?? ja,
+      zhName: k?.zhName ?? zh,
+      display: k?.display ?? `＜${name}＞`,
+      zh: k?.zh ?? null,
+    };
+  });
+}
+
+function KeywordList({ items }: { items: KeywordRow[] }) {
   return (
     <dl className="not-prose grid grid-cols-1 gap-y-2.5 text-sm">
       {items.map((k) => (
@@ -92,19 +141,21 @@ function KeywordList({ items }: { items: Keyword[] }) {
               {k.display}
             </span>
             <span className="text-xs text-[var(--color-muted-fg)]">
-              {k.zhName} · {k.ja}
+              {[k.zhName, k.ja].filter(Boolean).join(" · ")}
             </span>
           </dt>
-          <dd className="text-[var(--color-fg)] leading-relaxed mt-0.5">
-            {k.zh}
-          </dd>
+          {k.zh ? (
+            <dd className="text-[var(--color-fg)] leading-relaxed mt-0.5">
+              {k.zh}
+            </dd>
+          ) : null}
         </div>
       ))}
     </dl>
   );
 }
 
-function DigimonAbout() {
+function DigimonAbout({ keywords }: { keywords: KeywordRow[] }) {
   return (
     <>
       <h1 className="text-2xl font-bold">Digimon Card Game</h1>
@@ -220,9 +271,9 @@ function DigimonAbout() {
 
       <H>关键字（Keywords）</H>
       <P className="!mt-0 text-xs">
-        共 {KEYWORDS.length} 个,取自官方综合规则(2026-06-19 版)。每条给出英/中/日三种卡面写法。数值或指定卡不同的写法(＜Draw 1＞ 与 ＜Draw 2＞)按规则 16-2 视为同一个关键字,这里合并成一条。
+        共 {keywords.length} 个,取自官方卡表的关键字表,按名称排序,随卡表更新。每条给出英/中/日三种卡面写法。数值或指定卡不同的写法(＜Draw 1＞ 与 ＜Draw 2＞)按规则 16-2 视为同一个关键字,合并成一条。
       </P>
-      <KeywordList items={KEYWORDS} />
+      <KeywordList items={keywords} />
 
       <H>构筑规则</H>
       <P>
