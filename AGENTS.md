@@ -187,6 +187,23 @@ An e2e that needs to plant either file reads the server's data directory from
 points somewhere else — playwright.config.ts is evaluated once per process and
 each evaluation makes its own fixture directory.
 
+### A deck card's price: typed, or the cheaper shop
+
+`getDeckCards` returns three columns, and the difference between them is the
+point:
+
+- `manual_price` — what a person typed (the deck owner's row, or the legacy
+  global one).
+- `market_price` / `market_source` — the cheapest base-printing quote across
+  **both** shops, in-stock preferred.
+- `price` — the first of those, and what every total counts.
+
+The tile binds the input's *value* to `manual_price` and its *placeholder* to
+`market_price`: an empty box showing a grey 180 says "this is the number in
+force", where the old behaviour — the market price as the value — looked like
+something someone had chosen. Blur only saves when the text actually changed,
+so tabbing through a deck still writes nothing.
+
 ### Two price sources
 
 `external_prices` is keyed by `(source, card_id, variant_type)`, and two shops

@@ -99,7 +99,13 @@ export type DeckWithCardQty<TDeck> = TDeck & {
 export type DeckCardRow<TCard> = TCard & {
   quantity: number;
   purchased: number;
+  /** What the card is worth here: the typed price, or the shop floor. */
   price: number | null;
+  /** Only what a person typed — null when `price` came from a shop. */
+  manual_price: number | null;
+  /** The shop floor itself, and which shop it came from. */
+  market_price: number | null;
+  market_source: string | null;
 };
 
 /** Upper bound for an adjustment's copy count — a memo, not a rules engine,
@@ -755,19 +761,23 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
   }
 
   /**
-   * Any user can read any deck's cards. The `price` column is resolved via a
-   * three-tier fallback:
-   *   1. The deck-owner's manually-entered price (user.card_prices).
-   *   2. The legacy "global" manual price (user.card_prices with NULL user_id).
-   *   3. The scraped Cardrush market price for the base printing
-   *      (external_prices).
+   * Any user can read any deck's cards.
    *
-   * That is: manual numbers always win — they're the user's authoritative
-   * intent ("this card is worth ¥X to me"). External prices only fill in the
-   * gaps, so deck totals reflect real market value for cards the user hasn't
-   * bothered to tag.
+   * Price comes back three ways, because the UI needs to tell them apart:
+   *   · `manual_price` — what a person typed (the owner's row, or the legacy
+   *     global one from single-user installs). Their authoritative intent.
+   *   · `market_price` / `market_source` — the cheapest base-printing quote
+   *     any shop has, in-stock preferred. Two shops are scraped now, and the
+   *     cheaper of them is the honest default.
+   *   · `price` — the first of those two: what the totals count.
+   *
+   * The split is what lets the tile show a typed price as a value and a shop
+   * price as a placeholder — the number in force, not one someone chose.
    */
   function getDeckCards(deckId: string): DeckCardRow<TCard>[] {
+    const floor = `SELECT ep.price_yen FROM external_prices ep
+                    WHERE ep.card_id = c.id AND ep.variant_type = 'base'
+                    ORDER BY ep.in_stock DESC, ep.price_yen ASC LIMIT 1`;
     return db()
       .prepare(
         `SELECT c.*, dc.quantity, dc.purchased,
@@ -775,18 +785,25 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
                   (SELECT p.price FROM user.card_prices p
                     WHERE p.card_id = c.id AND p.user_id = (SELECT user_id FROM user.decks WHERE id = ?)),
                   (SELECT p.price FROM user.card_prices p
+                    WHERE p.card_id = c.id AND p.user_id IS NULL)
+                ) AS manual_price,
+                (${floor}) AS market_price,
+                (SELECT ep.source FROM external_prices ep
+                  WHERE ep.card_id = c.id AND ep.variant_type = 'base'
+                  ORDER BY ep.in_stock DESC, ep.price_yen ASC LIMIT 1) AS market_source,
+                COALESCE(
+                  (SELECT p.price FROM user.card_prices p
+                    WHERE p.card_id = c.id AND p.user_id = (SELECT user_id FROM user.decks WHERE id = ?)),
+                  (SELECT p.price FROM user.card_prices p
                     WHERE p.card_id = c.id AND p.user_id IS NULL),
-                  (SELECT ep.price_yen FROM external_prices ep
-                    WHERE ep.card_id = c.id
-                      AND ep.source = 'cardrush'
-                      AND ep.variant_type = 'base')
+                  (${floor})
                 ) AS price
          FROM user.deck_cards dc
          JOIN cards c ON c.id = dc.card_id
          WHERE dc.deck_id = ?
          ORDER BY ${deckCardOrderBy}`,
       )
-      .all(deckId, deckId) as DeckCardRow<TCard>[];
+      .all(deckId, deckId, deckId) as DeckCardRow<TCard>[];
   }
 
   /**

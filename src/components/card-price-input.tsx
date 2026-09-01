@@ -12,11 +12,18 @@ export function CardPriceInput({
   game,
   cardId,
   price,
+  market = null,
   className,
 }: {
   game: string;
   cardId: string;
   price: number | null;
+  /**
+   * The cheaper of the shop quotes, when there is one. Shown as the
+   * placeholder — the value in force until someone types over it — so an
+   * empty box reads as "this is what we're using" rather than "no price".
+   */
+  market?: { price_yen: number; source: string } | null;
   className?: string;
 }) {
   const router = useRouter();
@@ -45,7 +52,12 @@ export function CardPriceInput({
         inputMode="decimal"
         defaultValue={price ?? ""}
         key={`price-${price ?? ""}`}
-        placeholder="预期价"
+        placeholder={market ? `${market.price_yen}` : "预期价"}
+        title={
+          market
+            ? `未填写时按${market.source === "pao" ? "PAO" : "Cardrush"}的 ¥${market.price_yen} 计算`
+            : undefined
+        }
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();

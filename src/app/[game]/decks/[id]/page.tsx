@@ -347,6 +347,11 @@ export default async function DeckEditPage({
         quantity: c.quantity,
         purchased: c.purchased,
         price: c.price,
+        manualPrice: c.manual_price,
+        market:
+          c.market_price != null
+            ? { price_yen: c.market_price, source: c.market_source ?? "" }
+            : null,
         // 0 is a real answer here — only a signed-out viewer gets nothing.
         collected: ownedCounts ? (ownedCounts.get(c.id) ?? 0) : undefined,
       };
@@ -496,7 +501,8 @@ export default async function DeckEditPage({
   const purchaseProgress =
     totalWanted === 0 ? 0 : Math.round((totalOwned / totalWanted) * 100);
 
-  // Expected price totals (only counts cards that have a price filled in).
+  // Price totals. `price` is already the typed number or, failing that, the
+  // cheaper shop quote — see getDeckCards.
   const pricedCards = loaded.cards.filter((c) => c.price != null);
   const totalPrice = pricedCards.reduce(
     (s, c) => s + (c.price ?? 0) * c.quantity,

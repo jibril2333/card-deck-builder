@@ -29,7 +29,12 @@ export type DeckCardData = {
   image_url?: string | null;
   quantity: number;
   purchased: number;
+  /** What this card counts as: the typed price, or the shop floor. */
   price: number | null;
+  /** Only what a person typed — null when `price` is a shop's number. */
+  manualPrice?: number | null;
+  /** The shop floor itself, for the placeholder and the label. */
+  market?: { price_yen: number; source: string } | null;
   /**
    * Copies of this card in the VIEWER's collection, summed over printings.
    * Undefined when nobody is signed in — a zero would claim something.
@@ -260,13 +265,30 @@ export function DeckCard({
 
       {mode === "browse" ? (
         card.price != null ? (
-          <div className="card-price px-2 pb-1.5 text-xs text-[var(--color-accent2)] tabular-nums">
+          <div
+            className={`card-price px-2 pb-1.5 text-xs tabular-nums ${
+              card.manualPrice != null
+                ? "text-[var(--color-accent2)]"
+                : // Nobody typed this one: shown quieter, as the shop's number.
+                  "text-[var(--color-muted-fg)]"
+            }`}
+            title={
+              card.manualPrice != null
+                ? "预期价格"
+                : `${card.market?.source === "pao" ? "PAO" : "Cardrush"} 市场价`
+            }
+          >
             ¥{card.price}
           </div>
         ) : null
       ) : (
         <div className="px-2 pb-1.5">
-          <CardPriceInput game={game} cardId={card.id} price={card.price} />
+          <CardPriceInput
+            game={game}
+            cardId={card.id}
+            price={card.manualPrice ?? null}
+            market={card.market ?? null}
+          />
         </div>
       )}
 

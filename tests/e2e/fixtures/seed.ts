@@ -115,9 +115,13 @@ const CARDS_SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS idx_external_prices_card
     ON external_prices(card_id);
+  -- Two shops on one card, so "the cheaper of the two" has something to
+  -- choose between: PAO is the floor here. BT1-001 has only one quote.
   INSERT OR IGNORE INTO external_prices (source, card_id, variant_type, price_yen, in_stock)
     VALUES ('pao', 'BT1-084', 'base', 180, 1),
-           ('pao', 'BT1-084', 'parallel', 3800, 0);
+           ('pao', 'BT1-084', 'parallel', 3800, 0),
+           ('cardrush', 'BT1-084', 'base', 300, 1),
+           ('cardrush', 'BT1-001', 'base', 40, 1);
 
   -- Written by the 关键词 refresh stage. The game-knowledge page builds its
   -- keyword table from these two, so a fixture without them only ever
