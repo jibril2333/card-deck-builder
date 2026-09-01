@@ -166,9 +166,13 @@ are scraped into it:
 - **pao** — `scrape-pao-prices.ts`, pao-onlineshop.com. One quote per printing,
   no illustrator split.
 
-PAO's search is fuzzy — `BT15-076` also returns `DZ-BT15/076` from another game
-— so `parsePaoSearchPage` keeps nothing whose name does not contain the code
-exactly. Condition and printing are both read off the product name:
+PAO's site-wide search is fuzzy — `BT15-076` also returns `DZ-BT15/076` from
+another game — so the scrape searches **inside the Digimon category**
+(`/view/search?search_keyword=<code>&search_category=DC`), which is the shop's
+own refine form. `parsePaoSearchPage` still drops anything whose name does not
+contain the code, as a backstop. A discounted item carries both `通常価格` and
+`特価価格`; the sale price is the one taken. Condition and printing are read off
+the product name:
 `（傷あり）` damaged, `【プレイ用】` played, unmarked mint, `（パラレル）` alt
 art. The headline price is the best condition available, not the cheapest
 listing: a 傷あり copy at ¥140 is not the price of a card you would sleeve up.

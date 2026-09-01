@@ -14,7 +14,27 @@ const unit = (name: string, price: string, stock = "残りあと2個") => `
 const page = (...units: string[]) =>
   `<ul class="itemList">${units.join("")}</ul>`;
 
+/** A discounted listing: two prices, and the sale one is what you pay. */
+const saleUnit = (name: string, regular: string, sale: string) => `
+  <li class="itemList__unit">
+    <p class="itemName">${name}</p>
+    <div class="price-stock-wrap">
+      <p class="itemPrice itemPrice--regular">通常価格：${regular}<small>(税込)</small></p>
+      <p class="itemPrice itemPrice--sale">特価価格：${sale}<small>(税込)</small></p>
+      <p class="itemPrice--saleRate">30%OFF</p>
+      <p class="itemstock itemstock--under-sale"><small>残りあと4個</small></p>
+    </div>
+  </li>`;
+
 describe("parsePaoSearchPage", () => {
+  it("takes the sale price, not the struck-through one", () => {
+    const s = parsePaoSearchPage(
+      page(saleUnit("★新弾特価★ ゾンビプルートモン SR BT26-079", "200円", "140円")),
+      "BT26-079",
+    );
+    expect(s.base_price).toBe(140);
+  });
+
   it("reads price, printing and condition off the name", () => {
     const s = parsePaoSearchPage(
       page(

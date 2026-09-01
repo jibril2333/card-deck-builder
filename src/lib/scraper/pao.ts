@@ -12,9 +12,13 @@
  *   · condition — 【プレイ用】 played, （傷あり）damaged, unmarked mint;
  *   · printing — （パラレル） is the alt art, everything else the base.
  *
- * And the shop's search is fuzzy: BT15-076 also returns "DZ-BT15/076", a card
- * from another game entirely. Nothing is kept unless the code appears in the
- * name exactly as searched.
+ * Search inside the Digimon category (`search_category=DC`) or the shop's
+ * fuzzy matching hands back other games — BT15-076 also returns
+ * "DZ-BT15/076". The code check below is the backstop for whatever the
+ * category filter still lets through.
+ *
+ * A discounted item carries two prices, `通常価格` in `.itemPrice--regular`
+ * and `特価価格` in `.itemPrice--sale`. The sale one is what you pay.
  */
 
 import * as cheerio from "cheerio";
@@ -55,7 +59,10 @@ export function parsePaoSearchPage(html: string, code: string): PaoSummary {
     const name = unit.find(".itemName").first().text().trim();
     if (!name || !name.includes(code)) return;
 
-    const priceText = unit.find(".itemPrice").first().text();
+    const sale = unit.find(".itemPrice--sale").first();
+    const priceText = (
+      sale.length > 0 ? sale : unit.find(".itemPrice").first()
+    ).text();
     const digits = priceText.replace(/[^\d]/g, "");
     if (!digits) return;
     const price_yen = Number(digits);
