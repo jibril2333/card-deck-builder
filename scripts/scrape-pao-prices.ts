@@ -19,14 +19,12 @@
 import Database from "better-sqlite3";
 import { GAMES } from "../src/lib/games";
 import { parsePaoSearchPage } from "../src/lib/scraper/pao";
+import { shopSearchUrl } from "../src/lib/shops";
 import {
   clearProgress,
   reportProgress,
 } from "../src/lib/refresh-progress";
 
-const SEARCH_URL = "https://pao-onlineshop.com/view/search";
-/** The shop's Digimon category. Searching without it returns other games. */
-const CATEGORY = "DC";
 const UA_HEADER =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -51,9 +49,7 @@ function parseArgs() {
 }
 
 async function fetchSearch(code: string): Promise<string> {
-  const url =
-    `${SEARCH_URL}?search_keyword=${encodeURIComponent(code)}` +
-    `&search_category=${CATEGORY}`;
+  const url = shopSearchUrl("pao", code);
   const r = await fetch(url, {
     headers: {
       "user-agent": UA_HEADER,

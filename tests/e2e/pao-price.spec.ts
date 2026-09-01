@@ -19,6 +19,19 @@ test("the card page shows PAO's quote per printing", async ({ page }) => {
   await expect(block.getByText("¥3,800")).toHaveClass(/line-through/);
 });
 
+test("each shop's heading links to that shop's page for the card", async ({
+  page,
+}) => {
+  await page.goto("/digimon/card/BT1-084");
+  const pao = page.getByRole("link", { name: /PAO 市场价/ });
+  await expect(pao).toHaveAttribute(
+    "href",
+    "https://pao-onlineshop.com/view/search?search_keyword=BT1-084&search_category=DC",
+  );
+  await expect(pao).toHaveAttribute("target", "_blank");
+  await expect(pao).toHaveAttribute("rel", /noopener/);
+});
+
 test("a card PAO doesn't stock has no block at all", async ({ page }) => {
   await page.goto("/digimon/card/BT1-001");
   await expect(page.getByText("PAO 市场价")).toHaveCount(0);

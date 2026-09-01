@@ -28,12 +28,12 @@ import {
   parseCardrushSearchPage,
 } from "../src/lib/scraper/cardrush";
 import { findUserByEmail } from "../src/lib/auth/repo";
+import { shopSearchUrl } from "../src/lib/shops";
 import {
   clearProgress,
   reportProgress,
 } from "../src/lib/refresh-progress";
 
-const SEARCH_URL = "https://www.cardrush-digimon.jp/product-list";
 const UA_HEADER =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const DELAY_MS = 700;
@@ -72,7 +72,7 @@ function parseArgs() {
 }
 
 async function fetchSearch(code: string): Promise<string> {
-  const url = `${SEARCH_URL}?keyword=${encodeURIComponent(code)}`;
+  const url = shopSearchUrl("cardrush", code);
   const r = await fetch(url, {
     headers: {
       "user-agent": UA_HEADER,

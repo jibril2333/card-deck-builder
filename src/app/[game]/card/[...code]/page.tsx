@@ -21,6 +21,7 @@ import {
 } from "@/lib/cards/digimon-fields";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
+import { SHOPS, shopSearchUrl, type ShopId } from "@/lib/shops";
 
 export const dynamic = "force-dynamic";
 
@@ -498,8 +499,8 @@ function DigimonDetail({
         pao.parallel ||
         price != null ? (
         <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
-          <MarketListingsBlock listings={marketListings} />
-          <PaoPriceBlock pao={pao} />
+          <MarketListingsBlock listings={marketListings} code={card.code} />
+          <PaoPriceBlock pao={pao} code={card.code} />
           {readonly ? (
             price != null ? (
               <div className="flex items-center justify-between gap-2 text-xs">
@@ -628,13 +629,45 @@ function DigimonDetail({
  * above it so the two read as two answers to one question rather than as two
  * different features.
  */
+/**
+ * The block's own heading, linking to the page the price was read from. A
+ * quote you cannot check is a rumour, and shop prices move faster than a
+ * daily scrape.
+ */
+function ShopHeading({
+  shop,
+  code,
+  title,
+}: {
+  shop: ShopId;
+  code: string;
+  title: string;
+}) {
+  return (
+    <a
+      href={shopSearchUrl(shop, code)}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={title}
+      className="text-xs font-medium text-[var(--color-muted-fg)] hover:text-[var(--color-accent)] transition-colors inline-flex items-center gap-1"
+    >
+      {SHOPS[shop].label} 市场价
+      <span aria-hidden className="text-[10px] opacity-70">
+        ↗
+      </span>
+    </a>
+  );
+}
+
 function PaoPriceBlock({
   pao,
+  code,
 }: {
   pao: {
     base: digimon.ExternalPrice | null;
     parallel: digimon.ExternalPrice | null;
   };
+  code: string;
 }) {
   const rows: [string, digimon.ExternalPrice][] = [];
   if (pao.base) rows.push(["原画", pao.base]);
@@ -642,12 +675,7 @@ function PaoPriceBlock({
   if (rows.length === 0) return null;
   return (
     <div className="space-y-1">
-      <div
-        className="text-xs font-medium text-[var(--color-muted-fg)]"
-        title="PAO 最低价(品相由好到差取第一档)"
-      >
-        PAO 市场价
-      </div>
+      <ShopHeading shop="pao" code={code} title="PAO 最低价(品相由好到差取第一档)" />
       <div className="space-y-0.5">
         {rows.map(([label, p]) => (
           <div
@@ -682,6 +710,7 @@ function PaoPriceBlock({
 
 function MarketListingsBlock({
   listings,
+  code,
 }: {
   listings: {
     variant_type: "base" | "parallel";
@@ -689,16 +718,16 @@ function MarketListingsBlock({
     price_yen: number;
     in_stock: boolean;
   }[];
+  code: string;
 }) {
   if (listings.length === 0) return null;
   return (
     <div className="space-y-1">
-      <div
-        className="text-xs font-medium text-[var(--color-muted-fg)]"
+      <ShopHeading
+        shop="cardrush"
+        code={code}
         title="Cardrush 最低价(品相 A- 以上)"
-      >
-        Cardrush 市场价
-      </div>
+      />
       <div className="space-y-0.5">
         {listings.map((l, i) => (
           <div
