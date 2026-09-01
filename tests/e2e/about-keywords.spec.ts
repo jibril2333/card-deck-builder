@@ -33,4 +33,12 @@ test("lists official keywords, written up or not", async ({ page }) => {
 
   // "Rule" is in the official dropdown and is not a keyword.
   await expect(page.getByText("＜Rule＞")).toHaveCount(0);
+
+  // On no official dropdown at all — a mechanic the rules define elsewhere,
+  // printed on the card as its own line. It comes from the written-up file,
+  // and its other spellings are printed bare, not bracketed.
+  const bare = list.locator("div", { hasText: "数码合体-N" }).first();
+  await expect(bare).toContainText("数码合体");
+  await expect(bare).toContainText("デジクロス");
+  await expect(bare).not.toContainText("≪デジクロス≫");
 });

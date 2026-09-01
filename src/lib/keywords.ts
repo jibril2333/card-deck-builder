@@ -34,6 +34,13 @@ export type Keyword = {
   /** How the card text writes it, for recognition. */
   display: string;
   zh: string;
+  /**
+   * Carried by neither official dropdown. The site lists "keyword effects";
+   * these are separate mechanics the rules define in their own sections, and
+   * they are on the cards regardless — so the page shows them from here, and
+   * the cross-check against the official list has to know to skip them.
+   */
+  offList?: true;
 };
 
 export const KEYWORDS: Keyword[] = [
@@ -352,6 +359,40 @@ export const KEYWORDS: Keyword[] = [
     zhName: "守护",
     display: "＜Guard＞",
     zh: "我方其他数码兽将因对手效果离开战场时,可删除带此效果的数码兽来阻止其离场。",
+  },
+  {
+    // Not on any official keyword list — the rules file these as their own
+    // mechanic, and the site's dropdown only carries "keyword effects". They
+    // are on the cards all the same, in their own green line.
+    official: "Assembly",
+    ja: "アセンブリ",
+    zhName: "组装",
+    display: "组装-N:「A」×「B」",
+    zh: "登场这张卡时,可把废弃区里指定的卡放到它下面作为进化源,每放 1 张登场费用 -N。写在进化条件下面,如「组装-4:「机械暴龙兽:奥特罗斯形态」×「暴龙兽」」。",
+  },
+  {
+    official: "DigiXros",
+    offList: true,
+    ja: "デジクロス",
+    zhName: "数码合体",
+    display: "数码合体-N:「A」×「B」",
+    zh: "登场这张卡时,可把手牌或战斗区里指定的卡放到它下面,每放 1 张登场费用 -N。与组装的差别只在于取卡的区域。",
+  },
+  {
+    official: "App Fusion",
+    offList: true,
+    ja: "アプ合体",
+    zhName: "应用合体",
+    display: "〔应用合体〕「A」＆「B」:费用N",
+    zh: "指定的数种卡处于链接状态时,把这张卡叠在链接卡上进化,支付写明的费用。",
+  },
+  {
+    official: "Digivolve",
+    offList: true,
+    ja: "進化",
+    zhName: "进化",
+    display: "〔进化〕来源:费用N",
+    zh: "把这张卡叠在满足写明条件的我方数码兽上并支付费用,原来那只连同它的进化源一起成为新数码兽的进化源。",
   },
   {
     official: "Detach",

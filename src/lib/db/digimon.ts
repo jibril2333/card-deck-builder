@@ -685,7 +685,8 @@ export function listKeywords(lang: string): string[] {
  * Empty until the 关键词 refresh stage has run.
  */
 export function listKeywordGlossary(): {
-  official: string;
+  /** Null for a keyword only the Japanese list carries. */
+  official: string | null;
   ja: string | null;
   zh: string | null;
 }[] {
@@ -719,14 +720,40 @@ export function listKeywordGlossary(): {
   }
   {
     const seen = new Set<string>();
-    const out: { official: string; ja: string | null; zh: string | null }[] = [];
+    const out: { official: string | null; ja: string | null; zh: string | null }[] =
+      [];
     for (const k of official) {
       if (!k || NON_KEYWORDS.has(k) || seen.has(k)) continue;
       seen.add(k);
       const n = names.get(k);
       out.push({ official: k, ja: n?.ja ?? null, zh: n?.zh ?? null });
     }
-    return out.sort((a, b) => a.official.localeCompare(b.official));
+
+    // Japan gets sets first, so its list carries keywords the English one has
+    // not heard of — アセンブリ among them. Those go in with no English name
+    // rather than being dropped for lacking one.
+    const paired = new Set(
+      [...names.values()].map((n) => n.ja).filter((x): x is string => !!x),
+    );
+    let ja: string[] = [];
+    try {
+      ja = (
+        db()
+          .prepare(`SELECT keyword FROM card_keywords WHERE lang = 'ja'`)
+          .all() as { keyword: string }[]
+      ).map((r) => keywordBase(r.keyword));
+    } catch {
+      ja = [];
+    }
+    for (const k of ja) {
+      if (!k || NON_KEYWORDS.has(k) || paired.has(k) || seen.has(k)) continue;
+      seen.add(k);
+      out.push({ official: null, ja: k, zh: null });
+    }
+
+    return out.sort((a, b) =>
+      (a.official ?? a.ja ?? "").localeCompare(b.official ?? b.ja ?? ""),
+    );
   }
 }
 

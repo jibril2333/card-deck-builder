@@ -3,7 +3,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { KEYWORDS } from "@/lib/keywords";
-import { NON_KEYWORDS } from "@/lib/keyword-derive";
+import { NON_KEYWORDS, keywordBase } from "@/lib/keyword-derive";
 
 /**
  * The keyword list on the game-knowledge page against the official one.
@@ -31,9 +31,10 @@ describe("KEYWORDS", () => {
     expect(names).toEqual([...new Set(names)]);
     for (const k of KEYWORDS) {
       expect(k.official.length).toBeGreaterThan(0);
-      // Card text uses ＜＞ for keyword effects and ［］ for the digivolution
-      // rules (［DNA Digivolution］, ［Link］), so accept either.
-      expect(k.display).toMatch(/[＜［]/);
+      // Card text uses ＜＞ for keyword effects, ［］/〔〕 for the digivolution
+      // rules (［DNA Digivolution］, 〔进化〕), and no brackets at all for the
+      // requirement lines (组装-N:…), which are printed as their own line.
+      expect(k.display).toMatch(/[＜［〔]|^[^＜［〔]+-N:/);
       expect(k.zh.length).toBeGreaterThan(8);
       // All three names are required: the table's job is recognising a
       // keyword on a card, and which language that card is in varies.
@@ -62,10 +63,24 @@ describe("KEYWORDS", () => {
       ).map((r) => r.keyword);
       // Substring, not equality: the scraped list carries the numeric and
       // card-name variants (デジバースト2, デコイ《黒》) while ours is the base.
-      const missing = KEYWORDS.filter(
-        (k) => !ja.some((o) => o.includes(k.ja)),
-      ).map((k) => `${k.official}→${k.ja}`);
+      const onList = (k: (typeof KEYWORDS)[number]) =>
+        ja.some((o) => o.includes(k.ja));
+      const missing = KEYWORDS.filter((k) => !k.offList && !onList(k)).map(
+        (k) => `${k.official}→${k.ja}`,
+      );
       expect(missing, `日文名对不上官方表: ${missing.join(", ")}`).toEqual([]);
+
+      // And the flag can't be used to wave a typo through: an entry claiming
+      // to be off-list has to actually be absent from the list. Exact base
+      // here, not substring — 進化 is inside アーツ進化 without being it.
+      const exact = new Set(ja.map(keywordBase));
+      const notReallyOff = KEYWORDS.filter(
+        (k) => k.offList && exact.has(k.ja),
+      ).map((k) => k.official);
+      expect(
+        notReallyOff,
+        `标了 offList 但官方表里有: ${notReallyOff.join(", ")}`,
+      ).toEqual([]);
     } finally {
       db.close();
     }

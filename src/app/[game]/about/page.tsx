@@ -108,28 +108,38 @@ function keywordRows(): KeywordRow[] {
   const byName = new Map<string, (typeof KEYWORDS)[number]>();
   for (const k of KEYWORDS) {
     byName.set(k.official, k);
+    byName.set(k.ja, k);
     for (const a of k.aka ?? []) byName.set(a, k);
   }
+  const rowOf = (k: (typeof KEYWORDS)[number]): KeywordRow => ({
+    official: k.official,
+    ja: k.ja,
+    zhName: k.zhName,
+    display: k.display,
+    zh: k.zh,
+  });
+
   const official = digimon.listKeywordGlossary();
-  if (official.length === 0) {
-    return KEYWORDS.map((k) => ({
-      official: k.official,
-      ja: k.ja,
-      zhName: k.zhName,
-      display: k.display,
-      zh: k.zh,
-    }));
-  }
-  return official.map(({ official: name, ja, zh }) => {
-    const k = byName.get(name);
+  if (official.length === 0) return KEYWORDS.map(rowOf);
+
+  const used = new Set<(typeof KEYWORDS)[number]>();
+  const rows = official.map(({ official: name, ja, zh }) => {
+    const k = byName.get(name ?? "") ?? byName.get(ja ?? "");
+    if (k) used.add(k);
     return {
-      official: name,
+      official: k?.official ?? name ?? ja ?? "",
       ja: k?.ja ?? ja,
       zhName: k?.zhName ?? zh,
-      display: k?.display ?? `＜${name}＞`,
+      display: k?.display ?? (name ? `＜${name}＞` : `≪${ja}≫`),
       zh: k?.zh ?? null,
     };
   });
+
+  // Mechanics neither dropdown carries — 数码合体, 应用合体, 进化. They are
+  // printed on the cards in their own line, so the table would be lying by
+  // omission without them.
+  for (const k of KEYWORDS) if (!used.has(k)) rows.push(rowOf(k));
+  return rows.sort((a, b) => a.official.localeCompare(b.official));
 }
 
 /**
@@ -140,9 +150,16 @@ function keywordRows(): KeywordRow[] {
  * written that way in every language.
  */
 function printedForms(k: KeywordRow): string[] {
-  const square = k.display.startsWith("［");
-  const wrap = (name: string, open: string, close: string) =>
-    square ? `［${name}］` : `${open}${name}${close}`;
+  const first = k.display[0];
+  // A requirement line (组装-N:…) is printed bare, so its other spellings are
+  // too; ［…］ and 〔…〕 keep their own bracket in every language; everything
+  // else is a keyword effect, which each language brackets its own way.
+  const wrap =
+    first === "＜"
+      ? (name: string, open: string, close: string) => `${open}${name}${close}`
+      : first === "［" || first === "〔"
+        ? (name: string) => `${first}${name}${first === "［" ? "］" : "〕"}`
+        : (name: string) => name;
   return [
     k.display,
     k.zhName ? wrap(k.zhName, "《", "》") : null,
