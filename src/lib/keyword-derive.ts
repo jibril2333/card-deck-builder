@@ -25,11 +25,12 @@
  */
 
 /**
- * Entries in the official dropdown that are not keywords:
+ * Entries in the official dropdowns that are not keywords:
  *   Rule           — the rules-note marker; no section defines it.
  *   BlockerDraw 1  — two <option>s run together on the official page.
+ *   あり / なし     — the JA form's has/hasn't选项, not vocabulary at all.
  */
-export const NON_KEYWORDS = new Set(["Rule", "BlockerDraw"]);
+export const NON_KEYWORDS = new Set(["Rule", "BlockerDraw", "あり", "なし"]);
 
 /** Agreement below which a candidate is treated as no answer. */
 const MIN_SCORE = 0.34;
@@ -42,6 +43,7 @@ export function keywordBase(name: string): string {
   return name
     .split(/[《〈「（(＜<≪]/)[0]
     .replace(/\s*[＋+\-−][0-9０-９]+\s*$/, "") // Recovery +1 ≪Deck≫
+    .replace(/\s*[＋+\-−]\s*$/, "") // セキュリティアタック+ / −
     .replace(/^[0-9０-９]+/, "") // 1ドロー
     .replace(/[0-9０-９]+$/, "") // デジクロス2
     .replace(/[0-9０-９]+张/, "") // 抽1张卡 → 抽卡

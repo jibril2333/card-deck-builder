@@ -122,18 +122,26 @@ function keywordRows(): KeywordRow[] {
   const official = digimon.listKeywordGlossary();
   if (official.length === 0) return KEYWORDS.map(rowOf);
 
+  // Both dropdowns feed this, and the same keyword reaches it from each: the
+  // English list calls it DNA Digivolution, the Japanese one ジョグレス. One
+  // row per write-up, keyed by whatever identified it.
   const used = new Set<(typeof KEYWORDS)[number]>();
-  const rows = official.map(({ official: name, ja, zh }) => {
+  const seen = new Set<string>();
+  const rows: KeywordRow[] = [];
+  for (const { official: name, ja, zh } of official) {
     const k = byName.get(name ?? "") ?? byName.get(ja ?? "");
+    const id = k?.official ?? name ?? ja ?? "";
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
     if (k) used.add(k);
-    return {
-      official: k?.official ?? name ?? ja ?? "",
+    rows.push({
+      official: id,
       ja: k?.ja ?? ja,
       zhName: k?.zhName ?? zh,
       display: k?.display ?? (name ? `＜${name}＞` : `≪${ja}≫`),
       zh: k?.zh ?? null,
-    };
-  });
+    });
+  }
 
   // Mechanics neither dropdown carries — 数码合体, 应用合体, 进化. They are
   // printed on the cards in their own line, so the table would be lying by
