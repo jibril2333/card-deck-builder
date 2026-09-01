@@ -18,7 +18,9 @@ const progress = path.join(DIR, "refresh-progress.json");
 const lock = path.join(DIR, ".refresh.lock");
 
 test.afterEach(() => {
-  for (const f of [status, progress]) fs.rmSync(f, { force: true });
+  for (const f of [status, progress, path.join(DIR, "refresh-resume.json")]) {
+    fs.rmSync(f, { force: true });
+  }
   fs.rmSync(lock, { recursive: true, force: true });
 });
 
@@ -54,6 +56,36 @@ test("shows which stage, and how far into it", async ({ page }) => {
   const width = await bar.evaluate((el) => el.style.width);
   expect(Number.parseFloat(width)).toBeGreaterThan(35);
   expect(Number.parseFloat(width)).toBeLessThan(50);
+});
+
+test("a run cut short by a redeploy reads as paused, not failed", async ({
+  page,
+}) => {
+  // What the container leaves behind when a new image replaces it mid-run:
+  // a status still saying "running", no lock, and the stages it never reached.
+  fs.writeFileSync(
+    status,
+    JSON.stringify({
+      state: "running",
+      message: "prices",
+      stages: "cards prices restrictions",
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+  fs.writeFileSync(
+    path.join(DIR, "refresh-resume.json"),
+    JSON.stringify({ stages: ["prices", "restrictions"], trigger: "manual" }),
+  );
+
+  await page.goto("/digimon/settings");
+  await expect(page.getByText("已暂停,重启后继续")).toBeVisible();
+  await expect(page.getByText("失败")).toHaveCount(0);
+
+  // Without the resume file the same state is a crash, and says so.
+  fs.rmSync(path.join(DIR, "refresh-resume.json"), { force: true });
+  await page.reload();
+  await expect(page.getByText("失败")).toBeVisible();
 });
 
 test("no run, no bar", async ({ page }) => {

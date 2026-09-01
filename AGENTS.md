@@ -220,6 +220,29 @@ search then matches it alongside `name`, together with the hiragana/katakana
 conversion in `lib/kana`. A fresh database has the column but no values until
 a price pass has run.
 
+### A redeploy pauses a refresh; it does not fail it
+
+A refresh runs inside this container, and watchtower replaces the container the
+moment a new image lands — mid-run, several times on a busy day. What happens
+now:
+
+- `refresh()` writes `refresh-resume.json` (the stages not yet reached) as each
+  stage starts, and deletes it when the run reaches its own end — success or a
+  failed script alike.
+- The daemon reads that file at startup, before its first tick, and finishes
+  what is left (`trigger: "resume"`). Scrapes are upserts and the price ones
+  skip anything fetched in the last 72h, so re-entering a half-done stage is
+  cheap.
+- The admin route reads the same file: a status still saying "running" with no
+  lock is a crash *unless* a resume file is there, in which case it reports
+  **已暂停,重启后继续**.
+
+There is deliberately no SIGTERM handler. The scrapes run through `spawnSync`,
+which blocks the daemon's event loop for the length of the scrape, and the
+daemon is not PID 1 anyway — the entrypoint backgrounds it and execs the
+server. An interruption is detected after the fact, by the file, not by being
+told.
+
 ### Prices are resumable; a redeploy will interrupt a refresh
 
 `scrape-cardrush-prices.ts` skips cards priced within `--max-age` hours

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { REFRESH_STAGES } from "@/lib/refresh-stages";
 
 type Status = {
-  state: "idle" | "running" | "ok" | "failed";
+  state: "idle" | "running" | "ok" | "failed" | "paused";
   message?: string;
   stages?: string;
   startedAt?: string;
@@ -207,6 +207,9 @@ function StateBadge({ state }: { state: Status["state"] }) {
     running: { text: "运行中", cls: "text-[var(--color-accent)]" },
     ok: { text: "成功", cls: "text-emerald-500" },
     failed: { text: "失败", cls: "text-red-500" },
+    // Stopped by a container replacement, not by an error. The remaining
+    // stages run by themselves when the new container starts.
+    paused: { text: "已暂停,重启后继续", cls: "text-amber-500" },
   };
   const s = map[state] ?? map.idle;
   return <span className={`font-medium ${s.cls}`}>{s.text}</span>;

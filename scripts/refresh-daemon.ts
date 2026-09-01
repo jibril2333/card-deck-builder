@@ -54,6 +54,16 @@ const STATUS_FILE = path.join(DATA_DIR, "refresh-status.json");
 const REQUEST_FILE = path.join(DATA_DIR, "refresh-request");
 const LOCK_FILE = path.join(DATA_DIR, ".refresh.lock");
 const LOG_FILE = path.join(DATA_DIR, "refresh.log");
+/**
+ * What a run still has left to do.
+ *
+ * A refresh runs inside this container, and a new image replaces the container
+ * — mid-run, whenever one is pushed. Without this the remaining stages simply
+ * never happen and the panel reports a failure, when what occurred was an
+ * interruption. Written when a run starts, trimmed as each stage finishes,
+ * removed when the run ends; read once at startup.
+ */
+const RESUME_FILE = path.join(DATA_DIR, "refresh-resume.json");
 /** Bundled JS next to this file when running in the image; source when not. */
 const SCRIPTS_DIR = process.env.CDB_SCRIPTS_DIR ?? __dirname;
 const TICK_MS = 60_000;
@@ -99,6 +109,19 @@ function writeStatus(
     updatedAt: new Date().toISOString(),
   });
 }
+
+/**
+ * Why there is no SIGTERM handler here.
+ *
+ * The scrapes run through `spawnSync`, which blocks this process for the
+ * length of the scrape — a handler would not run until the child was already
+ * finished. And the daemon is not PID 1: the entrypoint backgrounds it and
+ * execs the server, so on `docker stop` the signal goes to the server and this
+ * process is killed with the container.
+ *
+ * So an interrupted run is not detected by being told. It is detected
+ * afterwards, by the resume file the next start finds — see RESUME_FILE.
+ */
 
 /** Run one bundled script as a child process, inheriting the data dir. */
 function runScript(name: string, args: string[] = []): boolean {
@@ -160,9 +183,16 @@ function refresh(stages: string[], trigger: string): boolean {
   try {
     const before = snapshot();
 
-    for (const id of chosen) {
+    for (const [i, id] of chosen.entries()) {
       const stage = REFRESH_STAGES.find((s) => s.id === id);
       if (!stage) continue;
+      // What would be left if this container went away right now.
+      writeJsonAtomic(RESUME_FILE, {
+        stages: chosen.slice(i),
+        trigger,
+        startedAt,
+        updatedAt: new Date().toISOString(),
+      });
       for (const script of stage.scripts) {
         log(`--- ${id}: ${script} ---`);
         writeStatus("running", id, chosen, startedAt, trigger);
@@ -184,6 +214,10 @@ function refresh(stages: string[], trigger: string): boolean {
   } finally {
     fs.rmSync(LOCK_FILE, { force: true });
   }
+
+  // The run reached its own end — a success or a failed script, either way
+  // not something to resume.
+  fs.rmSync(RESUME_FILE, { force: true });
 
   if (ok) {
     const n = (() => {
@@ -281,6 +315,21 @@ function main() {
     fs.rmSync(LOCK_FILE, { force: true });
     log(`cleared a lock left behind by a previous run (${held})`);
   }
+
+  // A run that was cut short — almost always by this container being replaced
+  // with a new image — left the stages it had not reached. Finish them before
+  // going back to watching. The scrapes are upserts and the price ones skip
+  // what they already have, so re-entering a half-done stage is cheap.
+  const resume = readJson<{ stages?: string[] }>(RESUME_FILE);
+  if (resume?.stages?.length) {
+    const stages = resume.stages.filter((id) => REFRESH_STAGE_IDS.includes(id));
+    fs.rmSync(RESUME_FILE, { force: true });
+    if (stages.length) {
+      log(`resuming an interrupted run: ${stages.join(" ")}`);
+      refresh(stages, "resume");
+    }
+  }
+
   log(`watching ${DATA_DIR} — schedule + ${path.basename(REQUEST_FILE)}`);
   tick();
   setInterval(tick, TICK_MS);

@@ -30,13 +30,17 @@ const DATA_DIR =
 const STATUS_FILE = path.join(DATA_DIR, "refresh-status.json");
 const REQUEST_FILE = path.join(DATA_DIR, "refresh-request");
 const LOCK_DIR = path.join(DATA_DIR, ".refresh.lock");
+/** Left by a run that never reached its end; the daemon finishes it on its
+ *  next start. See scripts/refresh-daemon.ts. */
+const RESUME_FILE = path.join(DATA_DIR, "refresh-resume.json");
 
 /** Single source shared with the admin panel; kept in step with the shell
  *  script by tests/refresh-stages.test.ts. */
 const STAGES = REFRESH_STAGE_IDS;
 
 type Status = {
-  state: "idle" | "running" | "ok" | "failed";
+  /** "paused" = a container replacement stopped it; the next start resumes. */
+  state: "idle" | "running" | "ok" | "failed" | "paused";
   message?: string;
   stages?: string;
   startedAt?: string;
@@ -61,7 +65,17 @@ export async function GET() {
   const running = fs.existsSync(LOCK_DIR) || fs.existsSync(REQUEST_FILE);
   return Response.json({
     ...status,
-    state: running ? "running" : status.state === "running" ? "failed" : status.state,
+    // No lock and a status still saying "running" means the process went away
+    // mid-run. A resume file says why: the container was replaced, and the
+    // rest of the stages are waiting for the new one — that is a pause, not a
+    // failure. Deploys are frequent enough that the difference matters.
+    state: running
+      ? "running"
+      : status.state === "running"
+        ? fs.existsSync(RESUME_FILE)
+          ? "paused"
+          : "failed"
+        : status.state,
     running,
     // Only while something is actually in flight: a leftover count from a run
     // that has finished is a number pretending to be news.
