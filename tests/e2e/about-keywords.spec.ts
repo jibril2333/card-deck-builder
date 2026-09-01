@@ -41,4 +41,6 @@ test("lists official keywords, written up or not", async ({ page }) => {
   await expect(bare).toContainText("数码合体");
   await expect(bare).toContainText("デジクロス");
   await expect(bare).not.toContainText("≪デジクロス≫");
+  // And it wears the requirement line's green, not the keyword orange.
+  await expect(bare.locator("span").first()).toHaveClass(/#0f6c49/);
 });

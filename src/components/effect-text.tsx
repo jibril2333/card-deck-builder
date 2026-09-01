@@ -81,22 +81,26 @@ const CHIP_STYLE = {
   timing: "bg-[#1f3a93] text-white",
   limiter: "bg-[#d2232a] text-white",
   keyword: "bg-[#e8830c] text-white",
-  // Blue-violet, NOT teal. Sampled off the printed cards: the digivolve box
-  // reads #0e2459 on BT20-007 and #0d4356 on EX8-031 — a dark blue leaning
-  // violet, close to but distinguishable from the timing box's #09243b. Both
-  // measurements are near-black, so this is brightened by the same amount the
-  // timing navy already is (#09243b → #1f3a93). The earlier teal was a guess
-  // that no card actually carries.
-  special: "bg-[#3b3a9e] text-white",
+  // Green. The earlier blue-violet came from sampling two JAPANESE cards
+  // (#0e2459 on BT20-007, #0d4356 on EX8-031) without noticing what the two
+  // samples were saying: on a JP card this line is tinted with the CARD's own
+  // colour, so those were a blue card and a teal one, and averaging them
+  // produced a colour no card carries. The Chinese printings use one fixed
+  // green for the whole family — 链接 on BT26-010 reads #0f6c49 — so that is
+  // the one thing here that is a colour rather than an average.
+  special: "bg-[#0f6c49] text-white",
 } as const;
 
 const CHIP =
   "inline-block px-1.5 rounded align-[0.05em] text-[0.92em] font-medium " +
   "leading-[1.5] whitespace-nowrap";
 
-/** The keyword chip exactly as card text draws it, for the glossary on the
- *  game-knowledge page: a keyword should look the same wherever it is read. */
+/** The chips exactly as card text draws them, for the glossary on the
+ *  game-knowledge page: a keyword should look the same wherever it is read.
+ *  Orange for keyword effects, green for the requirement lines — 〔进化〕,
+ *  链接, 组装 — which the cards print as their own green line. */
 export const KEYWORD_CHIP = `${CHIP} ${CHIP_STYLE.keyword}`;
+export const SPECIAL_CHIP = `${CHIP} ${CHIP_STYLE.special}`;
 
 const PAIRS: Record<string, string> = {
   "【": "】", "〔": "〕", "[": "]", "［": "］", "{": "}",

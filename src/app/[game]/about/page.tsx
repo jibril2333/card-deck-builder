@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { KEYWORDS } from "@/lib/keywords";
 import * as digimon from "@/lib/db/digimon";
-import { KEYWORD_CHIP } from "@/components/effect-text";
+import { KEYWORD_CHIP, SPECIAL_CHIP } from "@/components/effect-text";
 
 export default async function AboutPage({
   params,
@@ -157,6 +157,18 @@ function keywordRows(): KeywordRow[] {
  * ≪…≫ in Japanese, 《…》 in Chinese, or ［…］ for the few keywords that are
  * written that way in every language.
  */
+/**
+ * Is this one of the requirement lines rather than a keyword effect?
+ *
+ * The cards draw the two differently — a keyword effect is an orange chip
+ * inside the text, a requirement (〔进化〕, 链接, 组装-N) is its own green
+ * line above it — and the bracket is what says which: ＜＞ for keywords,
+ * 〔〕／［］ or no bracket at all for requirements.
+ */
+function isRequirement(k: KeywordRow): boolean {
+  return !k.display.startsWith("＜");
+}
+
 function printedForms(k: KeywordRow): string[] {
   const first = k.display[0];
   // A requirement line (组装-N:…) is printed bare, so its other spellings are
@@ -185,7 +197,10 @@ function KeywordList({ items }: { items: KeywordRow[] }) {
               it looks like the thing being recognised. */}
           <dt className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
             {printedForms(k).map((form) => (
-              <span key={form} className={KEYWORD_CHIP}>
+              <span
+                key={form}
+                className={isRequirement(k) ? SPECIAL_CHIP : KEYWORD_CHIP}
+              >
                 {form}
               </span>
             ))}
