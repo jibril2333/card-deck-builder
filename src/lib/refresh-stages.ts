@@ -74,9 +74,10 @@ export const REFRESH_STAGES: RefreshStage[] = [
   {
     id: "prices",
     label: "价格与读音",
-    // Both come off the same listing pages — see scraper/cardrush.
-    hint: "cardrush 市场价与日文卡名读音（最慢，约 1 小时）",
-    scripts: ["scrape-cardrush-prices.ts"],
+    // Cardrush first (its pages also carry the kana readings — see
+    // scraper/cardrush), then PAO for a second quote on the same cards.
+    hint: "cardrush / PAO 市场价与日文卡名读音（最慢，约 2 小时）",
+    scripts: ["scrape-cardrush-prices.ts", "scrape-pao-prices.ts"],
   },
   {
     id: "restrictions",

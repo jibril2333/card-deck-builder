@@ -156,6 +156,27 @@ What is still hand-written is the Chinese explanation in `lib/keywords.ts`. A
 keyword with none renders as a row with its three spellings and no paragraph —
 which is why no test demands one.
 
+### Two price sources
+
+`external_prices` is keyed by `(source, card_id, variant_type)`, and two shops
+are scraped into it:
+
+- **cardrush** — `scrape-cardrush-prices.ts`, per-illustrator listings plus the
+  kana readings (see below).
+- **pao** — `scrape-pao-prices.ts`, pao-onlineshop.com. One quote per printing,
+  no illustrator split.
+
+PAO's search is fuzzy — `BT15-076` also returns `DZ-BT15/076` from another game
+— so `parsePaoSearchPage` keeps nothing whose name does not contain the code
+exactly. Condition and printing are both read off the product name:
+`（傷あり）` damaged, `【プレイ用】` played, unmarked mint, `（パラレル）` alt
+art. The headline price is the best condition available, not the cheapest
+listing: a 傷あり copy at ¥140 is not the price of a card you would sleeve up.
+
+Both run in the 价格与读音 stage, one after the other, which is why that stage
+now says ~2 hours. Each skips anything priced in the last 72h (`--max-age`,
+`--force`).
+
 ### The kana readings ride along with the price scrape
 
 Japanese card names print furigana over their kanji, and **no official source

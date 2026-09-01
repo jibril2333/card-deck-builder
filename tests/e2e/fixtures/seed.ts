@@ -101,6 +101,24 @@ const CARDS_SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_refresh_changes_run ON refresh_changes(run_at DESC);
   CREATE INDEX IF NOT EXISTS idx_refresh_changes_code ON refresh_changes(code);
 
+  -- Market prices (migration 10). Seeded here so the card page's two shop
+  -- blocks have something to render: Cardrush's per-illustrator list and
+  -- PAO's per-printing quote.
+  CREATE TABLE IF NOT EXISTS external_prices (
+    source TEXT NOT NULL,
+    card_id TEXT NOT NULL,
+    variant_type TEXT NOT NULL,
+    price_yen INTEGER NOT NULL,
+    in_stock INTEGER NOT NULL DEFAULT 1,
+    fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (source, card_id, variant_type)
+  );
+  CREATE INDEX IF NOT EXISTS idx_external_prices_card
+    ON external_prices(card_id);
+  INSERT OR IGNORE INTO external_prices (source, card_id, variant_type, price_yen, in_stock)
+    VALUES ('pao', 'BT1-084', 'base', 180, 1),
+           ('pao', 'BT1-084', 'parallel', 3800, 0);
+
   -- Written by the 关键词 refresh stage. The game-knowledge page builds its
   -- keyword table from these two, so a fixture without them only ever
   -- exercises the fallback.

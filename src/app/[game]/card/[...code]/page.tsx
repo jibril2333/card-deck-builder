@@ -85,6 +85,13 @@ export default async function CardPage({
   }
   // Cardrush per-illustrator market prices (each distinct printing).
   const listings = digimon.getExternalListings(card.id);
+  // PAO quotes the same card without splitting it by illustrator, so it is one
+  // price per printing rather than a list. Two shops disagreeing is the point.
+  const paoPrices = digimon.getExternalPrices([card.id], "pao");
+  const pao = {
+    base: paoPrices.get(`${card.id}|base`) ?? null,
+    parallel: paoPrices.get(`${card.id}|parallel`) ?? null,
+  };
   // What the reader's own shelf holds. Null for anon — nobody's shelf.
   const owned = me ? digimon.getCardOwnership(meId, card.id) : null;
   return (
@@ -98,6 +105,7 @@ export default async function CardPage({
         cardLang={cardLang}
         price={digimon.getCardPrice(meId, card.id)}
         marketListings={listings}
+        pao={pao}
         rulings={digimon.getCardRulings(card.code)}
         owned={owned}
         readonly={!me}
@@ -436,6 +444,7 @@ function DigimonDetail({
   cardLang,
   price,
   marketListings,
+  pao,
   rulings,
   owned,
   readonly,
@@ -460,6 +469,11 @@ function DigimonDetail({
   cardLang: string;
   price: number | null;
   marketListings: digimon.ExternalListing[];
+  /** The other shop's quote, per printing; null where it stocks none. */
+  pao: {
+    base: digimon.ExternalPrice | null;
+    parallel: digimon.ExternalPrice | null;
+  };
   /** The reader's own copies of this card; null when nobody is signed in. */
   owned: { total: number; byVariant: { variant: string; quantity: number }[] } | null;
   /** Anon viewer: hide the editable price input + the AddToDeck widget. */
@@ -478,9 +492,14 @@ function DigimonDetail({
         {/* Everything in this panel is conditional, so the panel has to be
             too — an anonymous reader looking at a card with no market listings
             and no price got an empty bordered box. */}
-        {!readonly || marketListings.length > 0 || price != null ? (
+        {!readonly ||
+        marketListings.length > 0 ||
+        pao.base ||
+        pao.parallel ||
+        price != null ? (
         <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
           <MarketListingsBlock listings={marketListings} />
+          <PaoPriceBlock pao={pao} />
           {readonly ? (
             price != null ? (
               <div className="flex items-center justify-between gap-2 text-xs">
@@ -604,6 +623,63 @@ function DigimonDetail({
  *
  * Renders nothing when no listings have been scraped yet.
  */
+/**
+ * PAO's quote. One line per printing, in the same shape as the Cardrush block
+ * above it so the two read as two answers to one question rather than as two
+ * different features.
+ */
+function PaoPriceBlock({
+  pao,
+}: {
+  pao: {
+    base: digimon.ExternalPrice | null;
+    parallel: digimon.ExternalPrice | null;
+  };
+}) {
+  const rows: [string, digimon.ExternalPrice][] = [];
+  if (pao.base) rows.push(["原画", pao.base]);
+  if (pao.parallel) rows.push(["异画", pao.parallel]);
+  if (rows.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <div
+        className="text-xs font-medium text-[var(--color-muted-fg)]"
+        title="PAO 最低价(品相由好到差取第一档)"
+      >
+        PAO 市场价
+      </div>
+      <div className="space-y-0.5">
+        {rows.map(([label, p]) => (
+          <div
+            key={label}
+            className="flex items-center justify-between gap-2 text-xs"
+          >
+            <span
+              className={`shrink-0 px-1 py-px text-[9px] rounded font-bold uppercase ${
+                label === "原画"
+                  ? "bg-[var(--color-muted)] text-[var(--color-muted-fg)]"
+                  : "bg-purple-600/15 text-purple-600 dark:text-purple-300"
+              }`}
+            >
+              {label}
+            </span>
+            <span
+              className={`font-mono tabular-nums shrink-0 ${
+                p.in_stock
+                  ? "text-[var(--color-fg)]"
+                  : "text-[var(--color-muted-fg)] line-through opacity-70"
+              }`}
+              title={p.in_stock ? "在售" : "已售罄(最后记录价)"}
+            >
+              ¥{p.price_yen.toLocaleString()}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MarketListingsBlock({
   listings,
 }: {
