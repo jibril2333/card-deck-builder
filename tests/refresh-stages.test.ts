@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { REFRESH_STAGES, REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
+import {
+  REFRESH_STAGES,
+  REFRESH_STAGE_IDS,
+  scriptLabel,
+} from "@/lib/refresh-stages";
 
 /**
  * `REFRESH_STAGES` is now the only authority: the daemon runs
@@ -31,6 +35,31 @@ describe("refresh stages", () => {
     for (const s of REFRESH_STAGES) {
       expect(s.label.length, s.id).toBeGreaterThan(0);
       expect(s.hint.length, s.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("gives every script a label for the progress line", () => {
+    // A script with no label shows a bar with no idea what is filling it —
+    // which is exactly the state 中/日文 was in with three scripts behind one
+    // stage name.
+    for (const stage of REFRESH_STAGES) {
+      for (const script of stage.scripts) {
+        expect(scriptLabel(script), `${stage.id} → ${script}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("every script reports its own progress", () => {
+    // The panel's inner count comes from the scripts themselves; one that
+    // never calls reportProgress leaves the bar stuck on the stage boundary.
+    for (const stage of REFRESH_STAGES) {
+      for (const script of stage.scripts) {
+        const src = fs.readFileSync(
+          path.join(process.cwd(), "scripts", script),
+          "utf8",
+        );
+        expect(src, `${stage.id} → ${script}`).toContain("reportProgress(");
+      }
     }
   });
 

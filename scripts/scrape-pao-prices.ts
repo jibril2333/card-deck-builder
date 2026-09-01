@@ -20,10 +20,7 @@ import Database from "better-sqlite3";
 import { GAMES } from "../src/lib/games";
 import { parsePaoSearchPage } from "../src/lib/scraper/pao";
 import { shopSearchUrl } from "../src/lib/shops";
-import {
-  clearProgress,
-  reportProgress,
-} from "../src/lib/refresh-progress";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 const UA_HEADER =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
@@ -179,7 +176,6 @@ async function main() {
     await new Promise((r) => setTimeout(r, DELAY_MS));
   }
 
-  clearProgress();
   console.log(
     `\nDone — priced=${priced}, not-stocked=${none}, error=${errored}` +
       (args.dryRun ? " (dry run, nothing written)" : ""),

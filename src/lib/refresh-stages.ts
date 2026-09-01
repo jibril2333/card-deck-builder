@@ -87,4 +87,29 @@ export const REFRESH_STAGES: RefreshStage[] = [
   },
 ];
 
+/**
+ * What each script is doing, for the progress line. A stage can be three
+ * scripts long — 中/日文 is the English mirror, then Chinese, then Japanese —
+ * and "第 3 / 8 项 · 中/日文" alone cannot say which of the three you are
+ * watching, or why the count restarted.
+ */
+export const SCRIPT_LABELS: Record<string, string> = {
+  "sync-cards.ts": "卡表",
+  "scrape-digimon-sets.ts": "卡包",
+  "scrape-digimon-metadata.ts": "英文卡表",
+  "scrape-digimon-cn.ts": "中文",
+  "scrape-digimon-jp.ts": "日文",
+  "scrape-digimon-alt-arts.ts": "异画",
+  "scrape-digimon-keywords.ts": "关键词",
+  "scrape-digimon-rulings.ts": "裁定",
+  "scrape-cardrush-prices.ts": "Cardrush",
+  "scrape-pao-prices.ts": "PAO",
+  "scrape-restrictions.ts": "禁限",
+};
+
+/** The label for a `script` name as reported by refresh-progress. */
+export function scriptLabel(script: string): string | null {
+  return SCRIPT_LABELS[script] ?? SCRIPT_LABELS[`${script}.ts`] ?? null;
+}
+
 export const REFRESH_STAGE_IDS: string[] = REFRESH_STAGES.map((s) => s.id);

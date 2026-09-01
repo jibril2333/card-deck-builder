@@ -20,6 +20,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import { deriveKeywordNames } from "../src/lib/keyword-derive";
 import { KEYWORD_TABLES_DDL } from "../src/lib/db/base-schema";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 const DB_PATH = path.join(
   process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync"),
@@ -97,7 +98,19 @@ async function main() {
      ON CONFLICT(lang, keyword) DO UPDATE SET updated_at = CURRENT_TIMESTAMP`,
   );
 
-  for (const s of SOURCES) {
+  reportProgress(
+    { script: "scrape-digimon-keywords", done: 0, total: SOURCES.length + 1 },
+    true,
+  );
+  for (const [si, s] of SOURCES.entries()) {
+    reportProgress({
+      script: "scrape-digimon-keywords",
+      done: si,
+      total: SOURCES.length + 1,
+      note: s.lang,
+    },
+      true,
+    );
     let list: string[];
     try {
       list = await fetchOptions(s.url, s.label);
@@ -117,6 +130,15 @@ async function main() {
     await new Promise((r) => setTimeout(r, 500));
   }
 
+  reportProgress(
+    {
+      script: "scrape-digimon-keywords",
+      done: SOURCES.length,
+      total: SOURCES.length + 1,
+      note: "配对三种写法",
+    },
+    true,
+  );
   // Second half: pair the English names with the ja / zh ones by reading the
   // cards. Local work on a database this process already has open — no
   // requests, so it runs even if a fetch above failed.

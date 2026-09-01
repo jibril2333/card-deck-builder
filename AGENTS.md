@@ -163,6 +163,18 @@ which is why no test demands one.
 how far into it. Two files, one writer each — the daemon and its child process
 would otherwise be writing the same file.
 
+Every stage reports: each script calls `reportProgress()` over whatever it
+actually walks — set prefixes for the EN/JP text scrapes, pages for the CN
+feed, cards for the art probe and the two price scrapes, phases for the ones
+that are a single request plus a write (卡表, 卡包, 禁限). `tests/
+refresh-stages.test.ts` fails if a script in a stage has no `reportProgress`
+call and if it has no entry in `SCRIPT_LABELS`, which is what the panel shows
+after the stage name — 中/日文 is three scripts and the count restarts at each.
+
+Reports are forced (unthrottled) in the loops where one iteration is one
+network round trip; the throttle is for the two loops that run thousands of
+times.
+
 `lib/refresh-progress.ts` is both ends: `reportProgress()` for the scripts
 (throttled to 1/s, `force` for the first and last call), `readProgress()` for
 the admin route, which ignores anything older than five minutes — a killed

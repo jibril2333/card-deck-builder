@@ -19,6 +19,7 @@ import {
   type ParsedRestriction,
   type ParsedPair,
 } from "../src/lib/scraper/restrictions";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 const SOURCES: Record<
   GameId,
@@ -161,7 +162,19 @@ async function runFor(game: GameId, dryRun: boolean) {
 async function main() {
   const { game, dryRun } = parseArgs();
   const games: GameId[] = game ? [game] : ["digimon"];
-  for (const g of games) {
+  reportProgress(
+    { script: "scrape-restrictions", done: 0, total: games.length },
+    true,
+  );
+  for (const [gi, g] of games.entries()) {
+    reportProgress({
+      script: "scrape-restrictions",
+      done: gi,
+      total: games.length,
+      note: g,
+    },
+      true,
+    );
     try {
       await runFor(g, dryRun);
     } catch (e) {

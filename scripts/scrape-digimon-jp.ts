@@ -27,6 +27,7 @@ import {
   CARD_TRANSLATIONS_DDL,
   UPSERT_TRANSLATION_SQL,
 } from "../src/lib/db/translations-ddl";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 // CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
 // keeps serving the real one (host writes to the bind-mounted DB corrupt the
@@ -247,7 +248,19 @@ async function main() {
   // first scrape captured, which is why P-190 still showed its Link blocks as
   // 進化元効果 after every other Link card had been fixed.
   const emptyPrefixes: string[] = [];
-  for (const prefix of prefixes) {
+  reportProgress(
+    { script: "scrape-digimon-jp", done: 0, total: prefixes.length },
+    true,
+  );
+  for (const [pi, prefix] of prefixes.entries()) {
+    reportProgress({
+      script: "scrape-digimon-jp",
+      done: pi,
+      total: prefixes.length,
+      note: prefix,
+    },
+      true,
+    );
     let cards;
     try {
       // Query with the trailing hyphen: the JP search returns nothing for

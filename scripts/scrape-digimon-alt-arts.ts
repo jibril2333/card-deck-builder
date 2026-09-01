@@ -21,6 +21,7 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 // Honour CDB_DATA_DIR so a long probe can run against a COPY of the DB while
 // the prod container keeps serving the real one (writing the bind-mounted DB
@@ -235,6 +236,12 @@ async function runLang(
     if (variants.length > 1) cardsWithAltArt++;
     return { code, count: variants.length };
   }, (done, total) => {
+    reportProgress({
+      script: "scrape-digimon-alt-arts",
+      done,
+      total,
+      note: lang,
+    });
     if (done % 200 === 0 || done === total) {
       const elapsed = Date.now() - startedAt;
       const rate = done / (elapsed / 1000);

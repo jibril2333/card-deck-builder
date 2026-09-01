@@ -29,10 +29,7 @@ import {
 } from "../src/lib/scraper/cardrush";
 import { findUserByEmail } from "../src/lib/auth/repo";
 import { shopSearchUrl } from "../src/lib/shops";
-import {
-  clearProgress,
-  reportProgress,
-} from "../src/lib/refresh-progress";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 const UA_HEADER =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -321,7 +318,6 @@ async function main() {
     if (codes.length > 1) await new Promise((r) => setTimeout(r, DELAY_MS));
   }
 
-  clearProgress();
   const elapsed = (Date.now() - startedAt) / 1000;
   console.log(
     `\nDone in ${elapsed.toFixed(0)}s — success=${success}, ` +

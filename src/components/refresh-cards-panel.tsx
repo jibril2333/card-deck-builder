@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { REFRESH_STAGES } from "@/lib/refresh-stages";
+import { REFRESH_STAGES, scriptLabel } from "@/lib/refresh-stages";
 
 type Status = {
   state: "idle" | "running" | "ok" | "failed" | "paused";
@@ -59,6 +59,8 @@ function RunProgress({ status }: { status: Status | null }) {
             ? `第 ${current + 1} / ${stages.length} 项`
             : "准备中"}
           {stage ? ` · ${stage.label}` : ""}
+          {/* Which script inside the stage — three of them share 中/日文. */}
+          {p && scriptLabel(p.script) ? ` · ${scriptLabel(p.script)}` : ""}
         </span>
         {p && p.total > 0 ? (
           <span className="tabular-nums">

@@ -20,6 +20,7 @@
 
 import Database from "better-sqlite3";
 import path from "node:path";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 const DB_PATH = path.join(
   process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync"),
@@ -68,6 +69,10 @@ export function parseSetOptions(html: string): ScrapedSet[] {
 }
 
 async function main() {
+  reportProgress(
+    { script: "scrape-digimon-sets", done: 0, total: 2, note: "抓取卡包列表" },
+    true,
+  );
   const dryRun = process.argv.includes("--dry-run");
   const res = await fetch(LIST_URL, { headers: { "user-agent": UA } });
   if (!res.ok) throw new Error(`GET card list failed: ${res.status}`);
@@ -100,6 +105,15 @@ async function main() {
        release_order = excluded.release_order`,
   );
   db.transaction(() => {
+    reportProgress(
+      {
+        script: "scrape-digimon-sets",
+        done: 1,
+        total: 2,
+        note: `写入 ${sets.length} 个卡包`,
+      },
+      true,
+    );
     for (const s of sets) upsert.run(s);
   })();
   const n = db.prepare("SELECT COUNT(*) n FROM card_sets").get() as { n: number };

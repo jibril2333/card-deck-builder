@@ -44,6 +44,7 @@ import {
   describeSchedule,
 } from "../src/lib/refresh-schedule";
 import { REFRESH_STAGES, REFRESH_STAGE_IDS } from "../src/lib/refresh-stages";
+import { clearProgress } from "../src/lib/refresh-progress";
 
 const DATA_DIR = process.env.CDB_DATA_DIR ?? "/app/data.nosync";
 const LIVE_DB = path.join(DATA_DIR, "digimon.db");
@@ -213,6 +214,9 @@ function refresh(stages: string[], trigger: string): boolean {
     }
   } finally {
     fs.rmSync(LOCK_FILE, { force: true });
+    // The scripts report their own progress; the run owns clearing it, so a
+    // finished count never lingers into the next thing the panel shows.
+    clearProgress();
   }
 
   // The run reached its own end — a success or a failed script, either way

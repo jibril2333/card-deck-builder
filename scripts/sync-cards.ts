@@ -47,6 +47,7 @@ import {
   setOf,
   type ApiCard,
 } from "../src/lib/scraper/digimoncardio";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 // Honour CDB_DATA_DIR so a run can target a COPY of the DB while the prod
 // container keeps serving the real one (host writes to the bind-mounted DB
@@ -66,9 +67,20 @@ const MIN_EXPECTED_ROWS = 5000;
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
 
+  // Three phases rather than a per-row count: the fetch is one request and
+  // the write is a single transaction, so rows would flash past without ever
+  // being the thing you are waiting for.
+  reportProgress(
+    { script: "sync-cards", done: 0, total: 3, note: "下载卡表" },
+    true,
+  );
   console.log("[sync] fetching full catalogue from digimoncard.io …");
   const all = await fetchCatalogue();
   console.log(`[sync] ${all.length} rows`);
+  reportProgress(
+    { script: "sync-cards", done: 1, total: 3, note: `整理 ${all.length} 行` },
+    true,
+  );
   if (all.length < MIN_EXPECTED_ROWS) {
     throw new Error(
       `only ${all.length} rows (expected ≥${MIN_EXPECTED_ROWS}) — refusing to ` +
@@ -238,6 +250,10 @@ async function main() {
     }
     if (newCodes.length === 0 && uncovered.length === 0) return;
 
+    reportProgress(
+      { script: "sync-cards", done: 2, total: 3, note: "写入数据库" },
+      true,
+    );
     const ins = db.prepare(UPSERT_CARD_SQL);
     const tx = db.transaction((codes: string[]) => {
       for (const c of codes) ins.run(toCardRow(byCode.get(c)!));

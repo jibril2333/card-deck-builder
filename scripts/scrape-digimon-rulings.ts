@@ -16,6 +16,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import { parseRulingsAll } from "../src/lib/scraper/digimon";
 import { CARD_RULINGS_DDL, UPSERT_RULING_SQL } from "../src/lib/db/rulings-ddl";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 // CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
 // keeps serving the real one (host writes to the bind-mounted DB corrupt the
@@ -68,7 +69,19 @@ async function main() {
 
   let total = 0;
   let cardsWithRulings = 0;
-  for (const prefix of prefixes) {
+  reportProgress(
+    { script: "scrape-digimon-rulings", done: 0, total: prefixes.length },
+    true,
+  );
+  for (const [pi, prefix] of prefixes.entries()) {
+    reportProgress({
+      script: "scrape-digimon-rulings",
+      done: pi,
+      total: prefixes.length,
+      note: prefix,
+    },
+      true,
+    );
     let rulings;
     try {
       rulings = parseRulingsAll(await postSearch(`${prefix}-`));

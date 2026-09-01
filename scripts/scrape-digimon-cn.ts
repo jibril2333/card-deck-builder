@@ -37,6 +37,7 @@ import {
   splitCnRequirements,
   type CnArtRow,
 } from "../src/lib/scraper/digimon-cn";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 // CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
 // keeps serving the real one (host writes to the bind-mounted DB corrupt the
@@ -214,6 +215,14 @@ async function main() {
     for (const c of list) {
       if (clean(c.model) && clean(c.name)) feed.push(c);
     }
+    reportProgress({
+      script: "scrape-digimon-cn",
+      done: page,
+      total: totalPage,
+      note: `第 ${page} 页`,
+    },
+      true,
+    );
     if (page % 10 === 0 || page === totalPage) {
       console.log(`[cn] page ${page}/${totalPage} (${feed.length} rows)`);
     }

@@ -35,6 +35,7 @@ import {
   checkScrapeSanity,
   formatSanityReport,
 } from "../src/lib/scraper/sanity";
+import { reportProgress } from "../src/lib/refresh-progress";
 
 // CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
 // keeps serving the real one (host writes to the bind-mounted DB corrupt the
@@ -234,8 +235,20 @@ async function main() {
   let totalInserted = 0;
   let totalUpdated = 0;
   const startedAt = Date.now();
-  for (const pfx of prefixes) {
+  reportProgress(
+    { script: "scrape-digimon-metadata", done: 0, total: prefixes.length },
+    true,
+  );
+  for (const [pi, pfx] of prefixes.entries()) {
     process.stdout.write(`  ${pfx}: `);
+    reportProgress({
+      script: "scrape-digimon-metadata",
+      done: pi,
+      total: prefixes.length,
+      note: pfx,
+    },
+      true,
+    );
     try {
       // Search with a trailing hyphen so prefixes like "BT1" don't also match BT10..BT19
       const html = await postSearch(`${pfx}-`);
