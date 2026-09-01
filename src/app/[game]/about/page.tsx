@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
 import { KEYWORDS } from "@/lib/keywords";
 import * as digimon from "@/lib/db/digimon";
+import { KEYWORD_CHIP } from "@/components/effect-text";
 
 export default async function AboutPage({
   params,
@@ -131,18 +132,38 @@ function keywordRows(): KeywordRow[] {
   });
 }
 
+/**
+ * How the three languages print this keyword. English carries its own
+ * brackets (they encode the numeric form, ＜Security A. +N／−N＞); the other
+ * two are stored bare and are wrapped here in the brackets their cards use —
+ * ≪…≫ in Japanese, 《…》 in Chinese, or ［…］ for the few keywords that are
+ * written that way in every language.
+ */
+function printedForms(k: KeywordRow): string[] {
+  const square = k.display.startsWith("［");
+  const wrap = (name: string, open: string, close: string) =>
+    square ? `［${name}］` : `${open}${name}${close}`;
+  return [
+    k.display,
+    k.zhName ? wrap(k.zhName, "《", "》") : null,
+    k.ja ? wrap(k.ja, "≪", "≫") : null,
+  ].filter((x): x is string => Boolean(x));
+}
+
 function KeywordList({ items }: { items: KeywordRow[] }) {
   return (
     <dl className="not-prose grid grid-cols-1 gap-y-2.5 text-sm">
       {items.map((k) => (
         <div key={k.official}>
-          <dt className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="font-mono text-xs font-semibold text-[var(--color-accent)]">
-              {k.display}
-            </span>
-            <span className="text-xs text-[var(--color-muted-fg)]">
-              {[k.zhName, k.ja].filter(Boolean).join(" · ")}
-            </span>
+          {/* All three spellings wear the card's own keyword chip: the table's
+              job is recognising a keyword on a card, and it reads faster when
+              it looks like the thing being recognised. */}
+          <dt className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
+            {printedForms(k).map((form) => (
+              <span key={form} className={KEYWORD_CHIP}>
+                {form}
+              </span>
+            ))}
           </dt>
           {k.zh ? (
             <dd className="text-[var(--color-fg)] leading-relaxed mt-0.5">

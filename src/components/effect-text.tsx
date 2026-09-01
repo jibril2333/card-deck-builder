@@ -94,6 +94,10 @@ const CHIP =
   "inline-block px-1.5 rounded align-[0.05em] text-[0.92em] font-medium " +
   "leading-[1.5] whitespace-nowrap";
 
+/** The keyword chip exactly as card text draws it, for the glossary on the
+ *  game-knowledge page: a keyword should look the same wherever it is read. */
+export const KEYWORD_CHIP = `${CHIP} ${CHIP_STYLE.keyword}`;
+
 const PAIRS: Record<string, string> = {
   "【": "】", "〔": "〕", "[": "]", "［": "］", "{": "}",
   "《": "》", "≪": "≫", "＜": "＞", "〈": "〉", "「": "」", "“": "”",

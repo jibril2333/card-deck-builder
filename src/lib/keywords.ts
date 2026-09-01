@@ -353,4 +353,18 @@ export const KEYWORDS: Keyword[] = [
     display: "＜Guard＞",
     zh: "我方其他数码兽将因对手效果离开战场时,可删除带此效果的数码兽来阻止其离场。",
   },
+  {
+    official: "Detach",
+    ja: "分離",
+    zhName: "分离",
+    display: "＜Detach（指定条件）＞",
+    zh: "这只数码兽因我方效果以外的方式将要离开战斗区时,可丢弃它 1 张指定的链接卡牌,使其不离开。括号里写明算作指定的链接卡,如 ＜Detach（特征「七代码」）＞。",
+  },
+  {
+    official: "Succession",
+    ja: "継承",
+    zhName: "继承",
+    display: "＜Succession（指定卡）＞",
+    zh: "获得这只数码兽进化源中指定卡牌最上方 1 张的全部效果,该卡自身的 ＜Succession＞ 除外。括号里写明哪些卡算作指定,如 ＜Succession（「朱庇特兽」）＞。",
+  },
 ];

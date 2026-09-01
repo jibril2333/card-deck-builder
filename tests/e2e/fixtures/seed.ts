@@ -116,14 +116,16 @@ const CARDS_SCHEMA = `
     zh         TEXT,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
-  -- Blocker is written up in lib/keywords; Detach is not, and stands in for
-  -- what a new set brings: on the page with its names, without an explanation.
+  -- Blocker is written up in lib/keywords. "Sample Keyword" is not, and never
+  -- will be: it stands in for what a new set brings — a keyword that reaches
+  -- the page with its three spellings and no explanation. A real one would
+  -- stop testing that the day someone writes it up.
   INSERT OR IGNORE INTO card_keywords (lang, keyword) VALUES
-    ('en', 'Blocker'), ('en', 'Detach'), ('en', 'Rule'),
-    ('ja', 'ブロッカー'), ('ja', '分離《特徴「セブンコード」》');
+    ('en', 'Blocker'), ('en', 'Sample Keyword'), ('en', 'Rule'),
+    ('ja', 'ブロッカー'), ('ja', 'サンプル');
   INSERT OR IGNORE INTO keyword_names (official, ja, zh) VALUES
     ('Blocker', 'ブロッカー', '阻挡者'),
-    ('Detach', '分離', '分离');
+    ('Sample Keyword', 'サンプル', '样例');
 `;
 
 /**
