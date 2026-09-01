@@ -71,6 +71,16 @@ export default async function globalSetup() {
   };
   fs.writeFileSync(storageStatePath, JSON.stringify(storageState));
 
+  // The data directory the SERVER uses. Specs run in a worker process that
+  // re-evaluates playwright.config.ts and computes a DIFFERENT directory (see
+  // that file's header), so a spec that needs to plant a file the app reads —
+  // refresh status, for one — cannot get there from its own env.
+  fs.writeFileSync(
+    path.resolve(process.cwd(), "tests/e2e/.datadir"),
+    process.env.CDB_DATA_DIR ?? "",
+    "utf8",
+  );
+
   console.log(`[e2e] injected test session into ${digimonUserDb}`);
   console.log(`[e2e] storageState at ${storageStatePath}`);
 }

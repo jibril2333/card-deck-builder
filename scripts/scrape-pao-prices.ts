@@ -19,6 +19,10 @@
 import Database from "better-sqlite3";
 import { GAMES } from "../src/lib/games";
 import { parsePaoSearchPage } from "../src/lib/scraper/pao";
+import {
+  clearProgress,
+  reportProgress,
+} from "../src/lib/refresh-progress";
 
 const SEARCH_URL = "https://pao-onlineshop.com/view/search";
 /** The shop's Digimon category. Searching without it returns other games. */
@@ -121,8 +125,18 @@ async function main() {
   let priced = 0;
   let none = 0;
   let errored = 0;
-  for (const code of codes) {
+  // The admin panel reads this while the run is in flight — see
+  // lib/refresh-progress. Written before the first request so the bar
+  // appears immediately rather than after the first card.
+  reportProgress({ script: "scrape-pao-prices", done: 0, total: codes.length }, true);
+  for (const [i, code] of codes.entries()) {
     process.stdout.write(`  ${code}: `);
+    reportProgress({
+      script: "scrape-pao-prices",
+      done: i,
+      total: codes.length,
+      note: code,
+    });
     try {
       const summary = parsePaoSearchPage(await fetchSearch(code), code);
       const cardId = idByCode.get(code);
@@ -169,6 +183,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, DELAY_MS));
   }
 
+  clearProgress();
   console.log(
     `\nDone — priced=${priced}, not-stocked=${none}, error=${errored}` +
       (args.dryRun ? " (dry run, nothing written)" : ""),

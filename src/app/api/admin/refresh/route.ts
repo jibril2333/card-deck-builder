@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { isAdmin } from "@/lib/auth/admin";
 import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
+import { clearProgress, readProgress } from "@/lib/refresh-progress";
 
 /**
  * Admin endpoint behind the "更新卡牌数据" button.
@@ -62,6 +63,9 @@ export async function GET() {
     ...status,
     state: running ? "running" : status.state === "running" ? "failed" : status.state,
     running,
+    // Only while something is actually in flight: a leftover count from a run
+    // that has finished is a number pretending to be news.
+    progress: running ? readProgress() : null,
   });
 }
 
@@ -88,6 +92,9 @@ export async function POST(req: Request) {
   }
 
   try {
+    // A new run starts with no progress: the panel would otherwise show the
+    // last run's tail for the seconds before the first script reports.
+    clearProgress();
     // The host script re-validates every stage name; this is defence in depth,
     // not the only check.
     fs.writeFileSync(REQUEST_FILE, stages.join(" "), "utf8");

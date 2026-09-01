@@ -156,6 +156,25 @@ What is still hand-written is the Chinese explanation in `lib/keywords.ts`. A
 keyword with none renders as a row with its three spellings and no paragraph —
 which is why no test demands one.
 
+### Refresh progress
+
+`refresh-status.json` (written by the daemon) says which stage is running;
+`refresh-progress.json` (written by whichever script is walking a list) says
+how far into it. Two files, one writer each — the daemon and its child process
+would otherwise be writing the same file.
+
+`lib/refresh-progress.ts` is both ends: `reportProgress()` for the scripts
+(throttled to 1/s, `force` for the first and last call), `readProgress()` for
+the admin route, which ignores anything older than five minutes — a killed
+scrape leaves its last count behind, and a number that stopped moving is worse
+than no number. The panel combines the two into one bar: stage k of n, with the
+current stage's own share filled in.
+
+An e2e that needs to plant either file reads the server's data directory from
+`tests/e2e/.datadir` (written by global-setup). A spec's own `CDB_DATA_DIR`
+points somewhere else — playwright.config.ts is evaluated once per process and
+each evaluation makes its own fixture directory.
+
 ### Two price sources
 
 `external_prices` is keyed by `(source, card_id, variant_type)`, and two shops

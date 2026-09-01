@@ -28,6 +28,10 @@ import {
   parseCardrushSearchPage,
 } from "../src/lib/scraper/cardrush";
 import { findUserByEmail } from "../src/lib/auth/repo";
+import {
+  clearProgress,
+  reportProgress,
+} from "../src/lib/refresh-progress";
 
 const SEARCH_URL = "https://www.cardrush-digimon.jp/product-list";
 const UA_HEADER =
@@ -235,9 +239,20 @@ async function main() {
   let zeroListings = 0;
   let errored = 0;
   const startedAt = Date.now();
+  // Read by the admin panel while the run is in flight — lib/refresh-progress.
+  reportProgress(
+    { script: "scrape-cardrush-prices", done: 0, total: codes.length },
+    true,
+  );
 
-  for (const code of codes) {
+  for (const [i, code] of codes.entries()) {
     process.stdout.write(`  ${code}: `);
+    reportProgress({
+      script: "scrape-cardrush-prices",
+      done: i,
+      total: codes.length,
+      note: code,
+    });
     try {
       const html = await fetchSearch(code);
       const summary = parseCardrushSearchPage(html, code);
@@ -306,6 +321,7 @@ async function main() {
     if (codes.length > 1) await new Promise((r) => setTimeout(r, DELAY_MS));
   }
 
+  clearProgress();
   const elapsed = (Date.now() - startedAt) / 1000;
   console.log(
     `\nDone in ${elapsed.toFixed(0)}s — success=${success}, ` +

@@ -10,9 +10,66 @@ type Status = {
   startedAt?: string;
   updatedAt?: string;
   running?: boolean;
+  /** Set by whichever script is walking a list right now. */
+  progress?: {
+    script: string;
+    done: number;
+    total: number;
+    note?: string;
+  } | null;
 };
 
 const STAGE_LABELS = REFRESH_STAGES;
+
+/**
+ * Where the run is: which stage of how many, and — for the scrapes that walk
+ * every card — how far into that list.
+ *
+ * The stage count comes from the status file's own fields (`stages` is what
+ * was asked for, `message` is the stage running now), so nothing new had to be
+ * recorded for it. The inner count is the scrapers reporting themselves; see
+ * lib/refresh-progress.
+ */
+function RunProgress({ status }: { status: Status | null }) {
+  if (!status) return null;
+  const stages = (status.stages ?? "").split(" ").filter(Boolean);
+  const current = stages.indexOf(status.message ?? "");
+  const stage = REFRESH_STAGES.find((s) => s.id === status.message);
+  const p = status.progress ?? null;
+  const inner = p && p.total > 0 ? p.done / p.total : null;
+
+  // Stage k of n, with the current stage's own share filled in when known.
+  const done = current >= 0 ? current : 0;
+  const pct =
+    stages.length > 0
+      ? ((done + (inner ?? 0)) / stages.length) * 100
+      : (inner ?? 0) * 100;
+
+  return (
+    <div className="space-y-1">
+      <div className="h-1.5 rounded-full bg-[var(--color-muted)] overflow-hidden">
+        <div
+          className="h-full bg-[var(--color-accent)] transition-[width] duration-500"
+          style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
+        />
+      </div>
+      <div className="flex items-baseline justify-between gap-2 text-xs text-[var(--color-muted-fg)]">
+        <span>
+          {stages.length > 0 && current >= 0
+            ? `第 ${current + 1} / ${stages.length} 项`
+            : "准备中"}
+          {stage ? ` · ${stage.label}` : ""}
+        </span>
+        {p && p.total > 0 ? (
+          <span className="tabular-nums">
+            {p.done.toLocaleString()} / {p.total.toLocaleString()}
+            {p.note ? ` · ${p.note}` : ""}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function fmt(iso?: string) {
   if (!iso) return "—";
@@ -125,12 +182,15 @@ export function RefreshCardsPanel() {
         {status ? (
           <span className="text-xs text-[var(--color-muted-fg)]">
             <StateBadge state={status.state} />
-            {status.message ? ` ${status.message}` : ""}
+            {/* The stage id would just repeat what the bar below already says
+                in words, so it is only shown when there is no bar. */}
+            {status.message && !running ? ` ${status.message}` : ""}
             {status.updatedAt ? ` · ${fmt(status.updatedAt)}` : ""}
           </span>
         ) : null}
       </div>
 
+      {running ? <RunProgress status={status} /> : null}
       {running ? (
         <p className="text-xs text-[var(--color-muted-fg)]">
           更新期间站点会短暂重启

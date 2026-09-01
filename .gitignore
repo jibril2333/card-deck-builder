@@ -60,3 +60,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 scripts-dist/
+tests/e2e/.datadir
