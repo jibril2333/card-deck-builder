@@ -1262,6 +1262,8 @@ export type RefreshChange = {
   field: string | null;
   before: string | null;
   after: string | null;
+  /** The card's name, so a row reads as a card rather than as a code. */
+  name?: string | null;
 };
 
 export type RefreshRun = {
@@ -1361,6 +1363,48 @@ export function listRefreshRuns(limit = 5): RefreshRun[] {
     ),
     sample: sample.all(r.run_at) as RefreshChange[],
   }));
+}
+
+/**
+ * Everything one refresh changed, in full.
+ *
+ * The run summaries carry a short sample — enough for the collapsed row. This
+ * is what the panel asks for when you open one: every row, with the card's
+ * name joined in, because "BT26-010 rarity C → R" is a sentence and
+ * "BT26-010" alone is a lookup exercise.
+ *
+ * `lang` picks which name to show: a translation change is about that
+ * language's text, so it reads better labelled with that language's name.
+ */
+export function listRefreshChanges(
+  runAt: string,
+  lang: string,
+  limit = 500,
+): RefreshChange[] {
+  const rows = db()
+    .prepare(
+      `SELECT ch.kind, ch.code, ch.lang, ch.field, ch.before, ch.after,
+              COALESCE(
+                (SELECT t.name FROM card_translations t
+                  WHERE t.code = ch.code AND t.lang = COALESCE(ch.lang, @lang)),
+                (SELECT t.name FROM card_translations t
+                  WHERE t.code = ch.code AND t.lang = @lang),
+                (SELECT c.name FROM cards c WHERE c.code = ch.code)
+              ) AS name
+         FROM refresh_changes ch
+        WHERE ch.run_at = @run
+        ORDER BY CASE
+                   WHEN ch.kind LIKE 'restriction%' THEN 0
+                   WHEN ch.kind LIKE 'pair%' THEN 1
+                   WHEN ch.kind = 'card_added' THEN 2
+                   WHEN ch.kind = 'card_removed' THEN 3
+                   WHEN ch.kind = 'field_changed' THEN 4
+                   ELSE 5
+                 END, ch.code, ch.field
+        LIMIT @limit`,
+    )
+    .all({ run: runAt, lang, limit }) as RefreshChange[];
+  return rows;
 }
 
 export type DeckRestrictionIssue =

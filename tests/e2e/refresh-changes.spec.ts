@@ -29,3 +29,21 @@ test("shows what a refresh changed, banlist moves first", async ({ page }) => {
   const kinds = await box.locator("div.divide-y > div span.font-mono").allTextContents();
   expect(kinds[0]).toBe("BT1-086");
 });
+
+test("每一行说清楚是哪张卡、改了哪个字段", async ({ page }) => {
+  await page.goto("/digimon/settings");
+  const box = panel(page);
+  await box.getByRole("button").first().click();
+
+  // Grouped by kind, with a count per group.
+  await expect(box.getByText(/^禁限变更 · \d+$/)).toBeVisible();
+  await expect(box.getByText(/^字段改动 · \d+$/)).toBeVisible();
+
+  // Rows carry the card's NAME, not just its code…
+  const text = (await box.innerText()).replace(/\s+/g, " ");
+  expect(text).toContain("BT1-084 Omnimon");
+  expect(text).toContain("BT1-086 Matt Ishida");
+  // …and the field is labelled in Chinese, not by its column name.
+  expect(text).toContain("主要效果");
+  expect(text).not.toContain("main_effect");
+});
