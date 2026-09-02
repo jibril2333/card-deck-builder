@@ -35,7 +35,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import Database from "better-sqlite3";
 import {
   parseSchedule,
@@ -114,30 +114,34 @@ function writeStatus(
 /**
  * Why there is no SIGTERM handler here.
  *
- * The scrapes run through `spawnSync`, which blocks this process for the
- * length of the scrape — a handler would not run until the child was already
- * finished. And the daemon is not PID 1: the entrypoint backgrounds it and
- * execs the server, so on `docker stop` the signal goes to the server and this
- * process is killed with the container.
+ * The daemon is not PID 1: the entrypoint backgrounds it and execs the server,
+ * so on `docker stop` the signal goes to the server and this process is killed
+ * with the container — a handler here would never run.
  *
  * So an interrupted run is not detected by being told. It is detected
  * afterwards, by the resume file the next start finds — see RESUME_FILE.
  */
 
-/** Run one bundled script as a child process, inheriting the data dir. */
-function runScript(name: string, args: string[] = []): boolean {
+/**
+ * Run one bundled script and resolve when it exits. Async so a stage can start
+ * two of them at once.
+ */
+function runScriptAsync(name: string, args: string[] = []): Promise<boolean> {
   const js = path.join(SCRIPTS_DIR, name.replace(/\.ts$/, ".js"));
   const useSource = !fs.existsSync(js);
-  const r = useSource
-    ? spawnSync("npx", ["tsx", path.join("scripts", name), ...args], {
+  const child = useSource
+    ? spawn("npx", ["tsx", path.join("scripts", name), ...args], {
         stdio: ["ignore", "inherit", "inherit"],
         env: { ...process.env, CDB_DATA_DIR: DATA_DIR },
       })
-    : spawnSync(process.execPath, [js, ...args], {
+    : spawn(process.execPath, [js, ...args], {
         stdio: ["ignore", "inherit", "inherit"],
         env: { ...process.env, CDB_DATA_DIR: DATA_DIR },
       });
-  return r.status === 0;
+  return new Promise((resolve) => {
+    child.on("close", (code) => resolve(code === 0));
+    child.on("error", () => resolve(false));
+  });
 }
 
 /** A consistent copy of the live DB, taken while the app keeps serving. */
@@ -165,7 +169,7 @@ function snapshot(): boolean {
  */
 const INSTANCE = `${process.pid}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-function refresh(stages: string[], trigger: string): boolean {
+async function refresh(stages: string[], trigger: string): Promise<boolean> {
   if (fs.existsSync(LOCK_FILE)) {
     const held = fs.readFileSync(LOCK_FILE, "utf8").trim();
     log(`another refresh holds the lock (${held}) — skipping`);
@@ -194,13 +198,26 @@ function refresh(stages: string[], trigger: string): boolean {
         startedAt,
         updatedAt: new Date().toISOString(),
       });
-      for (const script of stage.scripts) {
-        log(`--- ${id}: ${script} ---`);
-        writeStatus("running", id, chosen, startedAt, trigger);
-        if (!runScript(script)) {
+      writeStatus("running", id, chosen, startedAt, trigger);
+      if (stage.parallel && stage.scripts.length > 1) {
+        // Different sources, so at once: each keeps its own request rate and
+        // the stage takes as long as its slowest script instead of their sum.
+        log(`--- ${id}: ${stage.scripts.join(" + ")} (parallel) ---`);
+        const results = await Promise.all(
+          stage.scripts.map((script) => runScriptAsync(script)),
+        );
+        if (results.some((r) => !r)) {
           failedStage = id;
           ok = false;
-          break;
+        }
+      } else {
+        for (const script of stage.scripts) {
+          log(`--- ${id}: ${script} ---`);
+          if (!(await runScriptAsync(script))) {
+            failedStage = id;
+            ok = false;
+            break;
+          }
         }
       }
       if (!ok) break;
@@ -210,7 +227,11 @@ function refresh(stages: string[], trigger: string): boolean {
       // Never fatal: a refresh that scraped fine must not be reported as a
       // failure because the bookkeeping did not.
       log("--- changelog ---");
-      runScript("diff-refresh.ts", [BEFORE_DB, LIVE_DB, `--run-at=${startedAt}`]);
+      await runScriptAsync("diff-refresh.ts", [
+        BEFORE_DB,
+        LIVE_DB,
+        `--run-at=${startedAt}`,
+      ]);
     }
   } finally {
     fs.rmSync(LOCK_FILE, { force: true });
@@ -246,7 +267,10 @@ function refresh(stages: string[], trigger: string): boolean {
     );
     log(`FAILED at ${failedStage}`);
   }
-  runScript("notify-refresh.ts", ok ? ["ok", "{}"] : ["failed", failedStage || "refresh", "1"]);
+  await runScriptAsync(
+    "notify-refresh.ts",
+    ok ? ["ok", "{}"] : ["failed", failedStage || "refresh", "1"],
+  );
   return ok;
 }
 
@@ -268,10 +292,13 @@ function takeRequest(): string[] | null {
   return stages;
 }
 
-function tick() {
+/** True while a tick is in flight; ticks are no longer instantaneous. */
+let ticking = false;
+
+async function tick() {
   const requested = takeRequest();
   if (requested) {
-    refresh(requested, "manual");
+    await refresh(requested, "manual");
     return;
   }
 
@@ -298,15 +325,15 @@ function tick() {
     nextRunAt: next ? next.toISOString() : null,
     checkedAt: new Date().toISOString(),
   });
-  refresh(schedule.stages, "auto");
+  await refresh(schedule.stages, "auto");
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const onceAt = args.indexOf("--once");
   if (onceAt >= 0) {
     const stages = args.slice(onceAt + 1).filter((s) => REFRESH_STAGE_IDS.includes(s));
-    process.exit(refresh(stages, "manual") ? 0 : 1);
+    process.exit((await refresh(stages, "manual")) ? 0 : 1);
   }
   // Clear a lock nobody holds. In container mode this daemon is the only
   // thing that ever takes it, so at startup — before its first tick — any
@@ -330,13 +357,22 @@ function main() {
     fs.rmSync(RESUME_FILE, { force: true });
     if (stages.length) {
       log(`resuming an interrupted run: ${stages.join(" ")}`);
-      refresh(stages, "resume");
+      await refresh(stages, "resume");
     }
   }
 
   log(`watching ${DATA_DIR} — schedule + ${path.basename(REQUEST_FILE)}`);
-  tick();
-  setInterval(tick, TICK_MS);
+  void tick();
+  // A tick can now outlive the interval (a two-hour price stage), so the guard
+  // is not optional: without it the daemon would start a second run on top of
+  // the first every minute.
+  setInterval(() => {
+    if (ticking) return;
+    ticking = true;
+    void tick().finally(() => {
+      ticking = false;
+    });
+  }, TICK_MS);
 }
 
 main();

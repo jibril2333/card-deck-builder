@@ -77,9 +77,10 @@ export async function GET() {
           : "failed"
         : status.state,
     running,
-    // Only while something is actually in flight: a leftover count from a run
-    // that has finished is a number pretending to be news.
-    progress: running ? readProgress() : null,
+    // Only while something is actually in flight: leftover counts from a run
+    // that has finished are numbers pretending to be news. Plural: the price
+    // stage runs its two scrapes at once.
+    progress: running ? readProgress() : [],
   });
 }
 

@@ -25,6 +25,16 @@ export type RefreshStage = {
    * against the files that exist in scripts/.
    */
   scripts: string[];
+  /**
+   * Run this stage's scripts at the same time instead of one after another.
+   *
+   * Only where that is actually free: the two price scrapes talk to different
+   * shops, so running both at once leaves each shop's request rate exactly
+   * where it was and halves the wall clock. Scripts that share a source, or
+   * that depend on each other's output (the three text scrapes do — see the
+   * note on that stage), must stay sequential.
+   */
+  parallel?: true;
 };
 
 /** Declaration order IS run order — the daemon walks this list. */
@@ -76,8 +86,9 @@ export const REFRESH_STAGES: RefreshStage[] = [
     label: "价格与读音",
     // Cardrush first (its pages also carry the kana readings — see
     // scraper/cardrush), then PAO for a second quote on the same cards.
-    hint: "cardrush / PAO 市场价与日文卡名读音（最慢，约 2 小时）",
+    hint: "cardrush / PAO 市场价与日文卡名读音（最慢，约 1 小时）",
     scripts: ["scrape-cardrush-prices.ts", "scrape-pao-prices.ts"],
+    parallel: true,
   },
   {
     id: "restrictions",

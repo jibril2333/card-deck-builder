@@ -14,11 +14,16 @@ import path from "node:path";
 // global-setup leaves the server's here.
 const DIR = fs.readFileSync("tests/e2e/.datadir", "utf8").trim();
 const status = path.join(DIR, "refresh-status.json");
-const progress = path.join(DIR, "refresh-progress.json");
+const progress = path.join(DIR, "refresh-progress-scrape-pao-prices.json");
 const lock = path.join(DIR, ".refresh.lock");
 
 test.afterEach(() => {
-  for (const f of [status, progress, path.join(DIR, "refresh-resume.json")]) {
+  for (const f of [
+    status,
+    progress,
+    path.join(DIR, "refresh-progress-scrape-cardrush-prices.json"),
+    path.join(DIR, "refresh-resume.json"),
+  ]) {
     fs.rmSync(f, { force: true });
   }
   fs.rmSync(lock, { recursive: true, force: true });
@@ -35,6 +40,7 @@ test("shows which stage, and how far into it", async ({ page }) => {
       updatedAt: new Date().toISOString(),
     }),
   );
+  // Both price scrapes report at once — one file each.
   fs.writeFileSync(
     progress,
     JSON.stringify({
@@ -45,17 +51,31 @@ test("shows which stage, and how far into it", async ({ page }) => {
       updatedAt: new Date().toISOString(),
     }),
   );
+  fs.writeFileSync(
+    path.join(DIR, "refresh-progress-scrape-cardrush-prices.json"),
+    JSON.stringify({
+      script: "scrape-cardrush-prices",
+      done: 2201,
+      total: 4402,
+      note: "BT26-010",
+      updatedAt: new Date().toISOString(),
+    }),
+  );
   fs.mkdirSync(lock, { recursive: true });
 
   await page.goto("/digimon/settings");
   await expect(page.getByText("第 2 / 3 项 · 价格与读音")).toBeVisible();
-  await expect(page.getByText("1,234 / 4,402 · BT15-076")).toBeVisible();
+  await expect(page.getByText("PAO · 1,234 / 4,402 · BT15-076")).toBeVisible();
+  await expect(
+    page.getByText("Cardrush · 2,201 / 4,402 · BT26-010"),
+  ).toBeVisible();
 
-  // The bar is filled to (1 whole stage + 28% of this one) / 3 ≈ 42%.
+  // The bar is filled to (1 whole stage + the two scrapes' average, 28% and
+  // 50%, so 39% of this one) / 3 ≈ 46%.
   const bar = page.locator("div.bg-\\[var\\(--color-accent\\)\\]").first();
   const width = await bar.evaluate((el) => el.style.width);
-  expect(Number.parseFloat(width)).toBeGreaterThan(35);
-  expect(Number.parseFloat(width)).toBeLessThan(50);
+  expect(Number.parseFloat(width)).toBeGreaterThan(40);
+  expect(Number.parseFloat(width)).toBeLessThan(52);
 });
 
 test("a run cut short by a redeploy reads as paused, not failed", async ({

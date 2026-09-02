@@ -60,6 +60,11 @@ async function fetchSearch(code: string): Promise<string> {
 async function main() {
   const args = parseArgs();
   const db = new Database(GAMES.digimon.dbPath);
+  // The two price scrapes run at the same time and write the same table (one
+  // row each per card, different `source`). SQLite serialises them; without a
+  // busy timeout the loser of a lock race throws SQLITE_BUSY and takes the
+  // whole run down for a wait measured in milliseconds.
+  db.pragma("busy_timeout = 10000");
   console.log(`Cards DB: ${GAMES.digimon.dbPath}`);
   // This can run against a database the app has never opened, so the column
   // it writes has to be ensured here too (migration 41 does it for the app).

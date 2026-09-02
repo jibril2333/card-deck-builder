@@ -10,13 +10,13 @@ type Status = {
   startedAt?: string;
   updatedAt?: string;
   running?: boolean;
-  /** Set by whichever script is walking a list right now. */
+  /** Every script walking a list right now — the price stage runs two. */
   progress?: {
     script: string;
     done: number;
     total: number;
     note?: string;
-  } | null;
+  }[];
 };
 
 const STAGE_LABELS = REFRESH_STAGES;
@@ -35,8 +35,13 @@ function RunProgress({ status }: { status: Status | null }) {
   const stages = (status.stages ?? "").split(" ").filter(Boolean);
   const current = stages.indexOf(status.message ?? "");
   const stage = REFRESH_STAGES.find((s) => s.id === status.message);
-  const p = status.progress ?? null;
-  const inner = p && p.total > 0 ? p.done / p.total : null;
+  const rows = (status.progress ?? []).filter((p) => p.total > 0);
+  // Two scrapes running side by side are two thirds of one stage each; the
+  // stage is done when both are, so its share is their average.
+  const inner =
+    rows.length > 0
+      ? rows.reduce((s, p) => s + p.done / p.total, 0) / rows.length
+      : null;
 
   // Stage k of n, with the current stage's own share filled in when known.
   const done = current >= 0 ? current : 0;
@@ -59,15 +64,19 @@ function RunProgress({ status }: { status: Status | null }) {
             ? `第 ${current + 1} / ${stages.length} 项`
             : "准备中"}
           {stage ? ` · ${stage.label}` : ""}
-          {/* Which script inside the stage — three of them share 中/日文. */}
-          {p && scriptLabel(p.script) ? ` · ${scriptLabel(p.script)}` : ""}
         </span>
-        {p && p.total > 0 ? (
-          <span className="tabular-nums">
-            {p.done.toLocaleString()} / {p.total.toLocaleString()}
-            {p.note ? ` · ${p.note}` : ""}
-          </span>
-        ) : null}
+        {/* One line per script: 中/日文 runs three in turn, 价格与读音 runs
+            its two at the same time, and a single count could not say which
+            you were looking at. */}
+        <span className="flex flex-col items-end gap-0.5">
+          {rows.map((p) => (
+            <span key={p.script} className="tabular-nums">
+              {scriptLabel(p.script) ? `${scriptLabel(p.script)} · ` : ""}
+              {p.done.toLocaleString()} / {p.total.toLocaleString()}
+              {p.note ? ` · ${p.note}` : ""}
+            </span>
+          ))}
+        </span>
       </div>
     </div>
   );

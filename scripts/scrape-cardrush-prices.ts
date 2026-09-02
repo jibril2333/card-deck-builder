@@ -94,6 +94,11 @@ async function main() {
   const dbPath = GAMES.digimon.dbPath;
   console.log(`Cards DB: ${dbPath}`);
   const db = new Database(dbPath);
+  // The two price scrapes run at the same time and write the same table (one
+  // row each per card, different `source`). SQLite serialises them; without a
+  // busy timeout the loser of a lock race throws SQLITE_BUSY and takes the
+  // whole run down for a wait measured in milliseconds.
+  db.pragma("busy_timeout = 10000");
   // This script can run before the app has ever opened this database (the
   // refresh daemon starts alongside the server, and migrations belong to the
   // app), so the column it writes has to be ensured here too. ALTER is not

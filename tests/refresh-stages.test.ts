@@ -63,6 +63,15 @@ describe("refresh stages", () => {
     }
   });
 
+  it("only parallelises stages whose scripts hit different sources", () => {
+    // Running two scrapes at once is free when they talk to different shops
+    // and cost nothing extra to either. It is NOT free when they share a
+    // source (same server, double the rate) or feed each other — 中/日文 is
+    // three scripts in a deliberate order.
+    const parallel = REFRESH_STAGES.filter((s) => s.parallel).map((s) => s.id);
+    expect(parallel).toEqual(["prices"]);
+  });
+
   it("has no duplicate ids", () => {
     expect(new Set(REFRESH_STAGE_IDS).size).toBe(REFRESH_STAGE_IDS.length);
   });

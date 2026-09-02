@@ -259,8 +259,19 @@ the product name:
 art. The headline price is the best condition available, not the cheapest
 listing: a 傷あり copy at ¥140 is not the price of a card you would sleeve up.
 
-Both run in the 价格与读音 stage, one after the other, which is why that stage
-says ~2 hours: every card, every run. There used to be a 72-hour freshness
+Both run in the 价格与读音 stage **at the same time** (`parallel: true` on that
+stage), which is why it now says ~1 hour rather than ~2: they talk to different
+shops, so each keeps its own 0.7s-per-card rate and neither shop sees more
+traffic than before — the only thing that halves is the wall clock. Two things
+had to hold first: both scripts set `busy_timeout` (they write the same table,
+one row each per card), and progress is one file per script (`refresh-progress-
+<script>.json`), since a shared file would have two writers.
+
+Only this stage is parallel, and `tests/refresh-stages.test.ts` pins that: 中/
+日文 is three scripts in a deliberate order, and scripts sharing one source
+would just double that source's request rate.
+
+Every card, every run: There used to be a 72-hour freshness
 skip — it made a run cheap and the data quietly stale, and worse, it treated a
 row as finished because it existed: when `item_code` was added, 3,651 PAO rows
 kept their prices, gained no product id, and were skipped forever. An
