@@ -12,9 +12,10 @@ import { buildCartScriptAction } from "@/app/[game]/actions";
  * runs the snippet there, in their own browser, and pays — or doesn't — by
  * hand afterwards.
  *
- * The list is built when the button is pressed, not when the page renders. It
- * costs a quote lookup per card in the deck, and almost nobody opening a deck
- * is on their way to the shop.
+ * The list is built when the button is pressed, not when the page renders:
+ * every missing card is looked up at the shop right then, so the product ids
+ * belong to listings that exist now. That takes a few seconds — hence the
+ * spinner — and it is why this cannot happen on every deck view.
  */
 export function CartScriptButton({
   game,
@@ -54,7 +55,15 @@ export function CartScriptButton({
         disabled={pending}
         className="h-8 px-3 rounded-md border border-[var(--color-border)] text-xs hover:bg-[var(--color-muted)] cursor-pointer disabled:cursor-wait disabled:opacity-70 flex items-center gap-1.5"
       >
-        🛒 {pending ? "生成中…" : "复制 PAO 加购脚本"}
+        {pending ? (
+          <span
+            aria-hidden
+            className="w-3 h-3 rounded-full border border-current border-t-transparent animate-spin"
+          />
+        ) : (
+          "🛒"
+        )}
+        {pending ? "正在向 PAO 查询…" : "复制 PAO 加购脚本"}
       </button>
       {done ? (
         <span className="text-xs text-[var(--color-muted-fg)]">

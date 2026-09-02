@@ -126,6 +126,10 @@ export default defineConfig({
     env: {
       ...FIXTURE_PATHS,
       CDB_E2E: "1",
+      // The cart action looks a card up at the shop when you press the button.
+      // Not in tests: the suite must not depend on pao-onlineshop.com being
+      // up, and what these specs check is the fallback to stored quotes.
+      CDB_SHOP_FETCH: "off",
       CDB_ADMIN_EMAILS: "e2e@test.local",
       CDB_GIT_SHA: "e2e5ha0000000000000000000000000000000000",
       CDB_BUILT_AT: "2026-08-22T10:00:00Z",

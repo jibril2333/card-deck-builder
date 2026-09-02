@@ -211,11 +211,15 @@ needs. Three facts shape it:
 list; `CartScriptButton` copies it. Quantities are the shortfall (wanted −
 bought) and the price is the same band the price scrape uses.
 
-The list is built **on the click**, not while the deck page renders: it costs a
-shop quote per card, and opening a deck is not the same as going shopping. The
-button says 生成中… while the action runs and reports the count and total when
-it lands — the numbers cannot be shown before, which is the honest trade for
-not querying on every render.
+The list is built **on the click**, not while the deck page renders, and it
+asks the shop right then: one search per missing card, staggered, ~0.2s each
+(4 cards measured at 737ms). A product id names one listing and listings sell
+out, so a stored id can be hours stale or — before `item_code` existed —
+absent; looking them up at press time is what makes the cart actually fill. A
+card the shop cannot answer for falls back to the stored quote.
+
+`CDB_SHOP_FETCH=off` disables the live lookup; playwright.config.ts sets it, so
+the suite neither depends on pao-onlineshop.com being up nor hammers it.
 
 ### A deck card's price: typed, or the cheaper shop
 

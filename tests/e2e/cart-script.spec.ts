@@ -41,6 +41,9 @@ test("copies a script for the cards still missing", async ({ page, context }) =>
 
   // The list is built on the click, so the numbers arrive with the result:
   // 3 × ¥180 + 1 × ¥500, at PAO's prices — not the ¥100 Cardrush wants.
+  // (The button says 正在向 PAO 查询… while it runs. Not asserted: with
+  // CDB_SHOP_FETCH=off there is no shop request, so that state lasts a few
+  // milliseconds and a test that waits for it would be a coin toss.)
   await btn.click();
   await expect(page.getByText(/已复制 4 张 · ¥1,040/)).toBeVisible();
   const script = await page.evaluate(() => navigator.clipboard.readText());

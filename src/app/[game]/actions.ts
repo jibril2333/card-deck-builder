@@ -1,6 +1,8 @@
 "use server";
 
 import { paoCartScript, type CartItem } from "@/lib/cart-script";
+import { fetchPaoQuote } from "@/lib/scraper/pao";
+import { shopSearchUrl } from "@/lib/shops";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isGameId, type GameId, GAMES } from "@/lib/games";
@@ -310,6 +312,16 @@ export async function adjustDeckCardAction(formData: FormData) {
   else bumpDeck(game, deckId);
 }
 
+/** One deck's worth of shop lookups is fine; a crawl is not. */
+const MAX_CART_LOOKUPS = 80;
+
+/**
+ * Whether the cart action may talk to the shop. Off in e2e — the suite must
+ * not depend on a third party being up, and the fixture's stored quotes are
+ * what those tests are about.
+ */
+const SHOP_LOOKUP_LIVE = process.env.CDB_SHOP_FETCH !== "off";
+
 /**
  * Build the shop-cart script for one deck, on demand.
  *
@@ -334,21 +346,48 @@ export async function buildCartScriptAction(
   }
 
   const cards = lib(game).getDeckCards(deckId);
-  const quotes = digimon.getShopQuotes(
-    cards.map((c) => c.id),
+  const missing = cards
+    .filter((c) => c.quantity - c.purchased > 0)
+    .slice(0, MAX_CART_LOOKUPS);
+  const stored = digimon.getShopQuotes(
+    missing.map((c) => c.id),
     "pao",
   );
+
+  /**
+   * Ask the shop now, and only fall back to what the last refresh stored.
+   *
+   * A product id names one listing, and listings sell out — the stored one can
+   * be hours old, or missing entirely if it was scraped before the id was
+   * recorded. Looking them up at click time costs a few seconds on a button
+   * nobody presses often, and it is the difference between a cart that fills
+   * and one that half-fails.
+   */
+  const live = await Promise.all(
+    missing.map((c, i) =>
+      SHOP_LOOKUP_LIVE
+        ? // A small stagger: this is one person's shopping list, not a crawl.
+          new Promise<Awaited<ReturnType<typeof fetchPaoQuote>>>((resolve) =>
+            setTimeout(
+              () =>
+                resolve(fetchPaoQuote(c.code, shopSearchUrl("pao", c.code))),
+              (i % 4) * 120 + Math.floor(i / 4) * 260,
+            ),
+          )
+        : Promise.resolve(null),
+    ),
+  );
+
   const items: CartItem[] = [];
-  for (const c of cards) {
-    const q = quotes.get(c.id);
-    const need = c.quantity - c.purchased;
+  for (const [i, c] of missing.entries()) {
+    const q = live[i] ?? stored.get(c.id) ?? null;
     // Out of stock is not something a cart can hold, and a listing with no
     // product id is one the cart API cannot name.
-    if (need <= 0 || !q?.in_stock || !q.item_code) continue;
+    if (!q?.in_stock || !q.item_code) continue;
     items.push({
       code: c.code,
       itemCode: q.item_code,
-      quantity: need,
+      quantity: c.quantity - c.purchased,
       name: c.name,
       priceYen: q.price_yen,
     });

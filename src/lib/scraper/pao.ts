@@ -55,6 +55,43 @@ function conditionOf(name: string): PaoCondition {
   return "good";
 }
 
+/**
+ * Fetch one card's listings from PAO and pick the same one the price scrape
+ * would. Used at click time by the cart script, so the product ids it hands
+ * out belong to listings that exist right now rather than to whatever the last
+ * refresh saw.
+ *
+ * Returns null on any failure — the caller falls back to the stored quote,
+ * because a shopping list that is a few hours stale beats no list at all.
+ */
+export async function fetchPaoQuote(
+  code: string,
+  searchUrl: string,
+  timeoutMs = 8000,
+): Promise<{ price_yen: number; in_stock: boolean; item_code: string } | null> {
+  try {
+    const res = await fetch(searchUrl, {
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept-language": "ja-JP,ja;q=0.9,en;q=0.5",
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return null;
+    const s = parsePaoSearchPage(await res.text(), code);
+    if (s.base_price == null || !s.base_item_code) return null;
+    return {
+      price_yen: s.base_price,
+      in_stock: s.base_in_stock === true,
+      item_code: s.base_item_code,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function parsePaoSearchPage(html: string, code: string): PaoSummary {
   const $ = cheerio.load(html);
   const listings: PaoListing[] = [];
