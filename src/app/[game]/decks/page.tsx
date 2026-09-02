@@ -60,26 +60,26 @@ export default async function DecksPage({
     locked: !!d.locked,
   }));
 
-  // Fetch every deck's card list once and derive both auxiliary tool inputs
-  // from the same payload. Two consumers share this:
-  //   - 缺卡统计 (mine only, missing cards): purchased<quantity rows
-  //   - 卡组对比 (any pair of decks): full card list per deck
-  // Loading both eagerly is cheap — typical user has <20 decks × ~50 cards.
+  // Card lists are read for 缺卡统计 only, so only the decks that tool shows
+  // get loaded — starred decks of your own. 卡组对比 used to want every deck's
+  // list here as well; it moved to the deck page, where it loads the one deck
+  // you picked.
   const lib = digimon;
   const cardLang = parseCardLang(
     (await cookies()).get(CARD_LANG_COOKIE)?.value,
   );
-  const deckCardLists = decks.map((d) => ({
-    meta: d,
-    cards: digimon.overlayDisplay(digimon.getDeckCards(d.id), cardLang),
-  }));
+  const deckCardLists = decks
+    .filter((d) => d.mine && d.pinned)
+    .map((d) => ({
+      meta: d,
+      cards: digimon.overlayDisplay(digimon.getDeckCards(d.id), cardLang),
+    }));
 
   // Multi-deck missing-cards / shopping-list tool: YOUR decks, and only the
   // starred ones. "What should I buy next" is asked about the decks you mean
   // to play; every deck you ever made buries those, and the star is already
   // how you say which they are. None starred → the toolbar drops the button.
   const deckShortfalls = deckCardLists
-    .filter((d) => d.meta.mine && d.meta.pinned)
     .map(({ meta, cards }) => ({
       id: meta.id,
       name: meta.name,
@@ -95,22 +95,6 @@ export default async function DecksPage({
           need: c.quantity - c.purchased,
         })),
     }));
-
-  // Deck-diff tool: every deck the user can see (mine + friends'), with the
-  // bare minimum per-card payload needed to compute the three diff buckets.
-  const decksForDiff = deckCardLists.map(({ meta, cards }) => ({
-    id: meta.id,
-    name: meta.name,
-    accent_color: meta.accent_color,
-    mine: meta.mine,
-    owner_name: meta.owner_name,
-    cards: cards.map((c) => ({
-      code: c.code,
-      name: c.name,
-      image_url: c.image_url,
-      quantity: c.quantity,
-    })),
-  }));
 
   // Shared-pool groups (own decks that share one physical card set).
   const groups = me ? lib.listGroups(me.id) : [];
@@ -130,7 +114,6 @@ export default async function DecksPage({
             accent={GAMES[game].accent}
             deckCount={decks.length}
             deckShortfalls={deckShortfalls}
-            decksForDiff={decksForDiff}
           />
         ) : (
           <div className="flex items-center justify-between mb-4">

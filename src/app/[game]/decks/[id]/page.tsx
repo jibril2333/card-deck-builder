@@ -14,6 +14,8 @@ import { DeckDeleteButton } from "@/components/deck-delete-button";
 import { DeckLockButton } from "@/components/deck-lock-button";
 import { DeckPoolSelect } from "@/components/deck-pool-select";
 import { DeckExportMenu } from "@/components/deck-export-menu";
+import { DeckComparePicker } from "@/components/deck-compare-picker";
+import { DeckDiffPanel } from "@/components/deck-diff";
 import { computeDeckSearchTargets, type SearchGroup } from "@/lib/deck-search";
 import { DeckStats, type StatPanel } from "@/components/deck-stats";
 import {
@@ -203,7 +205,7 @@ export default async function DeckEditPage({
   searchParams,
 }: {
   params: Promise<{ game: string; id: string }>;
-  searchParams: Promise<{ mode?: string; missing?: string }>;
+  searchParams: Promise<{ mode?: string; missing?: string; compare?: string }>;
 }) {
   const me = await getCurrentUser();
   const { game, id } = await params;
@@ -465,6 +467,43 @@ export default async function DeckEditPage({
   // (including ones already bought) is opt-in via ?missing=0.
   const missingOnly = mode === "purchase" && sp.missing !== "0";
 
+  // 卡组对比: which other deck this one is being held up against.
+  //
+  // It lives in the URL rather than in component state because the diff is
+  // server-rendered — the picker is a set of links, so choosing a deck is one
+  // navigation and the result comes back already computed. It also means a
+  // comparison survives a reload and can be sent to someone.
+  //
+  // Any logged-in user may read any deck here (the app's decks are
+  // friend-readable), which is the same set the picker lists.
+  const otherDecks = me
+    ? digimon.listDecks(me.id).filter((d) => d.id !== loaded.deck.id)
+    : [];
+  const compareDeck = sp.compare
+    ? (otherDecks.find((d) => d.id === sp.compare) ?? null)
+    : null;
+  const compareCards = compareDeck
+    ? digimon.overlayDisplay(
+        digimon.getDeckCards(compareDeck.id),
+        cardLangForPage,
+      )
+    : null;
+  // Keep the current mode (and the purchase view's 全部/仅缺货 choice) when
+  // switching comparison on and off — comparing is not a different page.
+  const compareKeep = (() => {
+    const p = new URLSearchParams();
+    if (mode !== "browse") p.set("mode", mode);
+    if (mode === "purchase" && !missingOnly) p.set("missing", "0");
+    return p.toString();
+  })();
+  const compareBase = `/${game}/decks/${loaded.deck.id}`;
+  const compareClearHref = compareKeep
+    ? `${compareBase}?${compareKeep}`
+    : compareBase;
+  const compareHrefPrefix = compareKeep
+    ? `${compareBase}?${compareKeep}&compare=`
+    : `${compareBase}?compare=`;
+
   // Reported, never applied — see DeckRestrictionNotice.
   const restrictionIssues = digimon.deckRestrictionIssues(loaded.deck.id);
   const issueByCardId = new Map(restrictionIssues.map((i) => [i.card_id, i]));
@@ -612,6 +651,26 @@ export default async function DeckEditPage({
             >
               🎲 试玩
             </Link>
+            {/* Next to 试玩: both are ways of looking at the deck you have,
+              not edits to it. */}
+            {otherDecks.length > 0 ? (
+              <DeckComparePicker
+                decks={otherDecks.map((d) => ({
+                  id: d.id,
+                  name: d.name,
+                  accent_color: d.accent_color,
+                  mine: me !== null && d.user_id === me.id,
+                  owner_name: d.owner_name,
+                }))}
+                current={
+                  compareDeck
+                    ? { id: compareDeck.id, name: compareDeck.name }
+                    : null
+                }
+                hrefPrefix={compareHrefPrefix}
+                clearHref={compareClearHref}
+              />
+            ) : null}
             <DeckExportMenu
               text={exportText}
               url={exportUrl}
@@ -815,6 +874,37 @@ export default async function DeckEditPage({
               </div>
             </div>
           )}
+
+          {compareDeck && compareCards ? (
+            <DeckDiffPanel
+              game={game}
+              a={{
+                name: loaded.deck.name,
+                accent: loaded.deck.accent_color,
+                cards: loaded.cards.map((c) => ({
+                  code: c.code,
+                  name: c.name,
+                  image_url: c.image_url ?? null,
+                  quantity: c.quantity,
+                })),
+              }}
+              b={{
+                name: compareDeck.name,
+                accent: compareDeck.accent_color,
+                ownerName:
+                  me !== null && compareDeck.user_id === me.id
+                    ? null
+                    : compareDeck.owner_name,
+                cards: compareCards.map((c) => ({
+                  code: c.code,
+                  name: c.name,
+                  image_url: c.image_url ?? null,
+                  quantity: c.quantity,
+                })),
+              }}
+              closeHref={compareClearHref}
+            />
+          ) : null}
 
           {(() => {
             const visibleCards = missingOnly

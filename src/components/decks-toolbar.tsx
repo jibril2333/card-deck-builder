@@ -11,10 +11,6 @@ import {
   MissingCardsTool,
   type DeckShortfall,
 } from "@/components/missing-cards-tool";
-import {
-  DeckDiffTool,
-  type DeckForDiff,
-} from "@/components/deck-diff-tool";
 
 /**
  * Compact decks-page toolbar.
@@ -29,25 +25,23 @@ import {
  * for Digimon when name is empty) still applies, so users CAN leave the
  * name blank and let import name it from the deck contents.
  *
- * Auxiliary tools (缺卡统计 / 对比) keep their old toggle-panel-below
- * pattern.
+ * 缺卡统计 keeps its toggle-panel-below pattern. 卡组对比 used to sit here
+ * too, as an A/B picker over every deck; it now lives on the deck page
+ * itself (`?compare=`), where one side is already decided.
  */
 export function DecksToolbar({
   game,
   accent,
   deckCount,
   deckShortfalls,
-  decksForDiff,
 }: {
   game: string;
   accent: string;
   deckCount: number;
   deckShortfalls: DeckShortfall[];
-  decksForDiff: DeckForDiff[];
 }) {
   const router = useRouter();
   const [missingOpen, setMissingOpen] = useState(false);
-  const [diffOpen, setDiffOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
   // `notice` is a single status line below the form — used for both
@@ -189,20 +183,6 @@ export function DecksToolbar({
               🛒 缺卡统计
             </button>
           ) : null}
-          {decksForDiff.length >= 2 ? (
-            <button
-              type="button"
-              onClick={() => setDiffOpen((v) => !v)}
-              aria-pressed={diffOpen}
-              className={`h-9 px-3 rounded-md border text-sm cursor-pointer flex items-center gap-1.5 transition-colors ${
-                diffOpen
-                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
-                  : "border-[var(--color-border)] hover:bg-[var(--color-muted)]"
-              }`}
-            >
-              🔀 对比
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -216,16 +196,6 @@ export function DecksToolbar({
             game={game}
             decks={deckShortfalls}
             onClose={() => setMissingOpen(false)}
-          />
-        </div>
-      ) : null}
-
-      {diffOpen ? (
-        <div className="mt-3">
-          <DeckDiffTool
-            game={game}
-            decks={decksForDiff}
-            onClose={() => setDiffOpen(false)}
           />
         </div>
       ) : null}

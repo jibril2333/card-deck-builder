@@ -221,6 +221,29 @@ card the shop cannot answer for falls back to the stored quote.
 `CDB_SHOP_FETCH=off` disables the live lookup; playwright.config.ts sets it, so
 the suite neither depends on pao-onlineshop.com being up nor hammers it.
 
+### 卡组对比 lives in the deck's URL
+
+Comparing two decks used to be an A/B panel on the decks list, which meant the
+list page loaded **every** deck's full card list on every visit just in case
+someone opened it. It is now a picker in the deck's own toolbar
+(`deck-compare-picker.tsx`) writing `?compare=<deckId>`, and the page renders
+the diff on the server (`deck-diff.tsx`, no `"use client"`).
+
+Consequences worth keeping:
+
+- The deck you are on is always the left side, so the columns say 本卡组独有 /
+  对比卡组独有 instead of A / B, and there is no swap button to need.
+- The comparison survives a reload and can be pasted to someone.
+- `compareKeep` carries `mode` (and purchase's `missing=0`) through both the
+  picker links and the × — comparing is a thing you do *inside* a mode, not a
+  page of its own.
+- The list page now loads card lists only for starred decks of your own,
+  which is all 缺卡统计 ever needed.
+
+Identity is the exact `code`, so `BT1-009_p1` and `BT1-009` land in opposite
+columns. That is deliberate — the diff answers "are these the same physical
+list", and `tests/deck-diff.test.ts` pins it.
+
 ### A deck card's price: typed, or the cheaper shop
 
 `getDeckCards` returns three columns, and the difference between them is the
