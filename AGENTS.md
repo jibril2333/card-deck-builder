@@ -198,6 +198,11 @@ needs. Three facts shape it:
 - What the cart API takes is the shop's product id, which is why the PAO scrape
   stores `external_prices.item_code` (migration 41) beside the price. Cards
   with no id, or out of stock, are simply left out.
+- The list is built from **PAO's own quote** (`getShopQuotes(ids, "pao")`), not
+  from the deck's `market_price`. Those are different questions: the tile shows
+  what a card is worth (cheapest across shops), the cart needs what this shop
+  charges. Deriving one from the other quietly dropped every card Cardrush
+  happened to price lower — 2 of 21 on a real deck, with no way to tell.
 - It adds and nothing else. `tests/cart-script.test.ts` pulls every fetch URL
   and every `action` out of the generated text and asserts they are exactly
   `/api/cart/` and `add` — checkout stays a thing a person does.

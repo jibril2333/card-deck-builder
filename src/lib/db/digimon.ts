@@ -1177,6 +1177,48 @@ export function getExternalListings(
 }
 
 /**
+ * One shop's own quote for each card — price, stock and the shop's product id.
+ *
+ * Not the same question as `getExternalPrices`/the deck's `market_price`,
+ * which answer "what is this card worth" by taking the cheapest quote across
+ * shops. The cart is PAO's cart: what it needs is PAO's listing for every card
+ * PAO stocks, including the ones where Cardrush happens to be cheaper.
+ * Conflating the two silently dropped those cards from the cart script.
+ *
+ * Base printings only, matching what the cart script buys.
+ */
+export function getShopQuotes(
+  cardIds: string[],
+  source: string,
+): Map<string, { price_yen: number; in_stock: boolean; item_code: string | null }> {
+  if (cardIds.length === 0) return new Map();
+  const placeholders = cardIds.map(() => "?").join(",");
+  const rows = db()
+    .prepare(
+      `SELECT card_id, price_yen, in_stock, item_code
+         FROM external_prices
+        WHERE source = ? AND variant_type = 'base'
+          AND card_id IN (${placeholders})`,
+    )
+    .all(source, ...cardIds) as {
+    card_id: string;
+    price_yen: number;
+    in_stock: number;
+    item_code: string | null;
+  }[];
+  return new Map(
+    rows.map((r) => [
+      r.card_id,
+      {
+        price_yen: r.price_yen,
+        in_stock: r.in_stock === 1,
+        item_code: r.item_code,
+      },
+    ]),
+  );
+}
+
+/**
  * Batch fetch of third-party market prices for a set of card IDs.
  *
  * Returns a Map keyed by `${card_id}|${variant_type}` where `variant_type`

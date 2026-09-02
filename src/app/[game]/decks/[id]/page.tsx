@@ -8,6 +8,7 @@ import { splitSetNames } from "@/lib/card-sets";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { DeckCardSearch } from "@/components/deck-card-search";
 import { CartScriptButton } from "@/components/cart-script-button";
+import type { CartItem } from "@/lib/cart-script";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckHeader } from "@/components/deck-header";
 import { DeckDeleteButton } from "@/components/deck-delete-button";
@@ -171,6 +172,8 @@ type Loaded = {
   /** Cards needing a pack newer than the recorded version. */
   newerThanVersion: number;
   cards: DeckCardData[];
+  /** Still-missing cards PAO stocks, ready for the cart script. */
+  cartItems: CartItem[];
   /** Considered swaps — display only; excluded from every other computation. */
   adjustments: Adjustment[];
   exportCards: DeckCardForExport[];
@@ -232,6 +235,10 @@ export default async function DeckEditPage({
   // The viewer's own shelf, not the deck owner's — the question a tile answers
   // is "do I have this one", and that stays interesting on a friend's deck.
   const ownedCounts = me ? digimon.getOwnedCounts(me.id) : null;
+  // PAO's own listings, for the cart script. Deliberately not the cheaper-of-
+  // the-two price the tiles show: that is what a card is worth, and this is
+  // what one shop sells it for.
+  const paoQuotes = digimon.getShopQuotes(cards.map((c) => c.id), "pao");
   const cardLang = cardLangForPage;
   const tMap = digimon.getDisplayTranslations(
     cards.map((c) => c.code),
@@ -335,6 +342,22 @@ export default async function DeckEditPage({
         .reduce((n, c) => n + c.quantity, 0);
     })(),
     adjustments: digimon.listDeckAdjustments(id),
+    cartItems: cards.flatMap((c) => {
+      const q = paoQuotes.get(c.id);
+      const need = c.quantity - c.purchased;
+      // Out of stock is not something a cart can hold, and a listing with no
+      // product id is one the cart API can't name.
+      if (need <= 0 || !q?.in_stock || !q.item_code) return [];
+      return [
+        {
+          code: c.code,
+          itemCode: q.item_code,
+          quantity: need,
+          name: tMap.get(c.code)?.name ?? c.name,
+          priceYen: q.price_yen,
+        },
+      ];
+    }),
     cards: cards.map((c) => {
       const t = tMap.get(c.code);
       return {
@@ -811,22 +834,7 @@ export default async function DeckEditPage({
                   Only PAO for now — it is the shop whose cart API takes a
                   product id, which is the id the price scrape already sees. */}
               <div className="mt-2">
-                <CartScriptButton
-                  items={loaded.cards
-                    .filter(
-                      (c) =>
-                        c.purchased < c.quantity &&
-                        c.market?.source === "pao" &&
-                        c.market.item_code,
-                    )
-                    .map((c) => ({
-                      code: c.code,
-                      itemCode: c.market!.item_code!,
-                      quantity: c.quantity - c.purchased,
-                      name: c.name,
-                      priceYen: c.market!.price_yen,
-                    }))}
-                />
+                <CartScriptButton items={loaded.cartItems} />
               </div>
             </div>
           )}
