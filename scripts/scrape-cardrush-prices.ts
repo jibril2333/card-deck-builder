@@ -49,22 +49,6 @@ function parseArgs() {
     email: pick("--email"),
     myCollection: args.includes("--my-collection"),
     dryRun: args.includes("--dry-run"),
-    /**
-     * Skip cards priced within this many hours. Default 72.
-     *
-     * This is what makes an interrupted run resumable. A full pass is ~4400
-     * requests at 700ms — over an hour — and anything that restarts the
-     * process in that window (a redeploy recreating the container, a reboot)
-     * used to throw the whole hour away and start from the first card again.
-     * With a freshness window the next run simply continues: the cards already
-     * done are skipped, and it finishes the tail.
-     *
-     * It also takes the daily cost from an hour to almost nothing, which is
-     * the polite thing to do to cardrush as well.
-     */
-    maxAgeHours: args.includes("--force")
-      ? 0
-      : Number(pick("--max-age") ?? 72),
   };
 }
 
@@ -168,28 +152,11 @@ async function main() {
     codes = pickCodes(db, args) as string[];
   }
 
-  if (args.maxAgeHours > 0 && !args.only) {
-    const fresh = new Set(
-      (
-        db
-          .prepare(
-            `SELECT c.code FROM cards c
-               JOIN external_prices p ON p.card_id = c.id
-              WHERE p.fetched_at > datetime('now', ?)
-              GROUP BY c.code`,
-          )
-          .all(`-${args.maxAgeHours} hours`) as { code: string }[]
-      ).map((r) => r.code),
-    );
-    const before = codes.length;
-    codes = codes.filter((c) => !fresh.has(c));
-    if (before !== codes.length) {
-      console.log(
-        `Skipping ${before - codes.length} card(s) priced within ${args.maxAgeHours}h ` +
-          `(--force, or --max-age=0, to re-check everything)`,
-      );
-    }
-  }
+  // Every card, every run. There was a 72-hour freshness skip here; it made a
+  // run cheap and made the data quietly wrong — a price that moved yesterday
+  // stayed put, and a column added later (item_code) never got filled for the
+  // rows that already "existed". An interrupted run is handled by the daemon
+  // resuming it, not by pretending the tail was already done.
 
   console.log(`Scope: ${codes.length} code(s)\n`);
 

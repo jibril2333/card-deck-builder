@@ -245,8 +245,12 @@ art. The headline price is the best condition available, not the cheapest
 listing: a 傷あり copy at ¥140 is not the price of a card you would sleeve up.
 
 Both run in the 价格与读音 stage, one after the other, which is why that stage
-now says ~2 hours. Each skips anything priced in the last 72h (`--max-age`,
-`--force`).
+says ~2 hours: every card, every run. There used to be a 72-hour freshness
+skip — it made a run cheap and the data quietly stale, and worse, it treated a
+row as finished because it existed: when `item_code` was added, 3,651 PAO rows
+kept their prices, gained no product id, and were skipped forever. An
+interrupted run is handled by the daemon resuming it (see above), not by
+guessing which cards were already done.
 
 ### The kana readings ride along with the price scrape
 

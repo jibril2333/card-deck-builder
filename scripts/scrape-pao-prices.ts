@@ -7,13 +7,13 @@
  * same card are worth more than one — Cardrush and PAO disagree often enough
  * that the pair is the useful thing.
  *
- * One request per card code, throttled, and skipping anything priced in the
- * last `--max-age` hours (default 72) so a daily run costs almost nothing.
+ * One request per card code, throttled. Every card, every run — see the note
+ * where the freshness skip used to be.
  *
  * Usage:
  *   npx tsx scripts/scrape-pao-prices.ts --only=BT1-084
  *   npx tsx scripts/scrape-pao-prices.ts --limit=50 --dry-run
- *   npx tsx scripts/scrape-pao-prices.ts            # everything, aged out
+ *   npx tsx scripts/scrape-pao-prices.ts            # every card
  */
 
 import Database from "better-sqlite3";
@@ -41,7 +41,6 @@ function parseArgs() {
     only: pick("--only") || null,
     limit: Number(pick("--limit") ?? 0),
     dryRun: args.includes("--dry-run"),
-    maxAgeHours: args.includes("--force") ? 0 : Number(pick("--max-age") ?? 72),
   };
 }
 
@@ -81,32 +80,9 @@ async function main() {
           .all() as { code: string }[]
       ).map((r) => r.code);
 
-  if (args.maxAgeHours > 0 && !args.only) {
-    const fresh = new Set(
-      (
-        db
-          .prepare(
-            // Fresh AND complete. A row scraped before item_code existed has
-            // a price but no product id, which is a row the cart script can't
-            // use — so it is not "already done" and must be fetched again.
-            `SELECT c.code FROM cards c
-               JOIN external_prices p ON p.card_id = c.id
-              WHERE p.source = ? AND p.fetched_at > datetime('now', ?)
-                AND p.item_code IS NOT NULL
-              GROUP BY c.code`,
-          )
-          .all(SOURCE, `-${args.maxAgeHours} hours`) as { code: string }[]
-      ).map((r) => r.code),
-    );
-    const before = codes.length;
-    codes = codes.filter((c) => !fresh.has(c));
-    if (before !== codes.length) {
-      console.log(
-        `Skipping ${before - codes.length} card(s) priced within ${args.maxAgeHours}h ` +
-          `(--force, or --max-age=0, to re-check everything)`,
-      );
-    }
-  }
+  // Every card, every run. The 72-hour skip that used to live here treated a
+  // row as done because it existed, which is how 3,651 prices ended up with no
+  // item_code and no way to notice.
   if (args.limit > 0) codes = codes.slice(0, args.limit);
   console.log(`Scope: ${codes.length} code(s)\n`);
 
