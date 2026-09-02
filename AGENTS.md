@@ -187,6 +187,25 @@ An e2e that needs to plant either file reads the server's data directory from
 points somewhere else — playwright.config.ts is evaluated once per process and
 each evaluation makes its own fixture directory.
 
+### The cart script
+
+Purchase mode offers a snippet that fills PAO's cart with what the deck still
+needs. Three facts shape it:
+
+- A cart lives in a session on **the shop's** domain. The server can't reach
+  it, and neither can a page on this site — `/api/cart/` is same-origin. So the
+  reader runs the snippet on PAO themselves, in their own browser.
+- What the cart API takes is the shop's product id, which is why the PAO scrape
+  stores `external_prices.item_code` (migration 41) beside the price. Cards
+  with no id, or out of stock, are simply left out.
+- It adds and nothing else. `tests/cart-script.test.ts` pulls every fetch URL
+  and every `action` out of the generated text and asserts they are exactly
+  `/api/cart/` and `add` — checkout stays a thing a person does.
+
+`lib/cart-script.ts` builds the text; `CartScriptButton` copies it. Quantities
+are the shortfall (wanted − bought) and the price shown on the button is the
+same band the price scrape uses.
+
 ### A deck card's price: typed, or the cheaper shop
 
 `getDeckCards` returns three columns, and the difference between them is the

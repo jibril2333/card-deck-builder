@@ -1285,6 +1285,24 @@ const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: 41,
+    name: "external_prices.item_code",
+    up: (db) => {
+      // The shop's own product id for the listing a price came from. PAO's
+      // cart API takes exactly this (`item_code`), which is what lets the
+      // deck page hand you a "put the missing cards in my cart" script —
+      // the price alone can't identify what to add.
+      const cols = (
+        db.prepare("PRAGMA table_info(external_prices)").all() as {
+          name: string;
+        }[]
+      ).map((c) => c.name);
+      if (!cols.includes("item_code")) {
+        db.exec("ALTER TABLE external_prices ADD COLUMN item_code TEXT");
+      }
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(

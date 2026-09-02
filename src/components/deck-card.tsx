@@ -33,8 +33,12 @@ export type DeckCardData = {
   price: number | null;
   /** Only what a person typed — null when `price` is a shop's number. */
   manualPrice?: number | null;
-  /** The shop floor itself, for the placeholder and the label. */
-  market?: { price_yen: number; source: string } | null;
+  /** The shop floor itself, for the placeholder, the label and the cart. */
+  market?: {
+    price_yen: number;
+    source: string;
+    item_code?: string | null;
+  } | null;
   /**
    * Copies of this card in the VIEWER's collection, summed over printings.
    * Undefined when nobody is signed in — a zero would claim something.

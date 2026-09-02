@@ -111,6 +111,8 @@ const CARDS_SCHEMA = `
     price_yen INTEGER NOT NULL,
     in_stock INTEGER NOT NULL DEFAULT 1,
     fetched_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- The shop's product id for that listing (migration 41).
+    item_code TEXT,
     PRIMARY KEY (source, card_id, variant_type)
   );
   CREATE INDEX IF NOT EXISTS idx_external_prices_card
@@ -122,6 +124,8 @@ const CARDS_SCHEMA = `
            ('pao', 'BT1-084', 'parallel', 3800, 0),
            ('cardrush', 'BT1-084', 'base', 300, 1),
            ('cardrush', 'BT1-001', 'base', 40, 1);
+  UPDATE external_prices SET item_code = '000000078801'
+    WHERE source = 'pao' AND card_id = 'BT1-084' AND variant_type = 'base';
 
   -- Written by the 关键词 refresh stage. The game-knowledge page builds its
   -- keyword table from these two, so a fixture without them only ever

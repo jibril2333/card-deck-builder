@@ -106,6 +106,8 @@ export type DeckCardRow<TCard> = TCard & {
   /** The shop floor itself, and which shop it came from. */
   market_price: number | null;
   market_source: string | null;
+  /** That shop's product id for the listing, when it has one. */
+  market_item_code: string | null;
 };
 
 /** Upper bound for an adjustment's copy count — a memo, not a rules engine,
@@ -791,6 +793,9 @@ export function createDeckRepo<TCard, TDeck extends DeckCommon>(
                 (SELECT ep.source FROM external_prices ep
                   WHERE ep.card_id = c.id AND ep.variant_type = 'base'
                   ORDER BY ep.in_stock DESC, ep.price_yen ASC LIMIT 1) AS market_source,
+                (SELECT ep.item_code FROM external_prices ep
+                  WHERE ep.card_id = c.id AND ep.variant_type = 'base'
+                  ORDER BY ep.in_stock DESC, ep.price_yen ASC LIMIT 1) AS market_item_code,
                 COALESCE(
                   (SELECT p.price FROM user.card_prices p
                     WHERE p.card_id = c.id AND p.user_id = (SELECT user_id FROM user.decks WHERE id = ?)),

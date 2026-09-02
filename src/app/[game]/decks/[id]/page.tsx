@@ -7,6 +7,7 @@ import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { splitSetNames } from "@/lib/card-sets";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import { DeckCardSearch } from "@/components/deck-card-search";
+import { CartScriptButton } from "@/components/cart-script-button";
 import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckHeader } from "@/components/deck-header";
 import { DeckDeleteButton } from "@/components/deck-delete-button";
@@ -350,7 +351,11 @@ export default async function DeckEditPage({
         manualPrice: c.manual_price,
         market:
           c.market_price != null
-            ? { price_yen: c.market_price, source: c.market_source ?? "" }
+            ? {
+                price_yen: c.market_price,
+                source: c.market_source ?? "",
+                item_code: c.market_item_code ?? null,
+              }
             : null,
         // 0 is a real answer here — only a signed-out viewer gets nothing.
         collected: ownedCounts ? (ownedCounts.get(c.id) ?? 0) : undefined,
@@ -801,6 +806,27 @@ export default async function DeckEditPage({
                 <span className="text-[10px] text-[var(--color-muted-fg)] whitespace-nowrap">
                   绿=已备齐 · 橙=缺 · 灰=未买
                 </span>
+              </div>
+              {/* What is still missing, ready to drop into the shop's cart.
+                  Only PAO for now — it is the shop whose cart API takes a
+                  product id, which is the id the price scrape already sees. */}
+              <div className="mt-2">
+                <CartScriptButton
+                  items={loaded.cards
+                    .filter(
+                      (c) =>
+                        c.purchased < c.quantity &&
+                        c.market?.source === "pao" &&
+                        c.market.item_code,
+                    )
+                    .map((c) => ({
+                      code: c.code,
+                      itemCode: c.market!.item_code!,
+                      quantity: c.quantity - c.purchased,
+                      name: c.name,
+                      priceYen: c.market!.price_yen,
+                    }))}
+                />
               </div>
             </div>
           )}

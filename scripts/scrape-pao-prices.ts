@@ -62,6 +62,14 @@ async function main() {
   const args = parseArgs();
   const db = new Database(GAMES.digimon.dbPath);
   console.log(`Cards DB: ${GAMES.digimon.dbPath}`);
+  // This can run against a database the app has never opened, so the column
+  // it writes has to be ensured here too (migration 41 does it for the app).
+  const hasItemCode = (
+    db.prepare("PRAGMA table_info(external_prices)").all() as { name: string }[]
+  ).some((c) => c.name === "item_code");
+  if (!hasItemCode) {
+    db.exec("ALTER TABLE external_prices ADD COLUMN item_code TEXT");
+  }
 
   let codes = args.only
     ? [args.only]
@@ -107,11 +115,12 @@ async function main() {
 
   const upsert = db.prepare(
     `INSERT INTO external_prices
-       (source, card_id, variant_type, price_yen, in_stock, fetched_at)
-     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       (source, card_id, variant_type, price_yen, in_stock, item_code, fetched_at)
+     VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(source, card_id, variant_type) DO UPDATE SET
        price_yen = excluded.price_yen,
        in_stock = excluded.in_stock,
+       item_code = excluded.item_code,
        fetched_at = excluded.fetched_at`,
   );
 
@@ -149,6 +158,7 @@ async function main() {
               "base",
               summary.base_price,
               summary.base_in_stock ? 1 : 0,
+              summary.base_item_code,
             );
           }
           if (summary.parallel_price != null) {
@@ -158,6 +168,7 @@ async function main() {
               "parallel",
               summary.parallel_price,
               summary.parallel_in_stock ? 1 : 0,
+              summary.parallel_item_code,
             );
           }
         }

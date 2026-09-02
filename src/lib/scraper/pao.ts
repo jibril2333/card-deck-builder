@@ -31,6 +31,8 @@ export type PaoListing = {
   in_stock: boolean;
   variant_type: "base" | "parallel";
   condition: PaoCondition;
+  /** The shop's product id — `/view/item/<id>`, and what its cart API takes. */
+  item_code: string | null;
 };
 
 export type PaoSummary = {
@@ -39,8 +41,11 @@ export type PaoSummary = {
   /** Cheapest mint-band copy of each printing, and whether it is in stock. */
   base_price: number | null;
   base_in_stock: boolean | null;
+  /** The listing that price came from, for the cart. */
+  base_item_code: string | null;
   parallel_price: number | null;
   parallel_in_stock: boolean | null;
+  parallel_item_code: string | null;
   listings: PaoListing[];
 };
 
@@ -71,12 +76,14 @@ export function parsePaoSearchPage(html: string, code: string): PaoSummary {
     const stockText = unit.text();
     const in_stock = !/売り切れ|在庫なし|SOLD\s*OUT/i.test(stockText);
 
+    const item = unit.find('a[href*="/view/item/"]').first().attr("href");
     listings.push({
       name,
       price_yen,
       in_stock,
       variant_type: name.includes("パラレル") ? "parallel" : "base",
       condition: conditionOf(name),
+      item_code: item?.match(/\/view\/item\/(\d+)/)?.[1] ?? null,
     });
   });
 
@@ -93,14 +100,19 @@ export function parsePaoSearchPage(html: string, code: string): PaoSummary {
       tiers
         .map((c) => mine.filter((l) => l.condition === c))
         .find((tier) => tier.length > 0) ?? [];
-    if (pool.length === 0) return { price: null, in_stock: null };
+    if (pool.length === 0)
+      return { price: null, in_stock: null, item_code: null };
     const sorted = [...pool].sort((a, b) => {
       // In stock first, then cheapest: a sold-out listing is a record of a
       // price, not an offer.
       if (a.in_stock !== b.in_stock) return a.in_stock ? -1 : 1;
       return a.price_yen - b.price_yen;
     });
-    return { price: sorted[0].price_yen, in_stock: sorted[0].in_stock };
+    return {
+      price: sorted[0].price_yen,
+      in_stock: sorted[0].in_stock,
+      item_code: sorted[0].item_code,
+    };
   };
 
   const base = pick("base");
@@ -111,8 +123,10 @@ export function parsePaoSearchPage(html: string, code: string): PaoSummary {
     total_listings: listings.length,
     base_price: base.price,
     base_in_stock: base.in_stock,
+    base_item_code: base.item_code,
     parallel_price: parallel.price,
     parallel_in_stock: parallel.in_stock,
+    parallel_item_code: parallel.item_code,
     listings,
   };
 }
