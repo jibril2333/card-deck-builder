@@ -86,9 +86,13 @@ async function main() {
       (
         db
           .prepare(
+            // Fresh AND complete. A row scraped before item_code existed has
+            // a price but no product id, which is a row the cart script can't
+            // use — so it is not "already done" and must be fetched again.
             `SELECT c.code FROM cards c
                JOIN external_prices p ON p.card_id = c.id
               WHERE p.source = ? AND p.fetched_at > datetime('now', ?)
+                AND p.item_code IS NOT NULL
               GROUP BY c.code`,
           )
           .all(SOURCE, `-${args.maxAgeHours} hours`) as { code: string }[]
