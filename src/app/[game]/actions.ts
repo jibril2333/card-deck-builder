@@ -1,5 +1,6 @@
 "use server";
 
+import { paoCartScript, type CartItem } from "@/lib/cart-script";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isGameId, type GameId, GAMES } from "@/lib/games";
@@ -307,6 +308,61 @@ export async function adjustDeckCardAction(formData: FormData) {
   // Pooled deck: a card just added/resized should inherit the pool's held.
   if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
   else bumpDeck(game, deckId);
+}
+
+/**
+ * Build the shop-cart script for one deck, on demand.
+ *
+ * Deliberately not computed while the page renders: it needs a quote per card
+ * from one shop, and almost nobody opening a deck is about to go shopping.
+ * The click is the signal that the query is worth making.
+ *
+ * Owner-only — a cart list is a shopping list, and whose it is matters.
+ */
+export async function buildCartScriptAction(
+  game: string,
+  deckId: string,
+): Promise<
+  | { ok: true; script: string; kinds: number; cards: number; yen: number }
+  | { ok: false; error: string }
+> {
+  const me = await requireUser();
+  if (!isGameId(game)) return { ok: false, error: "invalid game" };
+  const deck = lib(game).getDeck(deckId);
+  if (!deck || deck.user_id !== me.id) {
+    return { ok: false, error: "不是你的卡组" };
+  }
+
+  const cards = lib(game).getDeckCards(deckId);
+  const quotes = digimon.getShopQuotes(
+    cards.map((c) => c.id),
+    "pao",
+  );
+  const items: CartItem[] = [];
+  for (const c of cards) {
+    const q = quotes.get(c.id);
+    const need = c.quantity - c.purchased;
+    // Out of stock is not something a cart can hold, and a listing with no
+    // product id is one the cart API cannot name.
+    if (need <= 0 || !q?.in_stock || !q.item_code) continue;
+    items.push({
+      code: c.code,
+      itemCode: q.item_code,
+      quantity: need,
+      name: c.name,
+      priceYen: q.price_yen,
+    });
+  }
+  if (items.length === 0) {
+    return { ok: false, error: "PAO 目前没有这副卡组缺的卡" };
+  }
+  return {
+    ok: true,
+    script: paoCartScript(items),
+    kinds: items.length,
+    cards: items.reduce((n, i) => n + i.quantity, 0),
+    yen: items.reduce((n, i) => n + i.priceYen * i.quantity, 0),
+  };
 }
 
 export async function reorderDecksAction(formData: FormData) {

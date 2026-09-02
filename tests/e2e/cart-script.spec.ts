@@ -38,12 +38,11 @@ test("copies a script for the cards still missing", async ({ page, context }) =>
   await page.goto(`${deckUrl}?mode=purchase`);
   const btn = page.getByRole("button", { name: /复制 PAO 加购脚本/ });
   await expect(btn).toBeVisible();
-  await expect(btn).toContainText("4 张");
-  // 3 × ¥180 + 1 × ¥500, at PAO's prices — not the ¥100 Cardrush wants.
-  await expect(btn).toContainText("¥1,040");
 
+  // The list is built on the click, so the numbers arrive with the result:
+  // 3 × ¥180 + 1 × ¥500, at PAO's prices — not the ¥100 Cardrush wants.
   await btn.click();
-  await expect(page.getByText(/已复制/)).toBeVisible();
+  await expect(page.getByText(/已复制 4 张 · ¥1,040/)).toBeVisible();
   const script = await page.evaluate(() => navigator.clipboard.readText());
   expect(script).toContain('"id": "000000078801"');
   expect(script).toContain('"n": 3');
@@ -52,4 +51,27 @@ test("copies a script for the cards still missing", async ({ page, context }) =>
   expect(script).toContain('action: "add"');
   // Adding only. Checkout is a thing a person does, not a script.
   expect(script).not.toContain("/view/cart/order");
+});
+
+test("a deck PAO can't fill says so instead of copying nothing", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/digimon/decks");
+  await page.getByPlaceholder("卡组名").fill("EMPTY CART " + Date.now());
+  await page.getByRole("button", { name: /创建/ }).click();
+  await page.waitForURL(/\/digimon\/decks\/[a-z0-9-]+/i);
+  const deckUrl = page.url();
+
+  // BT1-009 has no PAO listing in the fixture.
+  await page.getByRole("link", { name: /🛠 组建/ }).click();
+  await page.getByPlaceholder("搜卡加入卡组…").fill("BT1-009");
+  await expect(page.getByLabel(/^加入卡组 /)).toHaveCount(1);
+  await page.getByLabel(/^加入卡组 /).first().click();
+  await page.waitForTimeout(400);
+
+  await page.goto(`${deckUrl}?mode=purchase`);
+  await page.getByRole("button", { name: /复制 PAO 加购脚本/ }).click();
+  await expect(page.getByText(/PAO 目前没有这副卡组缺的卡/)).toBeVisible();
 });

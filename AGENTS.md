@@ -207,9 +207,15 @@ needs. Three facts shape it:
   and every `action` out of the generated text and asserts they are exactly
   `/api/cart/` and `add` — checkout stays a thing a person does.
 
-`lib/cart-script.ts` builds the text; `CartScriptButton` copies it. Quantities
-are the shortfall (wanted − bought) and the price shown on the button is the
-same band the price scrape uses.
+`lib/cart-script.ts` builds the text; `buildCartScriptAction` assembles the
+list; `CartScriptButton` copies it. Quantities are the shortfall (wanted −
+bought) and the price is the same band the price scrape uses.
+
+The list is built **on the click**, not while the deck page renders: it costs a
+shop quote per card, and opening a deck is not the same as going shopping. The
+button says 生成中… while the action runs and reports the count and total when
+it lands — the numbers cannot be shown before, which is the honest trade for
+not querying on every render.
 
 ### A deck card's price: typed, or the cheaper shop
 
