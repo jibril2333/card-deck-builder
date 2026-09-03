@@ -11,8 +11,16 @@ import {
   type RefreshSchedule,
 } from "@/lib/refresh-schedule";
 
-/** Local-time helper so the expectations read as wall clock, like the config. */
-const at = (s: string) => new Date(s);
+/**
+ * Wall clock in the schedule's own zone — which is what the config means.
+ *
+ * This used to be `new Date(s)`, which reads the string in the MACHINE's zone,
+ * so every expectation below silently depended on the author's laptop being
+ * set to Japan. They all failed the first time the suite ran on a CI runner,
+ * which is on UTC. Japan has no DST, so the offset is a literal; the cases
+ * that exercise other zones build their instants in UTC explicitly.
+ */
+const at = (s: string) => new Date(`${s}:00+09:00`);
 
 const weekly = (o: Partial<RefreshSchedule> = {}): RefreshSchedule => ({
   ...DEFAULT_SCHEDULE,
