@@ -7,6 +7,7 @@
  * while you work through a card.
  */
 import { expect, test } from "@playwright/test";
+import { expandDeckList } from "./deck-list-panel";
 
 const CARD = "/digimon/card/BT1-005";
 
@@ -19,8 +20,7 @@ async function deckOrder(page: import("@playwright/test").Page) {
 
 test("adding a card doesn't reorder the deck list", async ({ page }) => {
   await page.goto(CARD);
-  const expand = page.getByRole("button", { name: /展开/ });
-  if (await expand.count()) await expand.click();
+  await expandDeckList(page);
 
   const before = await deckOrder(page);
   expect(before.length).toBeGreaterThan(1);
@@ -32,7 +32,7 @@ test("adding a card doesn't reorder the deck list", async ({ page }) => {
   await expect(row).toContainText("已有 1 张");
 
   await page.reload();
-  if (await expand.count()) await expand.click();
+  await expandDeckList(page);
   expect(await deckOrder(page)).toEqual(before);
 
   // Put the fixture back the way it was found.

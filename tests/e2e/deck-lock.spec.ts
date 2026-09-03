@@ -7,6 +7,7 @@
  * lock is a door — everything comes back when you open it.
  */
 import { expect, test } from "@playwright/test";
+import { revealDeckRow } from "./deck-list-panel";
 
 const lockButton = (p: import("@playwright/test").Page) =>
   p.getByRole("button", { name: /锁定/ });
@@ -24,10 +25,7 @@ test("closes the deck to edits, everywhere, until you unlock it", async ({
   // Put a card in it from the card page, which is also the path that must
   // stop working once it's locked.
   await page.goto("/digimon/card/BT1-084");
-  // The list collapses once the account has a few decks, and a brand-new deck
-  // holding nothing is exactly what gets hidden.
-  const expand = page.getByRole("button", { name: /展开/ });
-  if (await expand.count()) await expand.click();
+  await revealDeckRow(page, name);
   // Scoped to THIS deck's row. Row order is by updated_at and the seeded decks
   // tie with it to the second, so "the first ＋" adds to somebody else's deck —
   // which is how this test spent its first run quietly editing the fixture out
@@ -53,15 +51,16 @@ test("closes the deck to edits, everywhere, until you unlock it", async ({
 
   // The card page lists it, says why, and offers no controls.
   await page.goto("/digimon/card/BT1-084");
-  const expand2 = page.getByRole("button", { name: /展开/ });
-  if (await expand2.count()) await expand2.click();
+  await revealDeckRow(page, name);
   const locked = rowFor(page);
   await expect(locked).toContainText("🔒 已锁定");
   // …and that row has no way to change anything.
   await expect(locked.getByTitle("+1")).toHaveCount(0);
   await expect(locked.getByTitle("−1")).toHaveCount(0);
   // Other decks are unaffected — the lock is per deck, not a global mode.
-  await expect(page.getByLabel("添加到卡组").getByTitle("+1").first()).toBeVisible();
+  await expect(
+    page.getByLabel("添加到卡组").getByTitle("+1").first(),
+  ).toBeVisible();
 
   // Unlock from the deck page and the controls come back.
   await page.goto(deckUrl);
