@@ -169,32 +169,6 @@ export function getCardImages(code: string, lang = "en"): CardImageVariant[] {
   return stmt.all(code, "en") as CardImageVariant[];
 }
 
-/**
- * Returns how many image variants each given code has, mapped by code.
- * Counted in `lang`, falling back to the English count for codes that have no
- * art in that language (mirrors getCardImages so badges match the gallery).
- */
-export function getCardImageCounts(
-  codes: string[],
-  lang = "en",
-): Map<string, number> {
-  if (codes.length === 0) return new Map();
-  const placeholders = codes.map(() => "?").join(",");
-  const count = (l: string) =>
-    db()
-      .prepare(
-        `SELECT code, COUNT(*) as n FROM card_images
-          WHERE code IN (${placeholders}) AND lang = ? GROUP BY code`,
-      )
-      .all(...codes, l) as { code: string; n: number }[];
-
-  const out = new Map(count(lang).map((r) => [r.code, r.n]));
-  if (lang !== "en") {
-    for (const r of count("en")) if (!out.has(r.code)) out.set(r.code, r.n);
-  }
-  return out;
-}
-
 export function distinct(col: keyof DigimonCard): string[] {
   return (
     db()
@@ -209,24 +183,6 @@ export function distinct(col: keyof DigimonCard): string[] {
  * Every individual product name across the whole card pool, deduped + sorted,
  * for the browse page's set filter.
  */
-/**
- * Official keyword vocabulary for a language, used by EffectText to chip the
- * keywords that are printed WITHOUT brackets (アセンブリ-6, デジクロス-2).
- * Empty until scrape-digimon-keywords.ts has run; the renderer just skips
- * bare-keyword matching in that case.
- */
-export function listKeywords(lang: string): string[] {
-  try {
-    return (
-      db()
-        .prepare(`SELECT keyword FROM card_keywords WHERE lang = ?`)
-        .all(lang) as { keyword: string }[]
-    ).map((r) => r.keyword);
-  } catch {
-    // Table not created yet (fresh DB, scraper never run).
-    return [];
-  }
-}
 
 /**
  * The keyword table the game-knowledge page prints: every keyword the official
@@ -499,7 +455,7 @@ export type DigimonCollectionRow = {
   quantity: number;
 };
 
-export function getCardCollectionQty(
+function getCardCollectionQty(
   currentUserId: string,
   cardId: string,
   variant: string,

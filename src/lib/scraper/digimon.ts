@@ -178,7 +178,7 @@ const COLOR_CANON: Record<string, string> = {
   White: "White",
 };
 
-export function canonColor(s: string): string | null {
+function canonColor(s: string): string | null {
   return COLOR_CANON[s.trim()] ?? null;
 }
 
@@ -212,7 +212,7 @@ export function levelFromText(s: string | null): number | null {
  * site, with nothing to indicate anything was missing. `unknownBlockLabels`
  * turns that into a warning on the very first scrape after Bandai adds one.
  */
-export function knownBlockLabels(L: LabelMap): Set<string> {
+function knownBlockLabels(L: LabelMap): Set<string> {
   return new Set([
     L.evoCondition,
     L.specialPlay,
@@ -230,7 +230,7 @@ export function knownBlockLabels(L: LabelMap): Set<string> {
 }
 
 /** Labels present in this block that `knownBlockLabels` doesn't cover. */
-export function unknownBlockLabels(
+function unknownBlockLabels(
   $: cheerio.CheerioAPI,
   block: AnyNode,
   L: LabelMap = EN_LABELS,
@@ -259,7 +259,8 @@ export function parseCardBlock(
   // and it re-uses the same class names (.cardTitle, .cardInfoBox,
   // .cardInfoBoxSmall). Every main-side lookup below therefore has to exclude
   // that subtree, or a Dual card would silently pick up Option-side values.
-  const notDual = (_i: number, e: AnyNode) => $(e).closest(".dualCardCol").length === 0;
+  const notDual = (_i: number, e: AnyNode) =>
+    $(e).closest(".dualCardCol").length === 0;
   const $dual = $el.find(".dualCardCol").first();
 
   const name = normalize($el.find(".cardTitle").filter(notDual).first().text());
@@ -275,18 +276,21 @@ export function parseCardBlock(
   // Color: ONLY from the "Color" dl. Note other cells (Digivolve Cost) also use
   // cardColor_<name> spans, so we must scope to the dl whose <dt> is "Color".
   const colors: string[] = [];
-  $el.find("dl.cardInfoBox").filter(notDual).each((_i, dl) => {
-    const dt = $(dl).find(".cardInfoTit").first();
-    if (normalize(dt.text()) !== L.color) return;
-    $(dl)
-      .find("dd span[class^='cardColor_']")
-      .each((_j, s) => {
-        const cls = $(s).attr("class") ?? "";
-        const t = normalize($(s).text());
-        if (cls !== "cardColor_" && t && !colors.includes(t)) colors.push(t);
-      });
-    return false; // found the Color cell, stop
-  });
+  $el
+    .find("dl.cardInfoBox")
+    .filter(notDual)
+    .each((_i, dl) => {
+      const dt = $(dl).find(".cardInfoTit").first();
+      if (normalize(dt.text()) !== L.color) return;
+      $(dl)
+        .find("dd span[class^='cardColor_']")
+        .each((_j, s) => {
+          const cls = $(s).attr("class") ?? "";
+          const t = normalize($(s).text());
+          if (cls !== "cardColor_" && t && !colors.includes(t)) colors.push(t);
+        });
+      return false; // found the Color cell, stop
+    });
   const [color = null, color2 = null] = colors;
 
   // Helper: find dd by dt label text. Strips out any nested link list
@@ -294,7 +298,9 @@ export function parseCardBlock(
   function dd(label: string): string | null {
     let result: string | null = null;
     $el
-      .find("dl.cardInfoBox .cardInfoTit, dl.cardInfoBoxSmall .cardInfoTitSmall")
+      .find(
+        "dl.cardInfoBox .cardInfoTit, dl.cardInfoBoxSmall .cardInfoTitSmall",
+      )
       .filter(notDual)
       .each((_i, e) => {
         if (normalize($(e).text()) === label) {
@@ -469,7 +475,7 @@ export function parseCardBlock(
  * main labels happen to differ today ([効果] vs [デュアル効果]), but relying
  * on that would break the moment the site reuses a label.
  */
-export function effectByLabel(
+function effectByLabel(
   $: cheerio.CheerioAPI,
   $el: cheerio.Cheerio<AnyNode>,
   label: string,
@@ -477,7 +483,7 @@ export function effectByLabel(
 ): string | null {
   let out: string | null = null;
   $el.find("dl.cardInfoBoxSmall").each((_i, dl) => {
-    if (($(dl).closest(".dualCardCol").length > 0) !== dual) return;
+    if ($(dl).closest(".dualCardCol").length > 0 !== dual) return;
     const dt = $(dl).find(".cardInfoTitSmall").first();
     if (normalize(dt.text()) === label) {
       const dd = $(dl).find("dd.cardInfoData").first();
@@ -562,7 +568,10 @@ export function parseRulingsAll(html: string): ScrapedRuling[] {
  */
 export let lastUnknownLabels: Map<string, string[]> = new Map();
 
-export function parseAll(html: string, labels: LabelMap = EN_LABELS): ScrapedCard[] {
+export function parseAll(
+  html: string,
+  labels: LabelMap = EN_LABELS,
+): ScrapedCard[] {
   const $ = cheerio.load(html);
   const byCode = new Map<string, ScrapedCard[]>();
   lastUnknownLabels = new Map();
@@ -680,6 +689,8 @@ export const JP_CARD_TYPE: Record<string, string> = {
 };
 
 /** Canonical English for a JP type word, or undefined if we don't model it. */
-export function canonicalJpType(t: string | null | undefined): string | undefined {
+export function canonicalJpType(
+  t: string | null | undefined,
+): string | undefined {
   return t ? JP_CARD_TYPE[t.trim()] : undefined;
 }

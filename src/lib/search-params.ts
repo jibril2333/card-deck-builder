@@ -49,48 +49,6 @@ export function pickSort(sp: SearchParamsRecord): {
   return { field: s, dir: "asc" };
 }
 
-/** Build URL params skipping empty values. */
-export function buildQuery(
-  current: SearchParamsRecord,
-  patch: Record<string, string | string[] | undefined | null>,
-): string {
-  const out = new URLSearchParams();
-  // Carry over existing keys not present in patch
-  for (const [k, v] of Object.entries(current)) {
-    if (k in patch) continue;
-    if (v === undefined) continue;
-    if (Array.isArray(v)) {
-      if (v.length) out.set(k, v.join(","));
-    } else if (v.length) {
-      out.set(k, v);
-    }
-  }
-  for (const [k, v] of Object.entries(patch)) {
-    if (v === undefined || v === null || v === "") continue;
-    if (Array.isArray(v)) {
-      if (v.length) out.set(k, v.join(","));
-    } else {
-      out.set(k, String(v));
-    }
-  }
-  return out.toString();
-}
-
-/** Toggle a value in a comma-list field. */
-export function toggleListValue(
-  current: SearchParamsRecord,
-  key: string,
-  value: string,
-): string {
-  const existing = pickList(current, key);
-  const next = existing.includes(value)
-    ? existing.filter((v) => v !== value)
-    : [...existing, value];
-  return buildQuery(current, {
-    [key]: next.length ? next : undefined,
-    page: undefined,
-  });
-}
 
 /**
  * How many filters are actually on.

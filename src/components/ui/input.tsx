@@ -17,21 +17,6 @@ export const Input = React.forwardRef<
 ));
 Input.displayName = "Input";
 
-export const Textarea = React.forwardRef<
-  HTMLTextAreaElement,
-  React.TextareaHTMLAttributes<HTMLTextAreaElement>
->(({ className, ...props }, ref) => (
-  <textarea
-    ref={ref}
-    className={cn(
-      "flex min-h-[80px] w-full rounded-md border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-[var(--color-muted-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50",
-      className,
-    )}
-    {...props}
-  />
-));
-Textarea.displayName = "Textarea";
-
 export const Select = React.forwardRef<
   HTMLSelectElement,
   React.SelectHTMLAttributes<HTMLSelectElement>
@@ -46,16 +31,3 @@ export const Select = React.forwardRef<
   />
 ));
 Select.displayName = "Select";
-
-export const Label = ({
-  className,
-  ...props
-}: React.LabelHTMLAttributes<HTMLLabelElement>) => (
-  <label
-    className={cn(
-      "text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]",
-      className,
-    )}
-    {...props}
-  />
-);

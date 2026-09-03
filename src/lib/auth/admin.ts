@@ -12,7 +12,7 @@ import { getCurrentUser } from "./session";
  * Fails CLOSED: with the variable unset nobody is an admin, so forgetting to
  * configure it disables the button rather than exposing it to everyone.
  */
-export function adminEmails(): string[] {
+function adminEmails(): string[] {
   return (process.env.CDB_ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())

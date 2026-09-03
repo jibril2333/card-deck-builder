@@ -15,9 +15,7 @@
  */
 
 const HIRA_START = 0x3041; // ぁ
-const HIRA_END = 0x3096; // ゖ
 const KATA_START = 0x30a1; // ァ
-const KATA_END = 0x30f6; // ヶ
 const GAP = KATA_START - HIRA_START;
 
 export function toKatakana(s: string): string {

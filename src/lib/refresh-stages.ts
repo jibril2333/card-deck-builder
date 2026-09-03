@@ -104,7 +104,7 @@ export const REFRESH_STAGES: RefreshStage[] = [
  * and "第 3 / 8 项 · 中/日文" alone cannot say which of the three you are
  * watching, or why the count restarted.
  */
-export const SCRIPT_LABELS: Record<string, string> = {
+const SCRIPT_LABELS: Record<string, string> = {
   "sync-cards.ts": "卡表",
   "scrape-digimon-sets.ts": "卡包",
   "scrape-digimon-metadata.ts": "英文卡表",

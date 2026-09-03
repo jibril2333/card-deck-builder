@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { isGameId, type GameId, colorHex } from "@/lib/games";
+import { isGameId, colorHex } from "@/lib/games";
 import { KEYWORDS } from "@/lib/keywords";
 import * as digimon from "@/lib/db/digimon";
 import { KEYWORD_CHIP, SPECIAL_CHIP } from "@/components/effect-text";
@@ -64,25 +64,6 @@ function ColorList({ colors }: { colors: string[] }) {
  * you're holding, the ones on the site and the ones in an English article
  * won't agree on which language that is.
  */
-/** Simple term/definition list, for the sections that aren't the keyword
- *  table — terms with no three-language mapping behind them. */
-function TermList({ items }: { items: [string, string][] }) {
-  return (
-    <dl className="not-prose grid grid-cols-1 gap-y-1.5 text-sm">
-      {items.map(([term, def]) => (
-        <div
-          key={term}
-          className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-3 items-baseline"
-        >
-          <dt className="font-mono text-xs font-semibold text-[var(--color-accent)] whitespace-nowrap">
-            {term}
-          </dt>
-          <dd className="text-[var(--color-fg)] leading-relaxed">{def}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
 type KeywordRow = {
   official: string;

@@ -1,7 +1,6 @@
 "use server";
 
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
@@ -28,7 +27,9 @@ import { setSessionCookie } from "./session";
 async function rpFromRequest(): Promise<{ rpID: string; origin: string }> {
   const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const proto =
+    h.get("x-forwarded-proto") ??
+    (host.startsWith("localhost") ? "http" : "https");
   // rpID is the registrable domain, NO port, NO scheme.
   const rpID = host.split(":")[0];
   const origin = `${proto}://${host}`;
@@ -94,8 +95,4 @@ export async function finishLoginWithPasskeyAction(input: {
   if (!r.ok) return { ok: false, error: r.error };
   await setSessionCookie(r.user_id);
   return { ok: true };
-}
-
-export async function logoutAfterPasskeyAction() {
-  redirect("/");
 }

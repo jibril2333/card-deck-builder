@@ -85,11 +85,13 @@ export async function verifyPassword(
        FROM user.users WHERE email = ?`,
     )
     .get(email.toLowerCase().trim()) as
-    | (User & { password_hash: string })
-    | undefined;
+    (User & { password_hash: string }) | undefined;
   if (!row) {
     // Run a dummy compare so timing doesn't leak whether the email exists.
-    await bcrypt.compare(password, "$2b$12$invalidinvalidinvalidinvalidinvalidi");
+    await bcrypt.compare(
+      password,
+      "$2b$12$invalidinvalidinvalidinvalidinvalidi",
+    );
     return null;
   }
   const ok = await bcrypt.compare(password, row.password_hash);
@@ -138,14 +140,6 @@ export function findSession(token: string): Session | null {
 
 export function deleteSession(token: string): void {
   authDb().prepare(`DELETE FROM user.sessions WHERE id = ?`).run(token);
-}
-
-/** Periodic cleanup — call from a cron or on app start. */
-export function purgeExpiredSessions(): number {
-  const r = authDb()
-    .prepare(`DELETE FROM user.sessions WHERE expires_at < ?`)
-    .run(new Date().toISOString());
-  return r.changes;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -199,8 +193,4 @@ export function redeemInvite(code: string, userId: string): boolean {
     )
     .run(userId, code.trim());
   return r.changes > 0;
-}
-
-export function deleteInvite(code: string): void {
-  authDb().prepare(`DELETE FROM user.invites WHERE code = ?`).run(code);
 }

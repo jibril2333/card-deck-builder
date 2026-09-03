@@ -95,12 +95,16 @@ export const FIELD_SOURCE: Record<FieldKey, FieldSource> = {
   dual_effect: { base: "dual_effect", translated: "dual_effect" },
   dual_rule: { base: "dual_rule", translated: "dual_rule" },
   link_dp: { base: "link_dp" },
-  link_requirement: { base: "link_requirement", translated: "link_requirement" },
+  link_requirement: {
+    base: "link_requirement",
+    translated: "link_requirement",
+  },
   link_effect: { base: "link_effect", translated: "link_effect" },
 };
 
 /** Canonical card types, as stored in `cards.card_type`. */
-export type CanonicalType = "Digimon" | "Digi-Egg" | "Tamer" | "Option" | "Dual";
+export type CanonicalType =
+  "Digimon" | "Digi-Egg" | "Tamer" | "Option" | "Dual";
 
 const TEXT_FIELDS: FieldKey[] = [
   "main_effect",
@@ -162,7 +166,9 @@ export const CARD_TYPE_FIELDS: Record<CanonicalType, FieldKey[]> = {
   ],
 };
 
-export function canonicalType(t: string | null | undefined): CanonicalType | null {
+export function canonicalType(
+  t: string | null | undefined,
+): CanonicalType | null {
   return t && t in CARD_TYPE_FIELDS ? (t as CanonicalType) : null;
 }
 
@@ -187,7 +193,8 @@ export function buildCardView(
   for (const src of Object.values(FIELD_SOURCE)) {
     if (!src.translated) continue; // language-independent — leave canonical
     const localized = t[src.translated];
-    if (localized === null || localized === undefined || localized === "") continue;
+    if (localized === null || localized === undefined || localized === "")
+      continue;
     (view[src.base] as unknown) = localized;
   }
   // `stage` mirrors `form` on this game; keep them consistent after overlay so
@@ -196,7 +203,7 @@ export function buildCardView(
   return view;
 }
 
-export function hasValue(v: unknown): boolean {
+function hasValue(v: unknown): boolean {
   return v !== null && v !== undefined && v !== "";
 }
 

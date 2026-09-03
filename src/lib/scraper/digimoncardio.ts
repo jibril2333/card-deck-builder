@@ -7,9 +7,8 @@
  * subtly different rows for the same card.
  */
 
-export const DIGIMONCARDIO_API = "https://digimoncard.io/api-public/search";
-export const DIGIMONCARDIO_IMG_BASE =
-  "https://images.digimoncard.io/images/cards";
+const DIGIMONCARDIO_API = "https://digimoncard.io/api-public/search";
+const DIGIMONCARDIO_IMG_BASE = "https://images.digimoncard.io/images/cards";
 const UA = "card-deck-builder/0.1 (digimoncardio)";
 
 export type ApiCard = {
@@ -52,13 +51,17 @@ export type ApiCard = {
  * the upsert collapse them) is safe and order-independent.
  */
 export async function fetchCatalogue(query = ""): Promise<ApiCard[]> {
-  const res = await fetch(`${DIGIMONCARDIO_API}?n=${encodeURIComponent(query)}`, {
-    headers: { "user-agent": UA },
-    redirect: "follow",
-  });
+  const res = await fetch(
+    `${DIGIMONCARDIO_API}?n=${encodeURIComponent(query)}`,
+    {
+      headers: { "user-agent": UA },
+      redirect: "follow",
+    },
+  );
   if (!res.ok) throw new Error(`digimoncard.io HTTP ${res.status}`);
   const rows = (await res.json()) as ApiCard[];
-  if (!Array.isArray(rows)) throw new Error("digimoncard.io: unexpected payload");
+  if (!Array.isArray(rows))
+    throw new Error("digimoncard.io: unexpected payload");
   return rows;
 }
 
@@ -117,7 +120,8 @@ const WIKI_MARKUP_RE = /^\s*\|[a-z_]+\s*=\s*$|\{\{/i;
  * and it does this in BOTH text fields. The label names the block the text
  * belongs to, which is all we need to route it.
  */
-const LEAKED_LABEL_RE = /^\s*(Inherited Effect|Security Effect|Card Effect\(s\))\s+/;
+const LEAKED_LABEL_RE =
+  /^\s*(Inherited Effect|Security Effect|Card Effect\(s\))\s+/;
 
 /**
  * Overflow is a card-level RULE, printed in the [Special Rule] block — it says
@@ -180,7 +184,11 @@ export function toCardRow(c: ApiCard): CardRow {
   // label names the block it belongs in, so route by it and drop the prefix.
   const leakedMain = splitLeakedLabel(usableText(c.main_effect));
   const leakedSecond = splitLeakedLabel(secondBlock);
-  const bySlot: Record<Slot, string> = { main: "", security: "", inherited: "" };
+  const bySlot: Record<Slot, string> = {
+    main: "",
+    security: "",
+    inherited: "",
+  };
   for (const p of [leakedMain, leakedSecond]) {
     if (p.slot && !bySlot[p.slot]) bySlot[p.slot] = p.body;
   }
@@ -197,10 +205,14 @@ export function toCardRow(c: ApiCard): CardRow {
     .replace(/\r\n/g, "\n")
     .trim();
   const linkTail = rawEvoLine.search(/^Link Requirements?\s/m);
-  const evoLine = linkTail >= 0 ? rawEvoLine.slice(0, linkTail).trim() : rawEvoLine;
+  const evoLine =
+    linkTail >= 0 ? rawEvoLine.slice(0, linkTail).trim() : rawEvoLine;
   const linkFromEvo =
     linkTail >= 0
-      ? rawEvoLine.slice(linkTail).replace(/^Link Requirements?\s+/, "").trim()
+      ? rawEvoLine
+          .slice(linkTail)
+          .replace(/^Link Requirements?\s+/, "")
+          .trim()
       : "";
   // Compose the "Yellow 3 from Lv.4"-style cost line when the structured
   // pieces are present (they often aren't for newer JP/CN sets).
@@ -239,7 +251,9 @@ export function toCardRow(c: ApiCard): CardRow {
       bySlot.security || (isOptionOrTamer ? unlabelledSecond : ""),
     inherited_effect:
       bySlot.inherited ||
-      (isOptionOrTamer || isDual || isLink || isOverflow ? "" : unlabelledSecond),
+      (isOptionOrTamer || isDual || isLink || isOverflow
+        ? ""
+        : unlabelledSecond),
     special_rule: isOverflow ? secondBlock : "",
     dual_effect: isDual ? secondBlock : "",
     link_requirement: isLink ? linkLines[0].trim() : linkFromEvo,

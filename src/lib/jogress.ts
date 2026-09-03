@@ -156,7 +156,9 @@ function parseSide(raw: string): JogressSide {
 
   const colors = rest.match(/^((?:[赤青黄緑黒紫白]\/?)+)の?(?=Lv\.|$)/);
   if (colors) {
-    side.colors = [...colors[1]].filter((ch) => COLORS[ch]).map((ch) => COLORS[ch]);
+    side.colors = [...colors[1]]
+      .filter((ch) => COLORS[ch])
+      .map((ch) => COLORS[ch]);
     rest = rest.slice(colors[0].length);
   }
   const lv = rest.match(/^Lv\.(\d+)$/);
@@ -179,7 +181,9 @@ function parseSide(raw: string): JogressSide {
  * Every ジョグレス condition on a card. More than one is an "or" — EX8-064 can
  * be made either from 紫/黒Lv.6+黄/緑Lv.6 or from ピエモン+ヴァンデモン.
  */
-export function parseJogress(evoReqJa: string | null | undefined): JogressCondition[] {
+export function parseJogress(
+  evoReqJa: string | null | undefined,
+): JogressCondition[] {
   if (!evoReqJa) return [];
   const out: JogressCondition[] = [];
   for (const line of evoReqJa.split(/\n/)) {
@@ -194,11 +198,18 @@ export function parseJogress(evoReqJa: string | null | undefined): JogressCondit
     if (parts.length !== 2) {
       // Keep it visible rather than dropping it: the reader still learns the
       // card has a condition, we just can't check it for them.
-      const side = (raw: string): JogressSide => ({ ...parseSide(raw), parsed: false });
+      const side = (raw: string): JogressSide => ({
+        ...parseSide(raw),
+        parsed: false,
+      });
       out.push({ sides: [side(body), side("")], cost, raw: clause });
       continue;
     }
-    out.push({ sides: [parseSide(parts[0]), parseSide(parts[1])], cost, raw: clause });
+    out.push({
+      sides: [parseSide(parts[0]), parseSide(parts[1])],
+      cost,
+      raw: clause,
+    });
   }
   return out;
 }
@@ -236,14 +247,15 @@ export function matchesSide(card: JogressCard, side: JogressSide): boolean {
 }
 
 /** The condition in Chinese, for the popover header. */
-export function describeSide(side: JogressSide): string {
+function describeSide(side: JogressSide): string {
   if (!side.parsed) return side.raw;
   if (side.exactName) return `「${side.exactName}」`;
   const bits: string[] = [];
   if (side.nameContains) bits.push(`名称含「${side.nameContains}」`);
   if (side.traits.length) bits.push(`特征「${side.traits.join("/")}」`);
   if (side.mentions) bits.push(`提及「${side.mentions}」`);
-  if (side.colors.length) bits.push(side.colors.map((c) => COLOR_ZH[c] ?? c).join("/"));
+  if (side.colors.length)
+    bits.push(side.colors.map((c) => COLOR_ZH[c] ?? c).join("/"));
   if (side.level !== null) bits.push(`Lv.${side.level}`);
   return bits.join(" ");
 }
