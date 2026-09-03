@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 export type Variant = {
-  variant: string; // "" for base, "_P1" etc for parallels (Digimon)
+  variant: string; // "" for base, "_P1" etc for parallels
   image_url: string;
-  /** Optional display label (e.g. UA rarity "C★"). Falls back to variant. */
+  /** Optional display label. Falls back to the variant key. */
   label?: string;
   /** Language of the artwork itself, when known ("en" | "zh" | "ja"). */
   lang?: string;
@@ -27,7 +27,7 @@ export function CardImageGallery({
 }: {
   name: string;
   variants: Variant[];
-  /** variant key (the `variant` field, e.g. a UA code) to show first */
+  /** variant key (the `variant` field) to show first */
   defaultVariant?: string;
   /** Reader's card language — used to flag art that isn't in it. */
   cardLang?: string;

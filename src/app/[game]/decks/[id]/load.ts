@@ -147,10 +147,6 @@ export type Loaded = {
     notes: string | null;
     accent_color: string;
     accent_color2: string | null;
-    /** UA only — null for Digimon (no column). */
-    locked_series: string | null;
-    /** UA only — null for Digimon (no column). */
-    locked_color: string | null;
     cover_card_id: string | null;
     /** Which printing of the cover card to show ('' = base art). */
     cover_variant: string;
@@ -186,12 +182,10 @@ export type Loaded = {
     /** Cover card's `color`, mapped to hex. Used by the meta form's
      *  "应用封面卡颜色" button to populate the accent picker. */
     accent: string | null;
-    /** Cover card's `color2`, mapped to hex. Null for single-color covers
-     *  and always null on UA (UA cards have no color2 column). */
+    /** Cover card's `color2`, mapped to hex. Null for single-color covers. */
     accent2: string | null;
     /** Every printing of the cover card (base + alt arts), so the owner can
-     *  choose which one the deck shows. Digimon only — on UA each printing is
-     *  its own card, so picking one is just picking a different cover card. */
+     *  choose which one the deck shows. */
     arts: { variant: string; image_url: string }[];
   } | null;
   isDigimon: boolean;
@@ -302,9 +296,6 @@ export async function loadDeckView({ game, id, sp, me }: DeckViewParams) {
       notes: deck.notes,
       accent_color: deck.accent_color,
       accent_color2: deck.accent_color2,
-      // Digimon's user.decks has no locked_series/locked_color columns.
-      locked_series: null,
-      locked_color: null,
       cover_card_id: deck.cover_card_id,
       cover_variant: deck.cover_variant ?? "",
       version: deck.version ?? null,

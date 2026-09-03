@@ -1,92 +1,21 @@
 import { getDB } from "./connection";
+import type { DigimonCard, DigimonDeck } from "./digimon-types";
+
+export type { DigimonCard, DigimonDeck };
 
 export type { DigimonFilters };
-import { createDeckRepo, DeckLockedError, OwnershipError } from "./deck-shared";
 import {
-  buildSearchQuery,
-  codeNatural,
-  type DigimonFilters,
-} from "./card-search";
+  createDeckRepo,
+  DeckLockedError,
+  DEFAULT_DECK_ACCENT,
+  OwnershipError,
+} from "./deck-shared";
+import { buildSearchQuery, type DigimonFilters } from "./card-search";
 import { keywordBase, NON_KEYWORDS } from "@/lib/keyword-derive";
 import type { CardTranslation } from "./translations-ddl";
 import type { CardRuling } from "./rulings-ddl";
 import type { CardLang } from "../card-lang";
 import { splitSetNames } from "../card-sets";
-
-export type DigimonCard = {
-  id: string;
-  code: string;
-  name: string;
-  card_type: string;
-  color: string | null;
-  color2: string | null;
-  level: number | null;
-  play_cost: number | null;
-  dp: number | null;
-  attribute: string | null;
-  form: string | null;
-  stage: string | null;
-  digi_types: string | null;
-  rarity: string | null;
-  main_effect: string | null;
-  security_effect: string | null;
-  inherited_effect: string | null;
-  source_effect: string | null;
-  evolution_cost: string | null;
-  evolution_requirements: string | null;
-  set_names: string | null;
-  series: string | null;
-  artist: string | null;
-  image_url: string | null;
-  source_url: string | null;
-  /** ---- Dual cards (card_type 'Dual') ----------------------------------
-   *  Two cards printed on one: everything above describes the Digimon half,
-   *  these describe the Option half on the bottom. NULL on every other card.
-   *  `dual_color` is a run of canonical colour names ("RedYellow"), the same
-   *  shape as `evolution_cost`. */
-  dual_name: string | null;
-  dual_color: string | null;
-  dual_cost: number | null;
-  dual_effect: string | null;
-  dual_rule: string | null;
-  /** ---- Link cards -------------------------------------------------------
-   *  What this card contributes while plugged sideways into another Digimon.
-   *  `link_dp` is a number so the page reads the same in every language — the
-   *  two official sites print it as "DP+2000" and "+2000 DP". */
-  link_dp: number | null;
-  link_requirement: string | null;
-  link_effect: string | null;
-  /** [特別ルール] — card-specific rules text (Overflow &c.). */
-  special_rule: string | null;
-};
-
-export type DigimonDeck = {
-  id: string;
-  name: string;
-  notes: string | null;
-  accent_color: string;
-  /** Optional secondary accent color for dual-color decks. NULL = single. */
-  accent_color2: string | null;
-  cover_card_id: string | null;
-  sort_order: number;
-  /** 1 = a deck the owner actually plays; floats to the top of the deck list. */
-  pinned: number;
-  /** Which printing of the cover card to show: '' = base art, else a
-   *  `card_images.variant` key such as '_P1'. */
-  cover_variant: string;
-  /** Pack this list is built for, e.g. 'BT-26'. NULL = never set.
-   *  See lib/deck-version — it's a label, nothing enforces it. */
-  version: string | null;
-  /** 1 = closed to edits. Enforced in the repo, not just the UI. */
-  locked: number;
-  /** JSON `ImportReport` from the import that made this deck: the cards it
-   *  couldn't place. Shown in the deck's info bar until dismissed, then NULL
-   *  forever. See lib/import-report. */
-  import_report: string | null;
-  created_at: string;
-  updated_at: string;
-  user_id: string | null;
-};
 
 export type DigimonDeckCard = {
   card_id: string;
@@ -419,45 +348,7 @@ export function distinctNumbers(col: keyof DigimonCard): number[] {
 // deck-meta-update shape) stay below.
 // ────────────────────────────────────────────────────────────────────────
 
-const deckRepo = createDeckRepo<DigimonCard, DigimonDeck>({
-  // Keep `defaultAccent` in lock-step with the createDeck default below.
-  defaultAccent: "#f59e0b",
-  db,
-  /**
-   * The order a deck's cards are read in — the grid, the text export, the
-   * image export and the stats all take it from here.
-   *
-   * Two things were wrong with `level NULLS LAST, code`:
-   *
-   *  - Tamers and Options both have a NULL level, so they landed in one pile
-   *    sorted by code and interleaved with each other. They're the two groups
-   *    a player counts separately.
-   *  - `code` is TEXT, so BT10 sorted before BT2 and -010 before -002. A deck
-   *    holding several sets read as if it had been shuffled.
-   *
-   * So: eggs, then Digimon by level, then Tamers, then Options — the order the
-   * text export already used for its two halves and the one a decklist is
-   * written in. Inside a group, the card number read as a NUMBER: the letters
-   * of the set, then the set's number, then the card's.
-   *
-   * rtrim/ltrim with a character SET (not a prefix) is what splits "BT13" into
-   * "BT" and 13 without regex; CAST stops at the first non-digit, which also
-   * takes care of a `_P1` suffix.
-   */
-  deckCardOrderBy: `
-    CASE c.card_type
-      WHEN 'Digi-Egg' THEN 0
-      WHEN 'Tamer' THEN 2
-      WHEN 'Option' THEN 3
-      ELSE 1
-    END,
-    c.level NULLS LAST,
-    ${codeNatural("c.code")}`,
-  restrictionSource: "digimon",
-  // Digimon stores parallel art in card_images keyed off the base code,
-  // so cards.code IS the restriction identity — no transformation needed.
-  identityForCode: (code) => code,
-});
+const deckRepo = createDeckRepo(db);
 
 export const {
   listDecks,
@@ -522,7 +413,7 @@ export function createDeck(input: {
       id,
       input.name,
       input.notes ?? null,
-      input.accent_color ?? "#f59e0b",
+      input.accent_color ?? DEFAULT_DECK_ACCENT,
       input.accent_color2 ?? null,
       input.user_id,
       input.import_report ?? null,

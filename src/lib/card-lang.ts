@@ -1,6 +1,5 @@
 /**
- * Card-text language preference (Digimon only — UA cards are native JP and
- * have no translation data).
+ * Card-text language preference.
  *
  * Stored in a plain cookie so every server component can read it and the
  * switcher is a one-line client write + router.refresh(). 'en' is the native

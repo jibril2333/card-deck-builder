@@ -6,28 +6,28 @@
  */
 
 import { colorHex } from "@/lib/games";
+import type { DigimonDeck } from "../digimon-types";
 import {
+  DEFAULT_DECK_ACCENT,
   OwnershipError,
-  type DeckCommon,
   type DeckWithCardQty,
   type DeckWithCover,
-  type RepoCtx,
+  type DbFn,
 } from "./context";
 
-export function createMeta<TDeck extends DeckCommon>(
-  ctx: RepoCtx,
+export function createMeta(
+  db: DbFn,
   deps: {
     assertUnlocked: (deckId: string) => void;
   },
 ) {
-  const { db, defaultAccent, seedSeries, seedColor } = ctx;
   const { assertUnlocked } = deps;
 
   /**
    * All decks across all users. Decks owned by `currentUserId` come first;
    * within each ownership group, most-recently-updated first.
    */
-  function listDecks(currentUserId: string): (TDeck & {
+  function listDecks(currentUserId: string): (DigimonDeck & {
     owner_id: string | null;
     owner_name: string | null;
   })[] {
@@ -38,14 +38,14 @@ export function createMeta<TDeck extends DeckCommon>(
          LEFT JOIN user.users u ON u.id = d.user_id
          ORDER BY (d.user_id = ?) DESC, d.updated_at DESC`,
       )
-      .all(currentUserId) as (TDeck & {
+      .all(currentUserId) as (DigimonDeck & {
       owner_id: string | null;
       owner_name: string | null;
     })[];
   }
 
   /** Same as listDecks plus cover image join. */
-  function listDecksWithCover(currentUserId: string): DeckWithCover<TDeck>[] {
+  function listDecksWithCover(currentUserId: string): DeckWithCover[] {
     return db()
       .prepare(
         `SELECT d.*,
@@ -70,7 +70,7 @@ export function createMeta<TDeck extends DeckCommon>(
          ORDER BY (d.user_id = ?) DESC, d.pinned DESC,
                   d.sort_order ASC, d.updated_at DESC`,
       )
-      .all(currentUserId) as DeckWithCover<TDeck>[];
+      .all(currentUserId) as DeckWithCover[];
   }
 
   /**
@@ -149,78 +149,12 @@ export function createMeta<TDeck extends DeckCommon>(
   }
 
   /**
-   * Backfill the series/color lock for a LEGACY deck — one that has cards
-   * but NULL locks because it was built before the first-card-lock feature
-   * existed (the auto-lock only fires when adding to an *empty* deck).
-   *
-   * Idempotent and owner-scoped:
-   *   - no-op for games without the lock flags (Digimon)
-   *   - no-op if the deck already has both locks (or the relevant one)
-   *   - no-op if the deck is empty (nothing to infer from)
-   *   - locks `series` only if every card shares one series; same for color.
-   *     A legacy deck with mixed series/colors (pre-enforcement) gets locked
-   *     on whichever dimension is unambiguous, and stays unlocked on the
-   *     other — so a genuinely non-conforming deck won't be force-collapsed.
-   *
-   * Called lazily from the deck page when an owner views their UA deck, so
-   * legacy decks "heal" into the locked model on first view. Cheap: a couple
-   * of indexed SELECTs that bail immediately once a deck is locked.
-   */
-  function backfillLockFromCards(currentUserId: string, deckId: string): void {
-    if (!seedSeries && !seedColor) return;
-    const cols: string[] = [];
-    if (seedSeries) cols.push("locked_series");
-    if (seedColor) cols.push("locked_color");
-    const deck = db()
-      .prepare(
-        `SELECT ${cols.join(", ")} FROM user.decks WHERE id = ? AND user_id = ?`,
-      )
-      .get(deckId, currentUserId) as
-      | { locked_series?: string | null; locked_color?: string | null }
-      | undefined;
-    if (!deck) return; // not found / not the owner
-    const needSeries = seedSeries && deck.locked_series == null;
-    const needColor = seedColor && deck.locked_color == null;
-    if (!needSeries && !needColor) return; // already locked
-
-    const rows = db()
-      .prepare(
-        `SELECT DISTINCT c.series, c.color
-           FROM user.deck_cards dc
-           JOIN cards c ON c.id = dc.card_id
-          WHERE dc.deck_id = ? AND dc.quantity > 0`,
-      )
-      .all(deckId) as { series: string | null; color: string | null }[];
-    if (rows.length === 0) return; // empty deck — nothing to infer
-
-    const distinctSeries = new Set(rows.map((r) => r.series));
-    const distinctColor = new Set(rows.map((r) => r.color));
-    const sets: string[] = [];
-    const params: unknown[] = [];
-    if (needSeries && distinctSeries.size === 1) {
-      sets.push("locked_series = ?");
-      params.push([...distinctSeries][0]);
-    }
-    if (needColor && distinctColor.size === 1) {
-      sets.push("locked_color = ?");
-      params.push([...distinctColor][0]);
-    }
-    if (sets.length === 0) return; // mixed — can't safely lock
-    params.push(deckId, currentUserId);
-    db()
-      .prepare(
-        `UPDATE user.decks SET ${sets.join(", ")} WHERE id = ? AND user_id = ?`,
-      )
-      .run(...params);
-  }
-
-  /**
    * Set (or clear, when `cardId === null`) the cover card for a deck.
    *
    * Color-sync semantics:
    *   - `mode = "auto"` (default): only sync accent_color(s) from the new
    *     cover card if BOTH conditions hold —
-   *         1. deck.accent_color === defaultAccent  (user hasn't picked one)
+   *         1. deck.accent_color === DEFAULT_DECK_ACCENT  (user hasn't picked one)
    *         2. deck.cover_card_id IS NULL           (no prior cover)
    *     This makes the very first cover-set seed colors, but subsequent
    *     cover swaps respect whatever colors the user has chosen.
@@ -258,7 +192,10 @@ export function createMeta<TDeck extends DeckCommon>(
         )
         .get(deckId) as
         { accent_color: string; cover_card_id: string | null } | undefined;
-      if (cur?.accent_color === defaultAccent && cur?.cover_card_id === null) {
+      if (
+        cur?.accent_color === DEFAULT_DECK_ACCENT &&
+        cur?.cover_card_id === null
+      ) {
         shouldSync = true;
       }
     }
@@ -334,7 +271,7 @@ export function createMeta<TDeck extends DeckCommon>(
   function listDecksWithCardQty(
     currentUserId: string,
     cardId: string,
-  ): DeckWithCardQty<TDeck>[] {
+  ): DeckWithCardQty[] {
     return db()
       .prepare(
         `SELECT d.*,
@@ -344,7 +281,7 @@ export function createMeta<TDeck extends DeckCommon>(
          WHERE d.user_id = ?
          ORDER BY d.created_at DESC, d.id`,
       )
-      .all(cardId, currentUserId) as DeckWithCardQty<TDeck>[];
+      .all(cardId, currentUserId) as DeckWithCardQty[];
   }
 
   /** Any user can read any deck (friend-readable). */
@@ -381,9 +318,9 @@ export function createMeta<TDeck extends DeckCommon>(
     return new Set(rows.map((r) => r.deck_id));
   }
 
-  function getDeck(id: string): TDeck | undefined {
+  function getDeck(id: string): DigimonDeck | undefined {
     return db().prepare(`SELECT * FROM user.decks WHERE id = ?`).get(id) as
-      TDeck | undefined;
+      DigimonDeck | undefined;
   }
 
   function deleteDeck(currentUserId: string, id: string): void {
@@ -403,7 +340,6 @@ export function createMeta<TDeck extends DeckCommon>(
     setDeckPinned,
     setDeckCoverVariant,
     reorderDecks,
-    backfillLockFromCards,
     setDeckCover,
     listDecksWithCardQty,
     getCompletedDeckIds,

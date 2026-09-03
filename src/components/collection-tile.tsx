@@ -24,8 +24,7 @@ export type CollectionTileCard = {
   color: string | null;
   rarity: string | null;
   image_url: string | null;
-  /** "" base art; "_P1" / "_P2" … parallels (Digimon only — UA encodes alt
-   *  art in `code` so this is always "" there). */
+  /** "" base art; "_P1" / "_P2" … parallels. */
   variant: string;
 };
 

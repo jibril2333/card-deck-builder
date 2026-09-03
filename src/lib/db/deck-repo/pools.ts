@@ -7,11 +7,9 @@
  * that deck actually needs.
  */
 
-import { OwnershipError, type RepoCtx } from "./context";
+import { OwnershipError, type DbFn } from "./context";
 
-export function createPools(ctx: RepoCtx) {
-  const { db } = ctx;
-
+export function createPools(db: DbFn) {
   // ────────────────────────────────────────────────────────────────────
   // Deck groups — several decks that SHARE one physical card pool. The owner
   // buys each shared card only once (the max any single member deck needs)

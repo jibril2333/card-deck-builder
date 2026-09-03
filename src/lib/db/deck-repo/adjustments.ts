@@ -5,15 +5,14 @@
  * prices, shortfalls or the pool.
  */
 
-import { MAX_ADJUSTMENT_QTY, OwnershipError, type RepoCtx } from "./context";
+import { MAX_ADJUSTMENT_QTY, OwnershipError, type DbFn } from "./context";
 
 export function createAdjustments(
-  ctx: RepoCtx,
+  db: DbFn,
   deps: {
     assertUnlocked: (deckId: string) => void;
   },
 ) {
-  const { db } = ctx;
   const { assertUnlocked } = deps;
 
   // ── Adjustments ────────────────────────────────────────────────────────

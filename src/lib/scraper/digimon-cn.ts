@@ -206,8 +206,7 @@ export function cnEvolutionCost(raw: string | null | undefined): string | null {
  * EX1/EX2, where the feed happens to repeat the BARE code for the parallel too.
  *
  * Safe to split on the first `_`: no Digimon card code contains one (checked
- * against the live table — 0 of 4370). UA codes do, but they come from a
- * different feed entirely.
+ * against the live table — 0 of 4370).
  */
 export function splitCnModel(model: string): {
   code: string;

@@ -7,11 +7,9 @@
  * reconciler, the purchase tracker.
  */
 
-import { DeckLockedError, type RepoCtx } from "./context";
+import { DeckLockedError, type DbFn } from "./context";
 
-export function createLocks(ctx: RepoCtx) {
-  const { db } = ctx;
-
+export function createLocks(db: DbFn) {
   /**
    * Is this deck closed to edits?
    *

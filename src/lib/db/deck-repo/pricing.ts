@@ -1,10 +1,8 @@
 /** A card's manually typed price, per user. The shop-scraped side lives in `digimon.ts`. */
 
-import { type RepoCtx } from "./context";
+import { type DbFn } from "./context";
 
-export function createPricing(ctx: RepoCtx) {
-  const { db } = ctx;
-
+export function createPricing(db: DbFn) {
   /**
    * Resolve "the price this user paid attention to" for a card. Composite-PK
    * card_prices means a single card_id can have many rows. Lookup order:

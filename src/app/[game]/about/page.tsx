@@ -64,8 +64,8 @@ function ColorList({ colors }: { colors: string[] }) {
  * you're holding, the ones on the site and the ones in an English article
  * won't agree on which language that is.
  */
-/** Simple term/definition list, for sections that aren't the Digimon keyword
- *  table (UA's triggers, which have no three-language mapping behind them). */
+/** Simple term/definition list, for the sections that aren't the keyword
+ *  table — terms with no three-language mapping behind them. */
 function TermList({ items }: { items: [string, string][] }) {
   return (
     <dl className="not-prose grid grid-cols-1 gap-y-1.5 text-sm">

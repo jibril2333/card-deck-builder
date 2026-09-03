@@ -1,17 +1,22 @@
 /**
  * How many copies the banlist allows, and which pairs may not share a deck.
  *
+ * A card's restriction identity is its `code`: Digimon keeps parallel art in
+ * `card_images` under the base code, so every printing of a card already
+ * shares one code and the banlist covers them together.
+ *
  * Reads `card_restrictions` plus the card's own self-declared limit, and is
  * the only module that knows the difference. `clampQuantityToRestriction` is
  * the one the card writes call — it is not part of the repo's public surface,
  * it is a dependency handed to `createCards`.
  */
 
-import { type RepoCtx } from "./context";
+import { type DbFn } from "./context";
 
-export function createRestrictions(ctx: RepoCtx) {
-  const { db, restrictionSource, identityForCode, seedSeries, seedColor } = ctx;
+/** Which game's rows in `card_restrictions` apply. One game, one value. */
+const RESTRICTION_SOURCE = "digimon";
 
+export function createRestrictions(db: DbFn) {
   /**
    * Look up the official banlist / restricted-list cap for the card the
    * deck is trying to add. Returns null if no restriction applies (the
@@ -25,13 +30,13 @@ export function createRestrictions(ctx: RepoCtx) {
       .prepare(`SELECT code FROM cards WHERE id = ?`)
       .get(cardId) as { code: string } | undefined;
     if (!row) return null;
-    const identity = identityForCode(row.code);
+    const identity = row.code;
     const r = db()
       .prepare(
         `SELECT max_count FROM card_restrictions
          WHERE source = ? AND identity = ?`,
       )
-      .get(restrictionSource, identity) as { max_count: number } | undefined;
+      .get(RESTRICTION_SOURCE, identity) as { max_count: number } | undefined;
     if (!r) return null;
     return { identity, max_count: r.max_count };
   }
@@ -57,7 +62,7 @@ export function createRestrictions(ctx: RepoCtx) {
       .all(deckId, excludeCardId) as { quantity: number; code: string }[];
     let total = 0;
     for (const r of rows) {
-      if (identityForCode(r.code) === identity) total += r.quantity;
+      if (r.code === identity) total += r.quantity;
     }
     return total;
   }
@@ -82,7 +87,7 @@ export function createRestrictions(ctx: RepoCtx) {
       .prepare(`SELECT code FROM cards WHERE id = ?`)
       .get(cardId) as { code: string } | undefined;
     if (!row) return [];
-    const myIdentity = identityForCode(row.code);
+    const myIdentity = row.code;
 
     // Symmetric lookup: this identity could be the trigger (A) or the
     // banned (B) side. UNION returns the OPPOSING identities either way.
@@ -94,7 +99,7 @@ export function createRestrictions(ctx: RepoCtx) {
           SELECT trigger_identity AS other FROM banned_pairs
             WHERE source = ? AND banned_identity  = ?`,
       )
-      .all(restrictionSource, myIdentity, restrictionSource, myIdentity) as {
+      .all(RESTRICTION_SOURCE, myIdentity, RESTRICTION_SOURCE, myIdentity) as {
       other: string;
     }[];
     if (opposing.length === 0) return [];
@@ -120,8 +125,8 @@ export function createRestrictions(ctx: RepoCtx) {
   /**
    * Clamp a requested quantity for `cardId` in `deckId` to whatever the
    * official restriction allows. Standard cards default to ≤4; banned →
-   * 0; limited_1 → 1; limited_2 → 2. UA's "※パラレル含む" is handled by
-   * the identity collapsing alt-arts.
+   * 0; limited_1 → 1; limited_2 → 2. The official wording covers every
+   * printing of a card, which the code-as-identity rule already gives us.
    *
    * Also enforces banned-pair rules: if the deck already contains a card
    * whose identity is paired with `cardId`'s identity in `banned_pairs`,
@@ -182,11 +187,7 @@ export function createRestrictions(ctx: RepoCtx) {
         .prepare(`SELECT code FROM cards WHERE id = ?`)
         .get(cardId) as { code: string } | undefined;
       if (row) {
-        otherSum = deckIdentityCountExcluding(
-          deckId,
-          identityForCode(row.code),
-          cardId,
-        );
+        otherSum = deckIdentityCountExcluding(deckId, row.code, cardId);
       }
     }
     const allowed = Math.max(0, cap - otherSum);
@@ -199,38 +200,6 @@ export function createRestrictions(ctx: RepoCtx) {
     const pairConflicts = findBannedPairConflicts(deckId, cardId);
     if (pairConflicts.length > 0) return 0;
 
-    // Series + color lock enforcement (UA only — gated by the same flags
-    // that drive first-card seeding). For games whose schema doesn't have
-    // these columns (Digimon), the flags are off so no SELECT runs.
-    if (seedSeries || seedColor) {
-      const cols: string[] = [];
-      if (seedSeries) cols.push("locked_series");
-      if (seedColor) cols.push("locked_color");
-      const deck = db()
-        .prepare(`SELECT ${cols.join(", ")} FROM user.decks WHERE id = ?`)
-        .get(deckId) as
-        | { locked_series?: string | null; locked_color?: string | null }
-        | undefined;
-      if (deck) {
-        const lockedSeries = seedSeries ? (deck.locked_series ?? null) : null;
-        const lockedColor = seedColor ? (deck.locked_color ?? null) : null;
-        if (lockedSeries !== null || lockedColor !== null) {
-          const card = db()
-            .prepare(`SELECT series, color FROM cards WHERE id = ?`)
-            .get(cardId) as
-            { series: string | null; color: string | null } | undefined;
-          if (card) {
-            if (lockedSeries !== null && card.series !== lockedSeries) {
-              return 0;
-            }
-            if (lockedColor !== null && card.color !== lockedColor) {
-              return 0;
-            }
-          }
-        }
-      }
-    }
-
     return capped;
   }
 
@@ -238,11 +207,9 @@ export function createRestrictions(ctx: RepoCtx) {
    * Full banlist / limited-list dump for the restrictions page.
    *
    * Joins each restriction to its base-print card row (cards.code = identity)
-   * so the UI can render thumbnails + names without a second round-trip. For
-   * UA, the identity is already the base code (no `_p` suffix), so the simple
-   * equality join hits the base print. For digimon, identity == cards.code by
-   * construction. Cards with no matching row come back with null card fields
-   * (caller renders a placeholder).
+   * so the UI can render thumbnails + names without a second round-trip —
+   * identity == cards.code by construction. Cards with no matching row come
+   * back with null card fields (caller renders a placeholder).
    *
    * Sorted: banned first, then limited_1, then limited_2; alphabetic within
    * each group. The grouping matches how restriction status is taxonomized,
@@ -281,7 +248,7 @@ export function createRestrictions(ctx: RepoCtx) {
             END,
             r.identity`,
       )
-      .all(restrictionSource) as ReturnType<typeof listRestrictions>;
+      .all(RESTRICTION_SOURCE) as ReturnType<typeof listRestrictions>;
   }
 
   /**
@@ -324,7 +291,7 @@ export function createRestrictions(ctx: RepoCtx) {
           WHERE p.source = ?
           ORDER BY p.trigger_identity, p.banned_identity`,
       )
-      .all(restrictionSource) as ReturnType<typeof listBannedPairs>;
+      .all(RESTRICTION_SOURCE) as ReturnType<typeof listBannedPairs>;
   }
 
   return {

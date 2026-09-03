@@ -16,10 +16,6 @@ import { isEmptyReport, type ImportReport } from "@/lib/import-report";
 import { requireUser } from "@/lib/auth/session";
 import { field, formAction, z } from "./action-kit";
 
-function lib(_game: GameId) {
-  return digimon;
-}
-
 // ---------- Cache invalidation helpers ----------
 //
 // Server Actions choose one of these based on what the mutation actually
@@ -63,7 +59,7 @@ export const createDeckAction = formAction(
     // Empty name is fine — fall back to a generic placeholder. The user can
     // rename via the meta form afterward; this just keeps the create button
     // useful when someone clicks it without filling in the input.
-    const id = lib(game).createDeck({
+    const id = digimon.createDeck({
       user_id: me.id,
       name: input.name || "新卡组",
       notes: input.notes || undefined,
@@ -80,7 +76,7 @@ export const createDeckQuietAction = formAction(
   { name: field.trimmed, accent_color: field.trimmed },
   async ({ me, game, input }): Promise<string> => {
     if (!input.name) throw new Error("name required");
-    const id = lib(game).createDeck({
+    const id = digimon.createDeck({
       user_id: me.id,
       name: input.name,
       accent_color: input.accent_color || undefined,
@@ -158,7 +154,7 @@ export const setDeckVersionAction = formAction(
 export const deleteDeckAction = formAction(
   { id: field.id },
   async ({ me, game, input }) => {
-    lib(game).deleteDeck(me.id, input.id);
+    digimon.deleteDeck(me.id, input.id);
     bumpDeckList(game);
     redirect(`/${game}/decks`);
   },
@@ -186,20 +182,20 @@ function syncPoolForCard(
   deckId: string,
   cardId: string,
 ): boolean {
-  const peers = lib(game).decksSharingPoolWith(userId, deckId);
+  const peers = digimon.decksSharingPoolWith(userId, deckId);
   if (peers.length <= 1) return false;
-  const owned = lib(game).pooledOwnedForCard(peers, cardId);
-  lib(game).reconcilePoolCard([deckId], cardId, owned);
+  const owned = digimon.pooledOwnedForCard(peers, cardId);
+  digimon.reconcilePoolCard([deckId], cardId, owned);
   return true;
 }
 
 export const createGroupAction = formAction(
   { name: field.trimmed, deck_id: field.list },
   async ({ me, game, input }) => {
-    const id = lib(game).createGroup(me.id, input.name || "新卡池");
+    const id = digimon.createGroup(me.id, input.name || "新卡池");
     // A new group is empty; seed it with any decks ticked on the create form.
     if (input.deck_id.length) {
-      lib(game).setGroupDecks(me.id, id, input.deck_id);
+      digimon.setGroupDecks(me.id, id, input.deck_id);
     }
     bumpGroups(game);
     redirect(`/${game}/groups/${id}`);
@@ -210,7 +206,7 @@ export const renameGroupAction = formAction(
   { id: field.id, name: field.trimmed },
   async ({ me, game, input }) => {
     if (!input.name) return;
-    lib(game).renameGroup(me.id, input.id, input.name);
+    digimon.renameGroup(me.id, input.id, input.name);
     bumpGroups(game, input.id);
   },
 );
@@ -218,7 +214,7 @@ export const renameGroupAction = formAction(
 export const deleteGroupAction = formAction(
   { id: field.id },
   async ({ me, game, input }) => {
-    lib(game).deleteGroup(me.id, input.id);
+    digimon.deleteGroup(me.id, input.id);
     bumpGroups(game);
     redirect(`/${game}/decks`);
   },
@@ -227,7 +223,7 @@ export const deleteGroupAction = formAction(
 export const setGroupDecksAction = formAction(
   { id: field.id, deck_id: field.list },
   async ({ me, game, input }) => {
-    lib(game).setGroupDecks(me.id, input.id, input.deck_id);
+    digimon.setGroupDecks(me.id, input.id, input.deck_id);
     bumpGroups(game, input.id);
   },
 );
@@ -243,13 +239,13 @@ export const setDeckGroupsAction = formAction(
     const { deck_id: deckId, group_id: groupIds } = input;
     // Pools it is leaving need refreshing too, so read membership before the
     // write rather than after.
-    const touched = lib(game)
+    const touched = digimon
       .listGroups(me.id)
       .filter(
         (g) => g.decks.some((d) => d.id === deckId) || groupIds.includes(g.id),
       )
       .map((g) => g.id);
-    lib(game).setDeckGroups(me.id, deckId, groupIds);
+    digimon.setDeckGroups(me.id, deckId, groupIds);
     revalidatePath(`/${game}/decks/${deckId}`);
     bumpGroups(game);
     for (const id of touched) revalidatePath(`/${game}/groups/${id}`);
@@ -269,7 +265,7 @@ export const adjustDeckCardAction = formAction(
   { deck_id: field.id, card_id: field.id, delta: field.step },
   async ({ me, game, input }) => {
     const { deck_id: deckId, card_id: cardId } = input;
-    lib(game).adjustDeckCard(me.id, deckId, cardId, input.delta);
+    digimon.adjustDeckCard(me.id, deckId, cardId, input.delta);
     // Pooled deck: a card just added/resized should inherit the pool's held.
     if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
     else bumpDeck(game, deckId);
@@ -304,12 +300,12 @@ export async function buildCartScriptAction(
 > {
   const me = await requireUser();
   if (!isGameId(game)) return { ok: false, error: "invalid game" };
-  const deck = lib(game).getDeck(deckId);
+  const deck = digimon.getDeck(deckId);
   if (!deck || deck.user_id !== me.id) {
     return { ok: false, error: "不是你的卡组" };
   }
 
-  const cards = lib(game).getDeckCards(deckId);
+  const cards = digimon.getDeckCards(deckId);
   const missing = cards
     .filter((c) => c.quantity - c.purchased > 0)
     .slice(0, MAX_CART_LOOKUPS);
@@ -376,7 +372,7 @@ export const reorderDecksAction = formAction(
       .map((s) => s.trim())
       .filter(Boolean);
     if (ids.length === 0) return;
-    lib(game).reorderDecks(me.id, ids);
+    digimon.reorderDecks(me.id, ids);
     bumpDeckList(game);
   },
 );
@@ -388,12 +384,7 @@ export const reorderDecksAction = formAction(
 export const addDeckAdjustmentAction = formAction(
   { deck_id: field.id, card_id: field.id, kind: z.enum(["add", "remove"]) },
   async ({ me, game, input }) => {
-    lib(game).addDeckAdjustment(
-      me.id,
-      input.deck_id,
-      input.card_id,
-      input.kind,
-    );
+    digimon.addDeckAdjustment(me.id, input.deck_id, input.card_id, input.kind);
     bumpDeck(game, input.deck_id);
   },
 );
@@ -401,7 +392,7 @@ export const addDeckAdjustmentAction = formAction(
 export const removeDeckAdjustmentAction = formAction(
   { id: field.id, deck_id: field.text },
   async ({ me, game, input }) => {
-    lib(game).removeDeckAdjustment(me.id, input.id);
+    digimon.removeDeckAdjustment(me.id, input.id);
     if (input.deck_id) bumpDeck(game, input.deck_id);
   },
 );
@@ -410,7 +401,7 @@ export const setDeckAdjustmentQuantityAction = formAction(
   // The repo clamps the range; `strictNumber` only rejects outright nonsense.
   { id: field.id, deck_id: field.text, quantity: field.strictNumber },
   async ({ me, game, input }) => {
-    lib(game).setDeckAdjustmentQuantity(me.id, input.id, input.quantity);
+    digimon.setDeckAdjustmentQuantity(me.id, input.id, input.quantity);
     if (input.deck_id) bumpDeck(game, input.deck_id);
   },
 );
@@ -418,7 +409,7 @@ export const setDeckAdjustmentQuantityAction = formAction(
 export const setDeckAdjustmentNoteAction = formAction(
   { id: field.id, deck_id: field.text, note: field.text },
   async ({ me, game, input }) => {
-    lib(game).setDeckAdjustmentNote(me.id, input.id, input.note);
+    digimon.setDeckAdjustmentNote(me.id, input.id, input.note);
     if (input.deck_id) bumpDeck(game, input.deck_id);
   },
 );
@@ -455,7 +446,7 @@ export async function searchCardsAction(
   // build-mode picker and the adjustment memo — are "I know which card I want
   // and I'm typing its name". Matching effect text there buried the card:
   // searching ドラゴン returned twelve cards, not one of them named that.
-  const { rows } = lib(game).searchCards({
+  const { rows } = digimon.searchCards({
     q: query,
     limit: 12,
     q_mode: "name",
@@ -472,7 +463,7 @@ export async function searchCardsAction(
 
   const inDeck = new Map<string, number>();
   if (opts?.deckId) {
-    for (const c of lib(game).getDeckCards(opts.deckId)) {
+    for (const c of digimon.getDeckCards(opts.deckId)) {
       inDeck.set(c.id, c.quantity);
     }
   }
@@ -496,7 +487,7 @@ export async function searchCardsAction(
 export const setDeckCoverVariantAction = formAction(
   { deck_id: field.id, variant: field.text },
   async ({ me, game, input }) => {
-    lib(game).setDeckCoverVariant(me.id, input.deck_id, input.variant);
+    digimon.setDeckCoverVariant(me.id, input.deck_id, input.variant);
     bumpDeck(game, input.deck_id);
     bumpDeckList(game);
   },
@@ -511,7 +502,7 @@ export const setDeckPinnedAction = formAction(
   { deck_id: field.id, pinned: field.flag },
   async ({ me, game, input }) => {
     // Owner-scoped in the repo: someone else's deck id is a silent no-op.
-    lib(game).setDeckPinned(me.id, input.deck_id, input.pinned);
+    digimon.setDeckPinned(me.id, input.deck_id, input.pinned);
     bumpDeckList(game);
   },
 );
@@ -522,7 +513,7 @@ export const setCardPriceAction = formAction(
   { card_id: field.id, price: field.trimmed },
   async ({ me, game, input }) => {
     const price = input.price === "" ? null : Number(input.price);
-    lib(game).setCardPrice(
+    digimon.setCardPrice(
       me.id,
       input.card_id,
       price !== null && Number.isFinite(price) ? price : null,
@@ -538,7 +529,7 @@ export const setDeckCoverAction = formAction(
   // than an id.
   { deck_id: field.id, card_id: field.text },
   async ({ me, game, input }) => {
-    lib(game).setDeckCover(me.id, input.deck_id, input.card_id || null);
+    digimon.setDeckCover(me.id, input.deck_id, input.card_id || null);
     bumpDeckAndList(game, input.deck_id);
   },
 );
@@ -547,7 +538,7 @@ export const setDeckCardQuantityAction = formAction(
   { deck_id: field.id, card_id: field.id, quantity: field.count },
   async ({ me, game, input }) => {
     const { deck_id: deckId, card_id: cardId } = input;
-    lib(game).setDeckCardQuantity(me.id, deckId, cardId, input.quantity);
+    digimon.setDeckCardQuantity(me.id, deckId, cardId, input.quantity);
     if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
     else bumpDeck(game, deckId);
   },
@@ -560,17 +551,17 @@ export const adjustDeckCardPurchasedAction = formAction(
     // Pooled deck: ±1 adjusts the SHARED held count (max across the pool),
     // then re-applies it to every member deck (each capped at its own
     // quantity).
-    const peers = lib(game).decksSharingPoolWith(me.id, deckId);
+    const peers = digimon.decksSharingPoolWith(me.id, deckId);
     if (peers.length > 1) {
-      const cur = lib(game).pooledOwnedForCard(peers, cardId);
+      const cur = digimon.pooledOwnedForCard(peers, cardId);
       const owned = Math.min(
         Math.max(0, cur + delta),
-        lib(game).maxNeedForCard(peers, cardId),
+        digimon.maxNeedForCard(peers, cardId),
       );
-      lib(game).reconcilePoolCard(peers, cardId, owned);
+      digimon.reconcilePoolCard(peers, cardId, owned);
       bumpGame(game);
     } else {
-      lib(game).adjustDeckCardPurchased(me.id, deckId, cardId, delta);
+      digimon.adjustDeckCardPurchased(me.id, deckId, cardId, delta);
       bumpDeck(game, deckId);
     }
   },
@@ -582,13 +573,13 @@ export const setPoolCardOwnedAction = formAction(
   async ({ me, game, input }) => {
     const { group_id: groupId, card_id: cardId } = input;
     // Ownership: getGroup returns undefined unless the caller owns the group.
-    if (!lib(game).getGroup(me.id, groupId)) throw new Error("not found");
-    const members = lib(game).groupMemberDeckIds(groupId);
+    if (!digimon.getGroup(me.id, groupId)) throw new Error("not found");
+    const members = digimon.groupMemberDeckIds(groupId);
     const capped = Math.min(
       input.owned,
-      lib(game).maxNeedForCard(members, cardId),
+      digimon.maxNeedForCard(members, cardId),
     );
-    lib(game).reconcilePoolCard(members, cardId, capped);
+    digimon.reconcilePoolCard(members, cardId, capped);
     bumpGroups(game, groupId);
   },
 );
@@ -621,10 +612,8 @@ export async function importDeckAction(formData: FormData): Promise<{
     };
   }
 
-  const l = lib(game);
-
   // Normalize alt-art / parallel suffixes (e.g. "EX2-060_P1" → "EX2-060") to
-  // the base printing — that's the restriction identity for both games — and
+  // the base printing — that's the restriction identity — and
   // merge duplicate stacks that collapse to the same code.
   const merged = new Map<string, number>();
   for (const ln of lines) {
@@ -642,7 +631,7 @@ export async function importDeckAction(formData: FormData): Promise<{
     string,
     { max_count: number; status: string }
   >();
-  for (const r of l.listRestrictions()) {
+  for (const r of digimon.listRestrictions()) {
     restrictionByIdentity.set(r.identity, {
       max_count: r.max_count,
       status: r.status,
@@ -652,7 +641,7 @@ export async function importDeckAction(formData: FormData): Promise<{
   // coexist with it (whether this identity is the trigger or the banned
   // side, both directions land in the same map).
   const pairOpposites = new Map<string, Set<string>>();
-  for (const p of l.listBannedPairs()) {
+  for (const p of digimon.listBannedPairs()) {
     const a = p.trigger_identity;
     const b = p.banned_identity;
     if (!pairOpposites.has(a)) pairOpposites.set(a, new Set());
@@ -685,9 +674,8 @@ export async function importDeckAction(formData: FormData): Promise<{
       missing.push({ code, qty });
       continue;
     }
-    // `code` is the base identity since we already stripAltArt'd above and
-    // both Digimon (identity == code) and UA (identity == stripped code)
-    // collapse to the same form.
+    // `code` is the base identity: we already stripAltArt'd above, and the
+    // restriction identity IS the code.
     const identity = code;
 
     // Pair conflict: anything earlier in the import that pairs with me?
@@ -725,7 +713,7 @@ export async function importDeckAction(formData: FormData): Promise<{
       // can include up to 50 copies…" — Vemmon, Eosmon, …). Ask the repo so
       // this matches what the deck editor would actually allow, instead of
       // reporting a legal 8-of as over the limit.
-      const cap = l.selfDeclaredCopyLimit(card.id) ?? STANDARD_MAX;
+      const cap = digimon.selfDeclaredCopyLimit(card.id) ?? STANDARD_MAX;
       if (qty > cap) {
         // Some sloppy import sources (text dumps) request higher numbers —
         // clamp and note rather than silently truncate.
@@ -803,21 +791,21 @@ export async function importDeckAction(formData: FormData): Promise<{
   // Now that we know exactly what we're writing, create the deck and run
   // the writes. setDeckCardQuantity will re-clamp internally — that's fine,
   // the re-clamp will be a no-op since we already pre-clamped here.
-  const deckId = l.createDeck({
+  const deckId = digimon.createDeck({
     user_id: me.id,
     name,
     import_report: importReport,
     accent_color: GAMES[game].accent,
   });
   for (const w of plan) {
-    l.setDeckCardQuantity(me.id, deckId, w.cardId, w.qty);
+    digimon.setDeckCardQuantity(me.id, deckId, w.cardId, w.qty);
   }
   // Cover follows the hero when we picked one. Done after the deck cards
   // are written so the cover-card actually exists in deck_cards (the
   // listDecksWithCover join expects this — a cover that isn't in the deck
   // would render blank).
   if (hero) {
-    l.setDeckCover(me.id, deckId, hero.id);
+    digimon.setDeckCover(me.id, deckId, hero.id);
   }
 
   // Date the list by its own contents: the newest pack any card in it needs.
@@ -856,16 +844,13 @@ export const setDeckCardPurchasedAction = formAction(
     // If this deck shares a pool, held is a shared count — set it for the
     // whole pool (each deck capped at its own quantity). Otherwise just this
     // deck.
-    const peers = lib(game).decksSharingPoolWith(me.id, deckId);
+    const peers = digimon.decksSharingPoolWith(me.id, deckId);
     if (peers.length > 1) {
-      const owned = Math.min(
-        purchased,
-        lib(game).maxNeedForCard(peers, cardId),
-      );
-      lib(game).reconcilePoolCard(peers, cardId, owned);
+      const owned = Math.min(purchased, digimon.maxNeedForCard(peers, cardId));
+      digimon.reconcilePoolCard(peers, cardId, owned);
       bumpGame(game);
     } else {
-      lib(game).setDeckCardPurchased(me.id, deckId, cardId, purchased);
+      digimon.setDeckCardPurchased(me.id, deckId, cardId, purchased);
       bumpDeck(game, deckId);
     }
   },
@@ -882,7 +867,7 @@ function bumpCollection(game: GameId): void {
 export const setCardCollectionAction = formAction(
   { card_id: field.id, variant: field.text, quantity: field.count },
   async ({ me, game, input }) => {
-    lib(game).setCardCollectionQuantity(
+    digimon.setCardCollectionQuantity(
       me.id,
       input.card_id,
       input.variant,
@@ -895,7 +880,7 @@ export const setCardCollectionAction = formAction(
 export const adjustCardCollectionAction = formAction(
   { card_id: field.id, variant: field.text, delta: field.step },
   async ({ me, game, input }) => {
-    lib(game).adjustCardCollection(
+    digimon.adjustCardCollection(
       me.id,
       input.card_id,
       input.variant,
@@ -932,7 +917,7 @@ export async function adjustCollectionByCodeAction(
     };
   }
   backupBeforeWrite(game);
-  lib(game).adjustCardCollection(me.id, card.id, variant, delta);
+  digimon.adjustCardCollection(me.id, card.id, variant, delta);
   bumpCollection(game);
   return { ok: true };
 }

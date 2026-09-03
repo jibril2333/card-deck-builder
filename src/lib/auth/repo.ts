@@ -1,11 +1,6 @@
 /**
- * Auth data access — user / session / invite CRUD against the per-game
- * user.db. Each game has its own user.db, but for now the deploy story is
- * "share the same accounts across both games" — so we deliberately route all
- * auth queries to a single canonical user.db (defaulting to the digimon one).
- *
- * If someday we want fully separate user spaces per game, change `authDb()`
- * to take a game parameter and propagate it through every caller.
+ * Auth data access — user / session / invite CRUD against the canonical
+ * user.db — `getDB("digimon")`, whose path `CDB_DIGIMON_USER_DB` overrides.
  *
  * All callers MUST go through the `auth/` module — never read `users` /
  * `sessions` / `invites` directly from db modules.

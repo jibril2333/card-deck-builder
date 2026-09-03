@@ -2,9 +2,10 @@
  * The deck repository, assembled.
  *
  * One factory per area of the schema (`deck-repo/*.ts`), composed here into
- * the flat object both games destructure. It used to be one 1,758-line
- * closure; the split is by what the functions touch, and the wiring below is
- * the whole dependency graph:
+ * the flat object `digimon.ts` destructures. It used to be one 1,758-line
+ * closure, generic over a card and a deck row because the site once carried a
+ * second game; the split is by what the functions touch, and the wiring below
+ * is the whole dependency graph:
  *
  *   locks         ← nothing            (the lock gate every write asks)
  *   restrictions  ← nothing            (banlist + self-declared limits)
@@ -16,7 +17,12 @@
  *
  * `assertUnlocked` and `clampQuantityToRestriction` are dependencies, not
  * API: they are destructured away before the modules are spread, so the
- * returned surface is the same 44 functions it always was.
+ * returned surface stays exactly what `digimon.ts` names.
+ *
+ * Every factory takes the connection and nothing else. What used to be an
+ * options object — sort order, restriction source, code identity, default
+ * accent, first-card seeding — was one game's values dressed as
+ * configuration; each now sits in the module that reads it.
  *
  * Multi-user model:
  *   - Reads (list / get) return EVERY user's decks; the auth layer above
@@ -36,9 +42,10 @@ import { createMeta } from "./deck-repo/meta";
 import { createPools } from "./deck-repo/pools";
 import { createPricing } from "./deck-repo/pricing";
 import { createRestrictions } from "./deck-repo/restrictions";
-import { toCtx, type DeckCommon, type RepoOptions } from "./deck-repo/context";
+import type { DbFn } from "./deck-repo/context";
 
 export {
+  DEFAULT_DECK_ACCENT,
   DeckLockedError,
   OwnershipError,
   type DeckCardRow,
@@ -46,22 +53,18 @@ export {
   type DeckWithCover,
 } from "./deck-repo/context";
 
-export function createDeckRepo<TCard, TDeck extends DeckCommon>(
-  opts: RepoOptions,
-) {
-  const ctx = toCtx(opts);
-
-  const { assertUnlocked, ...lockApi } = createLocks(ctx);
+export function createDeckRepo(db: DbFn) {
+  const { assertUnlocked, ...lockApi } = createLocks(db);
   const { clampQuantityToRestriction, ...restrictionApi } =
-    createRestrictions(ctx);
+    createRestrictions(db);
 
   return {
     ...lockApi,
     ...restrictionApi,
-    ...createMeta<TDeck>(ctx, { assertUnlocked }),
-    ...createCards<TCard>(ctx, { assertUnlocked, clampQuantityToRestriction }),
-    ...createPricing(ctx),
-    ...createAdjustments(ctx, { assertUnlocked }),
-    ...createPools(ctx),
+    ...createMeta(db, { assertUnlocked }),
+    ...createCards(db, { assertUnlocked, clampQuantityToRestriction }),
+    ...createPricing(db),
+    ...createAdjustments(db, { assertUnlocked }),
+    ...createPools(db),
   };
 }
