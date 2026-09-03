@@ -22,7 +22,6 @@ import {
 } from "./repo";
 import {
   SESSION_COOKIE,
-  SESSION_TTL_MS,
   sessionCookieSecure,
   type User,
 } from "./types";
@@ -73,6 +72,3 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
-// Re-export the cookie name so middleware (which doesn't run in Node.js,
-// no fs / better-sqlite3) can read it without pulling this module's deps.
-export { SESSION_COOKIE, SESSION_TTL_MS };

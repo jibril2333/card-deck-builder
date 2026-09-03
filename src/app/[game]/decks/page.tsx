@@ -1,7 +1,7 @@
 import { ScrollMemory } from "@/components/scroll-memory";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { isGameId, GAMES, type GameId } from "@/lib/games";
+import { isGameId, GAMES } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { DecksToolbar } from "@/components/decks-toolbar";
 import { DecksGrid } from "@/components/decks-grid";

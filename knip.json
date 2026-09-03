@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "scripts/*.ts",
+    "tests/e2e/fixtures/*.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx,css}",
+    "scripts/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

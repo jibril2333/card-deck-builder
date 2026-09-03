@@ -51,7 +51,7 @@ export function keywordBase(name: string): string {
 }
 
 /** Bracketed English keywords on one card: ＜…＞ and ［…］. */
-export function englishTerms(text: string): Set<string> {
+function englishTerms(text: string): Set<string> {
   const out = new Set<string>();
   for (const m of (text ?? "").matchAll(/[<＜［[]([^>＞］\]]+)[>＞］\]]/g)) {
     const k = m[1]
@@ -68,9 +68,11 @@ export function englishTerms(text: string): Set<string> {
  * the term ends at the first nested bracket — ≪分離《特徴「セブンコード」》≫
  * is the keyword 分離 with its condition attached.
  */
-export function cjkTerms(text: string, allowed?: Set<string>): Set<string> {
+function cjkTerms(text: string, allowed?: Set<string>): Set<string> {
   const out = new Set<string>();
-  for (const m of (text ?? "").matchAll(/[≪《［[]([^≪《］\]]{1,26}?)(?=[《「〈≫》］\]])/g)) {
+  for (const m of (text ?? "").matchAll(
+    /[≪《［[]([^≪《］\]]{1,26}?)(?=[《「〈≫》］\]])/g,
+  )) {
     const k = keywordBase(m[1]);
     if (!k || k.length > 12) continue;
     // When the language has an official list, a candidate has to be on it.
@@ -99,7 +101,10 @@ export function deriveKeywordNames(
   const allowedJa = new Set(officialJa.map(keywordBase).filter(Boolean));
   const pairs = new Map<string, number>(); // "en\tlang\tterm" → cards
   const enN = new Map<string, number>();
-  const langN = { ja: new Map<string, number>(), zh: new Map<string, number>() };
+  const langN = {
+    ja: new Map<string, number>(),
+    zh: new Map<string, number>(),
+  };
 
   for (const c of cards) {
     const en = englishTerms(c.en);
@@ -137,6 +142,7 @@ export function deriveKeywordNames(
       best.set(en, cur);
     }
   }
-  for (const en of enN.keys()) if (!best.has(en)) best.set(en, { ja: null, zh: null });
+  for (const en of enN.keys())
+    if (!best.has(en)) best.set(en, { ja: null, zh: null });
   return best;
 }

@@ -17,7 +17,7 @@
  * than one that says so.
  */
 
-export type RefreshFrequency = "daily" | "weekly";
+type RefreshFrequency = "daily" | "weekly";
 
 export type RefreshSchedule = {
   enabled: boolean;
@@ -124,7 +124,7 @@ export function isKnownTimezone(tz: string): boolean {
 }
 
 /** The zone a schedule is written in. */
-export function zoneOf(s: RefreshSchedule): string {
+function zoneOf(s: RefreshSchedule): string {
   return s.timezone || DEFAULT_TIMEZONE;
 }
 

@@ -15,8 +15,8 @@ import {
 
 const DATA_DIR =
   process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync");
-export const BACKUP_CONFIG_FILE = path.join(DATA_DIR, "backup.json");
-export const BACKUP_STATUS_FILE = path.join(DATA_DIR, "backup-status.json");
+const BACKUP_CONFIG_FILE = path.join(DATA_DIR, "backup.json");
+const BACKUP_STATUS_FILE = path.join(DATA_DIR, "backup-status.json");
 
 export function readBackupConfig(): BackupConfig {
   try {

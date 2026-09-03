@@ -65,12 +65,12 @@ export const EMPTY_BACKUP: BackupConfig = {
  * days rather than the 7 it would if it could be set separately — at 360 KB a
  * snapshot, that is about 22 MB, which is not worth a second process to avoid.
  */
-export const SNAPSHOT_INTERVAL = "12h";
-export const SNAPSHOT_RETENTION = "720h"; // 30 days
-export const LOCAL_SYNC_INTERVAL = "1s";
-export const R2_SYNC_INTERVAL = "10s";
+const SNAPSHOT_INTERVAL = "12h";
+const SNAPSHOT_RETENTION = "720h"; // 30 days
+const LOCAL_SYNC_INTERVAL = "1s";
+const R2_SYNC_INTERVAL = "10s";
 /** Prometheus endpoint, bound to localhost — the daemon's health probe. */
-export const METRICS_ADDR = "127.0.0.1:9090";
+const METRICS_ADDR = "127.0.0.1:9090";
 
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 

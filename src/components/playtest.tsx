@@ -58,7 +58,6 @@ function CardFace({
       title={`${card.code} ${card.name}`}
     >
       {card.image_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={card.image_url}
           alt={card.name}
@@ -426,7 +425,6 @@ export function Playtest({
                             scan crops ~1.25% off each side, which is exactly
                             the card's printed frame. */}
                         {r.card.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={r.card.image_url}
                             alt=""

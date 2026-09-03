@@ -35,7 +35,7 @@ export type SearchableCard = {
   security_effect: string | null;
 };
 
-export type SearchTarget = {
+type SearchTarget = {
   id: string;
   code: string;
   name: string;

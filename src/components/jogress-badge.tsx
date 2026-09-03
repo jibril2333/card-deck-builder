@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export type JogressPairCard = {
+type JogressPairCard = {
   id: string;
   code: string;
   name: string;
@@ -179,7 +179,6 @@ function PairCard({ game, card }: { game: string; card: JogressPairCard }) {
     >
       <div className="w-6 shrink-0 aspect-[5/7] rounded overflow-hidden bg-[var(--color-muted)]">
         {card.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={card.image_url}
             alt={card.name}

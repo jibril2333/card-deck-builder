@@ -23,9 +23,9 @@
 
 import * as cheerio from "cheerio";
 
-export type PaoCondition = "good" | "played" | "damaged";
+type PaoCondition = "good" | "played" | "damaged";
 
-export type PaoListing = {
+type PaoListing = {
   name: string;
   price_yen: number;
   in_stock: boolean;

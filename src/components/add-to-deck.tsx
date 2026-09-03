@@ -40,6 +40,10 @@ export function AddToDeck({
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {
     try {
+      // localStorage does not exist during SSR, so the remembered state can
+      // only arrive after mount. The extra render is the price of markup that
+      // matches on hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (window.localStorage.getItem(COLLAPSE_KEY) === "1") setExpanded(true);
     } catch {
       /* private mode — the toggle still works, it just won't be remembered */
@@ -83,7 +87,10 @@ export function AddToDeck({
               aria-expanded={expanded}
               className="w-full h-9 px-3 flex items-center justify-center gap-1.5 text-xs text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:bg-[var(--color-muted)] cursor-pointer border-t border-[var(--color-border)]"
             >
-              <span aria-hidden className={expanded ? "" : "rotate-180 inline-block"}>
+              <span
+                aria-hidden
+                className={expanded ? "" : "rotate-180 inline-block"}
+              >
                 ⌃
               </span>
               {expanded
@@ -175,10 +182,13 @@ function DeckEntryRow({
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{deck.name}</div>
           <div className="text-[10px] text-[var(--color-muted-fg)] tabular-nums">
-            已有 <b className="text-[var(--color-fg)]">{qty}</b> 张 · 卡组共 {total} 张
+            已有 <b className="text-[var(--color-fg)]">{qty}</b> 张 · 卡组共{" "}
+            {total} 张
           </div>
         </div>
-        <span className="shrink-0 text-xs text-[var(--color-muted-fg)]">🔒 已锁定</span>
+        <span className="shrink-0 text-xs text-[var(--color-muted-fg)]">
+          🔒 已锁定
+        </span>
       </div>
     );
   }
@@ -205,7 +215,8 @@ function DeckEntryRow({
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{deck.name}</div>
         <div className="text-[10px] text-[var(--color-muted-fg)] tabular-nums">
-          已有 <b className="text-[var(--color-fg)]">{qty}</b> 张 · 卡组共 {total} 张
+          已有 <b className="text-[var(--color-fg)]">{qty}</b> 张 · 卡组共{" "}
+          {total} 张
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">

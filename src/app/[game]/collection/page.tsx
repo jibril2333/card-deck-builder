@@ -15,11 +15,9 @@
  * the ones you have.
  */
 
-import Link from "next/link";
 import { Pagination } from "@/components/pagination";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
-import { isGameId, type GameId } from "@/lib/games";
+import { isGameId } from "@/lib/games";
 import type { CardLang } from "@/lib/card-lang";
 
 /**
@@ -76,13 +74,11 @@ export default async function CollectionPage({
   // "1" own it, "0" don't, absent means the whole card pool.
   const ownedRaw = pickStr(sp, "owned");
   const ownedParam =
-    ownedRaw === "1" ? ("yes" as const) : ownedRaw === "0" ? ("no" as const) : undefined;
-
-  let rows: TileRow[];
-  let total: number;
-  let fields: FilterField[];
-  let sortOptions: { value: string; label: string }[];
-  let chipSpecs: ChipSpec[];
+    ownedRaw === "1"
+      ? ("yes" as const)
+      : ownedRaw === "0"
+        ? ("no" as const)
+        : undefined;
 
   const colors = digimon.distinct("color");
   const types = digimon.distinct("card_type");
@@ -97,7 +93,7 @@ export default async function CollectionPage({
   const dps = digimon.distinctNumbers("dp");
   const setNames = digimon.distinctSetNames();
 
-  fields = [
+  const fields: FilterField[] = [
     {
       type: "search",
       key: "q",
@@ -153,7 +149,7 @@ export default async function CollectionPage({
     },
   ];
 
-  sortOptions = [
+  const sortOptions: { value: string; label: string }[] = [
     { value: "code", label: "编号 ↑" },
     { value: "-code", label: "编号 ↓" },
     { value: "name", label: "名称 ↑" },
@@ -166,7 +162,7 @@ export default async function CollectionPage({
     { value: "-dp", label: "DP ↓" },
   ];
 
-  chipSpecs = [
+  const chipSpecs: ChipSpec[] = [
     { kind: "terms", key: "q", label: "关键词" },
     {
       kind: "single",
@@ -236,7 +232,7 @@ export default async function CollectionPage({
     r.rows.map((c) => c.code),
     COLLECTION_LANG,
   );
-  rows = r.rows.map((c) => ({
+  const rows: TileRow[] = r.rows.map((c) => ({
     card_id: c.id,
     code: c.code,
     name: tMap.get(c.code)?.name ?? c.name,
@@ -247,7 +243,7 @@ export default async function CollectionPage({
     quantity: collMap.get(`${c.id}|${c.variant}`) ?? 0,
     restriction: restrictionMap.get(c.id) ?? null,
   }));
-  total = r.total;
+  const total: number = r.total;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 

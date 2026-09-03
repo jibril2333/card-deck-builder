@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { Pagination } from "@/components/pagination";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { isGameId, type GameId } from "@/lib/games";
+import { isGameId } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import {
   pickStr,
@@ -39,12 +38,6 @@ export default async function CardsPage({
   const offset = (page - 1) * PAGE_SIZE;
   const sort = pickSort(sp);
 
-  let rows: CardLite[];
-  let total: number;
-  let fields: FilterField[];
-  let sortOptions: { value: string; label: string }[];
-  let chipSpecs: ChipSpec[];
-
   const colors = digimon.distinct("color");
   const types = digimon.distinct("card_type");
   // DB has mixed case ("SEC" + "sec" = same rarity from different sources).
@@ -60,7 +53,7 @@ export default async function CardsPage({
   const dps = digimon.distinctNumbers("dp");
   const setNames = digimon.distinctSetNames();
 
-  fields = [
+  const fields: FilterField[] = [
     {
       type: "search",
       key: "q",
@@ -125,7 +118,7 @@ export default async function CardsPage({
     },
   ];
 
-  sortOptions = [
+  const sortOptions: { value: string; label: string }[] = [
     { value: "code", label: "编号 ↑" },
     { value: "-code", label: "编号 ↓" },
     { value: "name", label: "名称 ↑" },
@@ -138,7 +131,7 @@ export default async function CardsPage({
     { value: "-dp", label: "DP ↓" },
   ];
 
-  chipSpecs = [
+  const chipSpecs: ChipSpec[] = [
     { kind: "terms", key: "q", label: "关键词" },
     { kind: "list", key: "color", label: "颜色", colorChips: true },
     { kind: "list", key: "card_type", label: "类型" },
@@ -202,8 +195,7 @@ export default async function CardsPage({
     limit: PAGE_SIZE,
     offset,
   });
-  const encD = (s: string) =>
-    s.split("/").map(encodeURIComponent).join("/");
+  const encD = (s: string) => s.split("/").map(encodeURIComponent).join("/");
   // Batch-load Cardrush prices for the entire visible page. variant ""
   // → "base" bucket, anything else → "parallel".
   const priceMap = digimon.getExternalPrices(r.rows.map((c) => c.id));
@@ -212,7 +204,7 @@ export default async function CardsPage({
     r.rows.map((c) => c.code),
     cardLang,
   );
-  rows = r.rows.map((c) => {
+  const rows: CardLite[] = r.rows.map((c) => {
     const baseHref = `/${game}/card/${encD(c.code)}`;
     const href = c.variant
       ? `${baseHref}?v=${encodeURIComponent(c.variant)}`
@@ -235,8 +227,7 @@ export default async function CardsPage({
       restriction: restrictionMap.get(c.id) ?? null,
     };
   });
-  total = r.total;
-  
+  const total: number = r.total;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 

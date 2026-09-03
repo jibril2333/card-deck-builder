@@ -6,9 +6,8 @@
  * open the cards db directly, possibly before the app has ever run) — the
  * IF NOT EXISTS makes it idempotent from either entry point.
  *
- * Column superset across both games; a game leaves columns it doesn't have
- * NULL (e.g. UA has no `form`/`attribute`). Display-time lookups
- * COALESCE(translation, base) per field.
+ * Columns a translation may carry; the ones a card has no value for stay
+ * NULL. Display-time lookups COALESCE(translation, base) per field.
  */
 export const CARD_TRANSLATIONS_DDL = `
   CREATE TABLE IF NOT EXISTS card_translations (

@@ -26,6 +26,9 @@ export function CardLangSwitcher({
 
   function pick(lang: CardLang) {
     if (lang === current) return;
+    // Writing the cookie IS the state change here: every server component
+    // reads the language from it, and the refresh below re-renders them.
+    // eslint-disable-next-line react-hooks/immutability
     document.cookie = `${CARD_LANG_COOKIE}=${lang}; path=/; max-age=31536000; samesite=lax`;
     startTransition(() => router.refresh());
   }

@@ -62,14 +62,12 @@ export const GAMES: Record<GameId, GameInfo> = {
   },
 };
 
-export const GAME_IDS: GameId[] = ["digimon"];
-
 export function isGameId(v: string): v is GameId {
   return v === "digimon";
 }
 
 // Common color → display map
-export const COLOR_HEX: Record<string, string> = {
+const COLOR_HEX: Record<string, string> = {
   Red: "#ef4444",
   Blue: "#3b82f6",
   Yellow: "#facc15",

@@ -24,16 +24,3 @@ export function splitSetNames(raw: string | null | undefined): string[] {
   return out;
 }
 
-/**
- * Shorten a product name for tight spaces, preferring the set code the name
- * carries: "Booster DUAL REVOLUTION [BT-25]" → "BT-25",
- * "BT01-03: Release Special Booster Ver.1.0" → "BT01-03".
- * Falls back to the full name when there's no code to pull out.
- */
-export function shortSetName(name: string): string {
-  const bracket = name.match(/\[([^\]]+)\]\s*$/);
-  if (bracket) return bracket[1].trim();
-  const prefix = name.match(/^([A-Z]{1,3}[-\d]*\d)\s*:/);
-  if (prefix) return prefix[1].trim();
-  return name;
-}

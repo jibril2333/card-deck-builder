@@ -11,7 +11,6 @@ import {
   setDeckCardPurchasedAction,
 } from "@/app/[game]/actions";
 import { colorHex } from "@/lib/games";
-import { shortSetName } from "@/lib/card-sets";
 import { CardPriceInput } from "@/components/card-price-input";
 import { useCardPreview } from "@/components/card-preview";
 import { SearchTargets } from "@/components/search-targets";
@@ -188,7 +187,9 @@ export function DeckCard({
       {jogress && jogress.length > 0 ? (
         <div
           className={`absolute left-1.5 z-20 ${
-            searchTargets && searchTargets.length > 0 ? "top-[3.75rem]" : "top-8"
+            searchTargets && searchTargets.length > 0
+              ? "top-[3.75rem]"
+              : "top-8"
           }`}
         >
           <JogressBadge game={game} options={jogress} />
@@ -204,104 +205,28 @@ export function DeckCard({
             missing={missing}
           />
 
-          {mode === "purchase" ? (
-            <PurchaseQtyBadge owned={owned} want={want} done={done} />
-          ) : (
-            <WantQtyBadge want={want} violation={violation} />
-          )}
-
-          {card.rarity ? <RarityBadge rarity={card.rarity} /> : null}
-
-          {/* What the shelf holds against what the deck asks for. In purchase
-              mode the count goes bare: the badge above already reads "2 / 4"
-              for bought-vs-wanted, and a second ratio beside it reads as one
-              wrong number rather than two right ones. */}
-          {optimisticCard.collected !== undefined ? (
-            <CollectedBadge
-              held={optimisticCard.collected}
-              want={want}
-              withWant={mode !== "purchase"}
-            />
-          ) : null}
-
-          {mine && (mode === "build" || mode === "browse") ? (
-            <CoverToggleButton
-              isCover={isCover}
-              pending={pending}
-              onToggle={toggleCover}
-            />
-          ) : done ? (
-            <DoneCheckBadge />
-          ) : null}
-
-          {mode === "purchase" ? (
-            <PurchaseProgressBar owned={owned} want={want} done={done} />
-          ) : null}
-        </div>
-
-        <div className="px-2 py-1.5">
-          {/* card-code / card-name / card-price are styling hooks, not
-              behaviour: the deck grid shrinks them on a phone (globals.css). */}
-          <div className="card-code flex items-center gap-1.5 text-[10px] text-[var(--color-muted-fg)] font-mono">
-            {card.color ? (
-              <span
-                className="chip-dot shrink-0"
-                style={{ background: colorHex(card.color) }}
-              />
-            ) : null}
-            <span className="truncate">{card.code}</span>
-            {/* Only shown when the card is reprinted across products — the
-                code already names the single-set case. */}
-            {card.sets && card.sets.length > 1 ? (
-              <span
-                className="shrink-0 px-1 rounded bg-[var(--color-muted)] text-[9px] font-sans"
-                title={`收录于 ${card.sets.length} 个产品：\n${card.sets.join("\n")}`}
-              >
-                {card.sets.length}包
-              </span>
-            ) : null}
-          </div>
-          <div className="card-name text-xs font-medium truncate group-hover:text-[var(--color-accent)]">
-            {card.name}
-          </div>
-        </div>
-      </Link>
-
-      {mode === "browse" ? (
-        card.price != null ? (
-          <div
-            className={`card-price px-2 pb-1.5 text-xs tabular-nums ${
-              card.manualPrice != null
-                ? "text-[var(--color-accent2)]"
-                : // Nobody typed this one: shown quieter, as the shop's number.
-                  "text-[var(--color-muted-fg)]"
-            }`}
-            title={
-              card.manualPrice != null
-                ? "预期价格"
-                : `${card.market?.source === "pao" ? "PAO" : "Cardrush"} 市场价`
-            }
-          >
-            ¥{card.price}
-          </div>
-        ) : null
-      ) : (
-        <div className="px-2 pb-1.5">
-          <CardPriceInput
-            game={game}
-            cardId={card.id}
-            price={card.manualPrice ?? null}
-            market={card.market ?? null}
+          <TileBadges
+            mode={mode}
+            owned={owned}
+            want={want}
+            done={done}
+            rarity={card.rarity ?? null}
+            collected={optimisticCard.collected}
+            violation={violation}
+            canSetCover={mine}
+            isCover={isCover}
+            pending={pending}
+            onToggleCover={toggleCover}
           />
         </div>
-      )}
+
+        <TileCaption card={card} />
+      </Link>
+
+      <TilePrice game={game} card={card} mode={mode} />
 
       {mode === "build" ? (
-        <BuildControlsBar
-          want={want}
-          pending={pending}
-          dispatch={dispatch}
-        />
+        <BuildControlsBar want={want} pending={pending} dispatch={dispatch} />
       ) : mode === "purchase" ? (
         <PurchaseControlsBar
           want={want}
@@ -328,6 +253,159 @@ export function DeckCard({
  * there already means "partly bought", and the tile's own badge is carrying
  * the ratio.
  */
+/** The code line (colour dot, code, reprint count) and the card's name. */
+function TileCaption({ card }: { card: DeckCardData }) {
+  return (
+    <div className="px-2 py-1.5">
+      {/* card-code / card-name / card-price are styling hooks, not
+          behaviour: the deck grid shrinks them on a phone (globals.css). */}
+      <div className="card-code flex items-center gap-1.5 text-[10px] text-[var(--color-muted-fg)] font-mono">
+        {card.color ? (
+          <span
+            className="chip-dot shrink-0"
+            style={{ background: colorHex(card.color) }}
+          />
+        ) : null}
+        <span className="truncate">{card.code}</span>
+        {/* Only shown when the card is reprinted across products — the code
+            already names the single-set case. */}
+        {card.sets && card.sets.length > 1 ? (
+          <span
+            className="shrink-0 px-1 rounded bg-[var(--color-muted)] text-[9px] font-sans"
+            title={`收录于 ${card.sets.length} 个产品：\n${card.sets.join("\n")}`}
+          >
+            {card.sets.length}包
+          </span>
+        ) : null}
+      </div>
+      <div className="card-name text-xs font-medium truncate group-hover:text-[var(--color-accent)]">
+        {card.name}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A number to read, or a box to type in.
+ *
+ * Browsing someone's deck (or your own, not editing) shows what the card
+ * counts as, and says which kind of number it is: a price someone typed is the
+ * deck's accent colour, a shop's is grey. Every other mode is editing, so the
+ * same spot becomes the input.
+ */
+function TilePrice({
+  game,
+  card,
+  mode,
+}: {
+  game: string;
+  card: DeckCardData;
+  mode: DeckMode;
+}) {
+  if (mode !== "browse") {
+    return (
+      <div className="px-2 pb-1.5">
+        <CardPriceInput
+          game={game}
+          cardId={card.id}
+          price={card.manualPrice ?? null}
+          market={card.market ?? null}
+        />
+      </div>
+    );
+  }
+  if (card.price == null) return null;
+  const typed = card.manualPrice != null;
+  return (
+    <div
+      className={`card-price px-2 pb-1.5 text-xs tabular-nums ${
+        typed
+          ? "text-[var(--color-accent2)]"
+          : // Nobody typed this one: shown quieter, as the shop's number.
+            "text-[var(--color-muted-fg)]"
+      }`}
+      title={
+        typed
+          ? "预期价格"
+          : `${card.market?.source === "pao" ? "PAO" : "Cardrush"} 市场价`
+      }
+    >
+      ¥{card.price}
+    </div>
+  );
+}
+
+/**
+ * Everything stacked on top of the art.
+ *
+ * The four things a mode changes about a tile all live here, so the rules read
+ * as one list instead of as four ternaries three hundred lines apart:
+ *
+ *   · the count badge — bought-vs-wanted while shopping, wanted otherwise
+ *   · the 📦 held count — bare while shopping (the badge above already shows
+ *     a ratio, and two ratios side by side read as one wrong number)
+ *   · the corner — a cover star you can toggle, or a ✓ when the card is done
+ *   · the progress bar — shopping only
+ */
+function TileBadges({
+  mode,
+  owned,
+  want,
+  done,
+  rarity,
+  collected,
+  violation,
+  canSetCover,
+  isCover,
+  pending,
+  onToggleCover,
+}: {
+  mode: DeckMode;
+  owned: number;
+  want: number;
+  done: boolean;
+  rarity: string | null;
+  /** Copies on the viewer's own shelf; undefined when nobody is signed in. */
+  collected: number | undefined;
+  violation: boolean;
+  /** The viewer owns this deck — only then is the cover theirs to change. */
+  canSetCover: boolean;
+  isCover: boolean;
+  pending: boolean;
+  onToggleCover: (e: React.MouseEvent) => void;
+}) {
+  const shopping = mode === "purchase";
+  return (
+    <>
+      {shopping ? (
+        <PurchaseQtyBadge owned={owned} want={want} done={done} />
+      ) : (
+        <WantQtyBadge want={want} violation={violation} />
+      )}
+
+      {rarity ? <RarityBadge rarity={rarity} /> : null}
+
+      {collected !== undefined ? (
+        <CollectedBadge held={collected} want={want} withWant={!shopping} />
+      ) : null}
+
+      {canSetCover && !shopping ? (
+        <CoverToggleButton
+          isCover={isCover}
+          pending={pending}
+          onToggle={onToggleCover}
+        />
+      ) : done ? (
+        <DoneCheckBadge />
+      ) : null}
+
+      {shopping ? (
+        <PurchaseProgressBar owned={owned} want={want} done={done} />
+      ) : null}
+    </>
+  );
+}
+
 function CollectedBadge({
   held,
   want,
@@ -391,7 +469,13 @@ function CardImage({
   );
 }
 
-function WantQtyBadge({ want, violation }: { want: number; violation?: boolean }) {
+function WantQtyBadge({
+  want,
+  violation,
+}: {
+  want: number;
+  violation?: boolean;
+}) {
   return (
     <span
       // Red when the current banlist disagrees with this count. The count is
@@ -415,7 +499,11 @@ function PurchaseQtyBadge({
   want: number;
   done: boolean;
 }) {
-  const bg = done ? "bg-green-600/90" : owned > 0 ? "bg-amber-600/90" : "bg-black/75";
+  const bg = done
+    ? "bg-green-600/90"
+    : owned > 0
+      ? "bg-amber-600/90"
+      : "bg-black/75";
   return (
     <span
       className={`absolute top-1.5 left-1.5 px-2 py-0.5 text-xs rounded-md text-white font-bold tabular-nums shadow ${bg}`}
@@ -544,11 +632,7 @@ function BuildControlsBar({
       <button
         type="button"
         onClick={() =>
-          dispatch(
-            adjustDeckCardAction,
-            { delta: "1" },
-            { quantity: want + 1 },
-          )
+          dispatch(adjustDeckCardAction, { delta: "1" }, { quantity: want + 1 })
         }
         disabled={pending}
         className="flex-1 h-8 hover:bg-[var(--color-muted)] text-sm cursor-pointer disabled:cursor-wait"

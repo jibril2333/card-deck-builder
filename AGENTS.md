@@ -57,6 +57,45 @@ means that build is actually serving.
   new image. Mounts, `user:`, environment: none of those change until someone
   runs `docker compose up -d` on the NAS.
 
+## Where the code lives
+
+Four layers, and the boundaries are load-bearing — a change that crosses one is
+usually a change in the wrong place.
+
+**`src/lib/db/`** — SQL and nothing else. `digimon.ts` is the game's own
+queries (cards, translations, keywords, prices, refresh runs) plus the deck
+repo it re-exports. The deck repo itself is `deck-shared.ts` (60 lines of
+assembly) over `deck-repo/{locks,restrictions,meta,cards,pricing,adjustments,
+pools}.ts`; the wiring comment at the top of `deck-shared.ts` is the whole
+dependency graph. `card-search.ts` turns filters into SQL and touches no
+database — it is the one part of the search that can be tested without one.
+
+**One game.** Union Arena was removed in Aug 2026 and the code no longer
+pretends otherwise: no repo generics, no per-game options object, no
+`lib(game)` indirection. Each factory in `deck-repo/` takes the connection and
+nothing else, and what used to be configuration (sort order, restriction
+source, code identity, default accent) sits in the module that reads it. The
+`[game]` URL segment stays — shared card and deck links must keep working, and
+`isGameId` 404s everything else — but it is a route constant, not a dimension
+the code varies over. A second game would be a rewrite of this layer, and that
+is the honest price.
+
+**`src/app/[game]/actions.ts`** — every mutation. Form-backed actions declare
+their fields through `formAction` in `action-kit.ts`, which does session,
+game id, validation and the daily backup; the body is left with the repo call
+and the cache bump. Four actions stay hand-written and say why.
+
+**Pages** load, components render. `decks/[id]/load.ts` is the deck page's
+whole data half — eight queries and the arithmetic over them — returning one
+view model; `page.tsx` destructures it and lays out. When a page grows a
+second screenful of `const`s before its JSX, that is the shape it wants.
+
+**Tests** are the safety net for all of the above: `tests/*.test.ts` for the
+pure pieces (query building, field parsing, diffing, keyword derivation),
+`tests/e2e/*.spec.ts` for behaviour. The rule during a refactor: **a change
+that needs an e2e edited is not a refactor**. Unit tests may change — they test
+implementations. e2e must not — it tests what the app does.
+
 ## Refreshing card data
 
 **Go through the daemon — don't run scrapers by hand against a live DB.** It

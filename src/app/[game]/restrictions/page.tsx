@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { isGameId, type GameId, colorHex } from "@/lib/games";
+import { isGameId, colorHex } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { RestrictionBadge } from "@/components/restriction-badge";
 import * as digimon from "@/lib/db/digimon";

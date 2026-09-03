@@ -50,7 +50,7 @@ const EXPECTED_COLORS = new Set([
   "白",
 ]);
 
-export type SanityIssue = {
+type SanityIssue = {
   severity: "error" | "warn";
   message: string;
 };

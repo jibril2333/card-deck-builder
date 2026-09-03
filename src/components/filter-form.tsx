@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Input, Select } from "@/components/ui/input";
 import { colorHex } from "@/lib/games";
 import { useComposition } from "@/lib/use-composition";
+import { useDebouncedField } from "@/lib/use-debounced-field";
 
 export type FilterField =
   | {
@@ -367,48 +368,18 @@ function SearchField({
   value: string;
   onCommit: (v: string) => void;
 }) {
-  const [local, setLocal] = useState(value);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** The last value WE sent to the URL. See the sync block below. */
-  const committedRef = useRef(value);
-
-  // Keep the box in sync while an IME composes, but don't navigate on the
-  // romaji — see `useComposition`.
-  const ime = useComposition((final) => schedule(final));
-
-  /**
-   * Adopt the URL's value — but only when it came from somewhere else.
-   *
-   * `value` is `searchParams.get(key)`, so it also comes back to us as the
-   * echo of our own debounced navigation, several hundred milliseconds later.
-   * Adopting THAT overwrites everything typed while the request was in flight:
-   * you pause after 暴龙, the search fires, you carry on typing, and the box
-   * snaps back to 暴龙. Worse with an IME — reassigning a controlled input's
-   * value mid-composition makes the browser throw the composing text away, so
-   * the characters vanish as you type them.
-   *
-   * So: ignore the echo, and never touch the box mid-composition. A genuinely
-   * external change (Back button, "清空全部") still lands — during composition
-   * it's simply deferred, because `composing` is state and ending the
-   * composition re-renders us right back here.
-   */
-  const [lastValueProp, setLastValueProp] = useState(value);
-  if (lastValueProp !== value && !ime.composingRef.current) {
-    setLastValueProp(value);
-    if (value !== committedRef.current) setLocal(value);
-  }
-
-  function commit(v: string) {
-    committedRef.current = v;
-    onCommit(v);
-  }
-
-  function schedule(v: string) {
-    setLocal(v);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (ime.composingRef.current) return;
-    debounceRef.current = setTimeout(() => commit(v.trim()), 300);
-  }
+  // Don't navigate on the romaji an IME emits while composing — see
+  // `useComposition`. The composed word is scheduled from onCompositionEnd
+  // below, where the flag has already been cleared.
+  const ime = useComposition();
+  const q = useDebouncedField({
+    value: { q: value },
+    delay: 300,
+    onCommit: (v) => onCommit(v.q),
+    composing: () => ime.composingRef.current,
+    clean: (v) => v.trim(),
+  });
+  const local = q.local.q;
 
   return (
     <div>
@@ -419,16 +390,23 @@ function SearchField({
           name={field.key}
           placeholder={field.placeholder}
           value={local}
-          onChange={(e) => schedule(e.target.value)}
+          onChange={(e) => q.set({ q: e.target.value })}
           {...ime.bind}
+          onCompositionEnd={(e) => {
+            // Order matters: clear the composing flag first, then schedule —
+            // `set` refuses to start the timer while the flag is up. Browsers
+            // disagree about whether the last `input` lands before or after
+            // this, so take the value from the element.
+            ime.bind.onCompositionEnd(e);
+            q.set({ q: (e.currentTarget as HTMLInputElement).value });
+          }}
           onKeyDown={(e) => {
             // Enter while composing is the IME accepting a candidate, not the
             // user submitting — `isComposing` is the only reliable signal,
             // since some IMEs report keyCode 229 and others don't.
             if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              if (debounceRef.current) clearTimeout(debounceRef.current);
-              commit(local.trim());
+              q.flush();
             }
           }}
           className="h-8 text-xs pr-7"
@@ -440,11 +418,7 @@ function SearchField({
         {local ? (
           <button
             type="button"
-            onClick={() => {
-              setLocal("");
-              if (debounceRef.current) clearTimeout(debounceRef.current);
-              commit("");
-            }}
+            onClick={() => q.flush({ q: "" })}
             className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-fg)] text-xs cursor-pointer flex items-center justify-center"
             aria-label="清空"
           >
@@ -679,30 +653,13 @@ function RangeInputs({
   maxValue: string;
   onCommit: (min: string, max: string) => void;
 }) {
-  const [localMin, setLocalMin] = useState(minValue);
-  const [localMax, setLocalMax] = useState(maxValue);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Reset locals when the committed values change externally.
-  const [lastMinProp, setLastMinProp] = useState(minValue);
-  const [lastMaxProp, setLastMaxProp] = useState(maxValue);
-  if (lastMinProp !== minValue) {
-    setLastMinProp(minValue);
-    setLocalMin(minValue);
-  }
-  if (lastMaxProp !== maxValue) {
-    setLastMaxProp(maxValue);
-    setLocalMax(maxValue);
-  }
-
-  function schedule(next: { min?: string; max?: string }) {
-    const nMin = next.min ?? localMin;
-    const nMax = next.max ?? localMax;
-    if (next.min !== undefined) setLocalMin(next.min);
-    if (next.max !== undefined) setLocalMax(next.max);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => onCommit(nMin, nMax), 350);
-  }
+  // Both ends share one timer: typing a min and then a max is one intent, and
+  // committing each separately would navigate twice.
+  const range = useDebouncedField({
+    value: { min: minValue, max: maxValue },
+    delay: 350,
+    onCommit: (v) => onCommit(v.min, v.max),
+  });
 
   return (
     <div className="flex items-center gap-1.5">
@@ -714,8 +671,8 @@ function RangeInputs({
           placeholder="—"
           min={field.min}
           max={field.max}
-          value={localMin}
-          onChange={(e) => schedule({ min: e.target.value })}
+          value={range.local.min}
+          onChange={(e) => range.set({ min: e.target.value })}
           className="h-7 text-xs px-1.5 flex-1 min-w-0 text-center"
         />
         <span className="text-[var(--color-muted-fg)] text-[10px]">–</span>
@@ -725,8 +682,8 @@ function RangeInputs({
           placeholder="—"
           min={field.min}
           max={field.max}
-          value={localMax}
-          onChange={(e) => schedule({ max: e.target.value })}
+          value={range.local.max}
+          onChange={(e) => range.set({ max: e.target.value })}
           className="h-7 text-xs px-1.5 flex-1 min-w-0 text-center"
         />
       </div>

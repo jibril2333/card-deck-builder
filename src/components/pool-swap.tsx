@@ -99,7 +99,6 @@ export function PoolSwap({
     return (
       <span className="w-6 h-[34px] shrink-0 rounded overflow-hidden bg-[var(--color-muted)] block">
         {c.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={c.image_url}
             alt={c.name}

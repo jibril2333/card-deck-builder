@@ -85,7 +85,7 @@ export function listCredentialsForUser(userId: string): StoredCredential[] {
     .all(userId) as StoredCredential[];
 }
 
-export function findCredentialById(credentialId: string): StoredCredential | null {
+function findCredentialById(credentialId: string): StoredCredential | null {
   const row = db()
     .prepare(
       `SELECT id, user_id, credential_id, public_key, counter, transports,
@@ -103,19 +103,6 @@ export function deleteCredential(id: string, userId: string): boolean {
       `DELETE FROM user.webauthn_credentials WHERE id = ? AND user_id = ?`,
     )
     .run(id, userId);
-  return r.changes > 0;
-}
-
-export function renameCredential(
-  id: string,
-  userId: string,
-  label: string,
-): boolean {
-  const r = db()
-    .prepare(
-      `UPDATE user.webauthn_credentials SET label = ? WHERE id = ? AND user_id = ?`,
-    )
-    .run(label, id, userId);
   return r.changes > 0;
 }
 
@@ -281,9 +268,7 @@ export async function finishRegistration(input: {
 // Authentication ceremony
 // ────────────────────────────────────────────────────────────────────────
 
-export async function beginAuthentication(
-  rpID: string,
-): Promise<{
+export async function beginAuthentication(rpID: string): Promise<{
   challengeId: string;
   options: PublicKeyCredentialRequestOptionsJSON;
 }> {
@@ -303,10 +288,7 @@ export async function finishAuthentication(input: {
   response: AuthenticationResponseJSON;
   expectedOrigin: string;
   expectedRPID: string;
-}): Promise<
-  | { ok: true; user_id: string }
-  | { ok: false; error: string }
-> {
+}): Promise<{ ok: true; user_id: string } | { ok: false; error: string }> {
   const challengeRow = consumeChallenge(input.challengeId, "authenticate");
   if (!challengeRow) {
     return { ok: false, error: "challenge expired or invalid" };

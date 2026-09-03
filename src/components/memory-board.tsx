@@ -135,6 +135,9 @@ export function MemoryBoard({ home }: { home: string }) {
   useWakeLock();
 
   useEffect(() => {
+    // The saved game lives in localStorage, which the server render cannot
+    // see; `ready` is what keeps the first paint from flashing a zero.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setValue(load());
     setReady(true);
   }, []);
@@ -152,7 +155,10 @@ export function MemoryBoard({ home }: { home: string }) {
     // Same rule as BackLink: only go back through history we pushed, and never
     // off the site. Otherwise land on the game's home page.
     const ref = typeof document === "undefined" ? "" : document.referrer;
-    if (hasInAppHistory() && (ref === "" || ref.startsWith(window.location.origin))) {
+    if (
+      hasInAppHistory() &&
+      (ref === "" || ref.startsWith(window.location.origin))
+    ) {
       router.back();
     } else {
       router.push(home);
@@ -249,7 +255,12 @@ function FullscreenButton() {
   const [on, setOn] = useState(false);
 
   useEffect(() => {
-    setSupported(typeof document.documentElement.requestFullscreen === "function");
+    // Feature detection needs a document, so the button can only learn
+    // after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSupported(
+      typeof document.documentElement.requestFullscreen === "function",
+    );
     const sync = () => setOn(document.fullscreenElement !== null);
     sync();
     document.addEventListener("fullscreenchange", sync);

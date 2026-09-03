@@ -1,210 +1,24 @@
 import { getDB } from "./connection";
-import { createDeckRepo, DeckLockedError, OwnershipError } from "./deck-shared";
-import { splitTerms } from "@/lib/search-terms";
-import { kanaVariants } from "@/lib/kana";
+import type { DigimonCard } from "./digimon-types";
+
+export type { DigimonCard };
+
+export type { DigimonFilters };
+import {
+  createDeckRepo,
+  DeckLockedError,
+  DEFAULT_DECK_ACCENT,
+  OwnershipError,
+} from "./deck-shared";
+import { buildSearchQuery, type DigimonFilters } from "./card-search";
 import { keywordBase, NON_KEYWORDS } from "@/lib/keyword-derive";
 import type { CardTranslation } from "./translations-ddl";
 import type { CardRuling } from "./rulings-ddl";
 import type { CardLang } from "../card-lang";
 import { splitSetNames } from "../card-sets";
 
-export type DigimonCard = {
-  id: string;
-  code: string;
-  name: string;
-  card_type: string;
-  color: string | null;
-  color2: string | null;
-  level: number | null;
-  play_cost: number | null;
-  dp: number | null;
-  attribute: string | null;
-  form: string | null;
-  stage: string | null;
-  digi_types: string | null;
-  rarity: string | null;
-  main_effect: string | null;
-  security_effect: string | null;
-  inherited_effect: string | null;
-  source_effect: string | null;
-  evolution_cost: string | null;
-  evolution_requirements: string | null;
-  set_names: string | null;
-  series: string | null;
-  artist: string | null;
-  image_url: string | null;
-  source_url: string | null;
-  /** ---- Dual cards (card_type 'Dual') ----------------------------------
-   *  Two cards printed on one: everything above describes the Digimon half,
-   *  these describe the Option half on the bottom. NULL on every other card.
-   *  `dual_color` is a run of canonical colour names ("RedYellow"), the same
-   *  shape as `evolution_cost`. */
-  dual_name: string | null;
-  dual_color: string | null;
-  dual_cost: number | null;
-  dual_effect: string | null;
-  dual_rule: string | null;
-  /** ---- Link cards -------------------------------------------------------
-   *  What this card contributes while plugged sideways into another Digimon.
-   *  `link_dp` is a number so the page reads the same in every language — the
-   *  two official sites print it as "DP+2000" and "+2000 DP". */
-  link_dp: number | null;
-  link_requirement: string | null;
-  link_effect: string | null;
-  /** [特別ルール] — card-specific rules text (Overflow &c.). */
-  special_rule: string | null;
-};
-
-export type DigimonDeck = {
-  id: string;
-  name: string;
-  notes: string | null;
-  accent_color: string;
-  /** Optional secondary accent color for dual-color decks. NULL = single. */
-  accent_color2: string | null;
-  cover_card_id: string | null;
-  sort_order: number;
-  /** 1 = a deck the owner actually plays; floats to the top of the deck list. */
-  pinned: number;
-  /** Which printing of the cover card to show: '' = base art, else a
-   *  `card_images.variant` key such as '_P1'. */
-  cover_variant: string;
-  /** Pack this list is built for, e.g. 'BT-26'. NULL = never set.
-   *  See lib/deck-version — it's a label, nothing enforces it. */
-  version: string | null;
-  /** 1 = closed to edits. Enforced in the repo, not just the UI. */
-  locked: number;
-  /** JSON `ImportReport` from the import that made this deck: the cards it
-   *  couldn't place. Shown in the deck's info bar until dismissed, then NULL
-   *  forever. See lib/import-report. */
-  import_report: string | null;
-  created_at: string;
-  updated_at: string;
-  user_id: string | null;
-};
-
-export type DigimonDeckCard = {
-  card_id: string;
-  quantity: number;
-};
 
 const db = () => getDB("digimon");
-
-export type DigimonFilters = {
-  q?: string;
-  colors?: string[];
-  card_types?: string[];
-  rarities?: string[];
-  forms?: string[];
-  stages?: string[];
-  attributes?: string[];
-  sets?: string[];
-  level_min?: number;
-  level_max?: number;
-  play_cost_min?: number;
-  play_cost_max?: number;
-  dp_min?: number;
-  dp_max?: number;
-  has_inherited?: boolean;
-  has_security?: boolean;
-  /** If false (default), parallel / alt-art versions are hidden. */
-  show_alt_arts?: boolean;
-  /** Which language's printings to expand / count. card_images holds a row
-   *  per (code, lang, variant), so without this every card multiplies by the
-   *  number of languages we have art for. */
-  art_lang?: string;
-  sort_field?: string;
-  sort_dir?: "asc" | "desc";
-  limit?: number;
-  offset?: number;
-  /**
-   * Restrict to what this user does — or does not — physically own.
-   *
-   * The collection page browses all ~4,400 cards so you can tick off what
-   * arrives in the post, which leaves no way to look at the shelf itself, or
-   * at the holes in it. Needs `owned_by` to mean anything.
-   *
-   * Ownership is recorded per PRINTING, so with `show_alt_arts` on (which is
-   * how the collection page reads it) a parallel you own does not make the
-   * base art count as owned.
-   */
-  owned?: "yes" | "no";
-  owned_by?: string;
-  /**
-   * What `q` is allowed to match.
-   *   "all"  (default) — names, codes, every effect block and traits. What the
-   *          card browser wants: you go there to find cards BY what they do.
-   *   "name" — names and codes only, ranked by how well the name matches. What
-   *          the add-a-card pickers want: you already know which card you
-   *          mean and are typing its name.
-   */
-  q_mode?: "all" | "name";
-};
-
-/**
- * A card code read as a NUMBER rather than as text.
- *
- * `ORDER BY code` puts BT10 before BT2 and -010 before -002, because "1" < "2"
- * one character at a time. Every list of cards in the app is affected: the
- * browser's 编号 sort, the collection, and the tie-break under every other
- * sort.
- *
- * "BT13-089" splits into "BT" / 13 / 89. rtrim/ltrim take a character SET, not
- * a prefix, which is what separates the letters from the set number without a
- * regex; CAST stops at the first non-digit, which also handles a `_P1` suffix.
- * A code with no "-" (none today) falls through to the plain string at the end.
- */
-function codeNatural(col: string, dir: "ASC" | "DESC" = "ASC"): string {
-  const head = `substr(${col}, 1, instr(${col}, '-') - 1)`;
-  return [
-    // The two TOKEN rows carry no "-" at all; keep them out of the way in
-    // both directions rather than letting an empty head float them to the top.
-    `CASE WHEN instr(${col}, '-') = 0 THEN 1 ELSE 0 END`,
-    `rtrim(${head}, '0123456789') ${dir}`,
-    `CAST(ltrim(${head}, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') AS INTEGER) ${dir}`,
-    `CAST(substr(${col}, instr(${col}, '-') + 1) AS INTEGER) ${dir}`,
-    `${col} ${dir}`,
-  ].join(", ");
-}
-
-/**
- * How recent the pack a card comes from is — the default order of the card
- * browser and of 已收集, newest pack first.
- *
- * The default used to be `level, code`, so the first screen was every Digi-Egg
- * ever printed. What someone opening the card list actually wants to see is
- * what the newest pack holds.
- *
- * The pack comes off the card's own code (BT26-082 → BT-26) rather than out of
- * `set_names`, because the code is what a reprint keeps: a card printed again
- * in a later pack still belongs, for this purpose, to the one it is numbered
- * for. `card_sets.code` is inconsistently padded — the official dropdown says
- * BT-01 but ST-1 — so both forms are tried.
- *
- * Promos (P-…) and the limited packs (LM-…) carry no pack number in their
- * codes; they resolve to NULL and DESC leaves them at the end, which is where
- * a "what's new" list wants them anyway.
- *
- * `col` MUST be qualified (cards.code / base.code): inside the subquery a bare
- * `code` resolves to card_sets.code, and every row silently comes back NULL.
- */
-function setRecency(col: string): string {
-  const head = `substr(${col}, 1, instr(${col}, '-') - 1)`;
-  const alpha = `rtrim(${head}, '0123456789')`;
-  const num = `CAST(ltrim(${head}, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') AS INTEGER)`;
-  return `(SELECT s.release_order FROM card_sets s
-             WHERE s.code = ${alpha} || '-' || ${num}
-                OR s.code = printf('%s-%02d', ${alpha}, ${num}))`;
-}
-
-const SORT_FIELDS: Record<string, string> = {
-  code: "code",
-  name: "name",
-  level: "level",
-  play_cost: "play_cost",
-  dp: "dp",
-  rarity: "rarity",
-};
 
 export type DigimonSearchRow = DigimonCard & {
   variant_count: number;
@@ -218,279 +32,16 @@ export function searchCards(filters: DigimonFilters = {}): {
   rows: DigimonSearchRow[];
   total: number;
 } {
-  const where: string[] = [];
-  const params: Record<string, unknown> = {};
-
-  const terms = splitTerms(filters.q);
-
-  if (terms.length) {
-    // Translated names are matched in BOTH modes, so 「天女兽」 or 「テイルモン」
-    // finds the card whatever the display language — that is still someone
-    // typing a name, just not in English.
-    terms.forEach((term, i) => {
-      // A kana term is looked for in both scripts: an IME hands you あぐもん
-      // and the card is named アグモン. Together with `name_kana` — the
-      // reading of a name written in kanji — that is what makes やがみたいち
-      // find 八神太一. `@q{i}` stays the term AS TYPED — the
-      // relevance ranking further down is written against it — and the other
-      // script, when there is one, comes in as `@q{i}k1`. A term with no kana
-      // produces exactly one placeholder, as before.
-      const keys = kanaVariants(term).map((v, j) => {
-        const key = j === 0 ? `q${i}` : `q${i}k${j}`;
-        params[key] = `%${v}%`;
-        return `@${key}`;
-      });
-      /** `col LIKE` against every form of this term. */
-      const any = (col: string) =>
-        keys.map((k) => `${col} LIKE ${k}`).join(" OR ");
-      if (filters.q_mode === "name") {
-        where.push(
-          `(${any("name")} OR ${any("code")}
-            OR EXISTS (
-              SELECT 1 FROM card_translations t
-              WHERE t.code = cards.code
-                AND (${any("t.name")} OR ${any("t.name_kana")})
-            ))`,
-        );
-      } else {
-        where.push(
-          `(${any("name")} OR ${any("code")} OR ${any("main_effect")} OR ${any("inherited_effect")} OR ${any("security_effect")} OR ${any("digi_types")}
-            OR EXISTS (
-              SELECT 1 FROM card_translations t
-              WHERE t.code = cards.code
-                AND (${any("t.name")} OR ${any("t.name_kana")} OR ${any("t.effect_main")} OR ${any("t.traits")})
-            ))`,
-        );
-      }
-    });
-    params.q_exact = filters.q!.trim();
-    params.q_prefix = `${terms[0]}%`;
-  }
-
-  // Multi-select: build IN clauses with positional placeholders
-  function addIn(
-    field: string,
-    values: string[] | undefined,
-    paramKey: string,
-  ) {
-    if (!values || values.length === 0) return;
-    const keys = values.map((_, i) => `@${paramKey}${i}`);
-    where.push(`${field} IN (${keys.join(",")})`);
-    values.forEach((v, i) => {
-      params[`${paramKey}${i}`] = v;
-    });
-  }
-
-  // Intersection: a card must have EVERY selected color (in color or color2).
-  // Selecting two colors → only cards that are both (dual-color cards).
-  if (filters.colors && filters.colors.length) {
-    filters.colors.forEach((v, i) => {
-      where.push(`(color = @color${i} OR color2 = @color${i})`);
-      params[`color${i}`] = v;
-    });
-  }
-  addIn("card_type", filters.card_types, "ct");
-  // Rarity match is case-insensitive (DB has both "SEC" and "sec" for same rarity)
-  if (filters.rarities && filters.rarities.length) {
-    const keys = filters.rarities.map((_, i) => `@ra${i}`);
-    where.push(`UPPER(rarity) IN (${keys.join(",")})`);
-    filters.rarities.forEach((v, i) => {
-      params[`ra${i}`] = v.toUpperCase();
-    });
-  }
-  addIn("form", filters.forms, "fm");
-  addIn("stage", filters.stages, "sg");
-  addIn("attribute", filters.attributes, "at");
-
-  // set_names is a " | " joined field; match if it contains any selected set
-  if (filters.sets && filters.sets.length) {
-    const parts: string[] = [];
-    filters.sets.forEach((v, i) => {
-      parts.push(`set_names LIKE @set${i}`);
-      params[`set${i}`] = `%${v}%`;
-    });
-    where.push(`(${parts.join(" OR ")})`);
-  }
-
-  if (filters.has_inherited) {
-    where.push("(inherited_effect IS NOT NULL AND inherited_effect != '')");
-  }
-  if (filters.has_security) {
-    where.push("(security_effect IS NOT NULL AND security_effect != '')");
-  }
-  // Note: Digimon DB has rarity in mixed case (e.g. both "SEC" and "sec") due to
-  // multiple scrape sources. They are NOT parallel/alt-art markers — they're the
-  // same rarity, just inconsistent casing across data sources. We don't have a
-  // reliable alt-art indicator in this dataset, so show_alt_arts is ignored.
-
-  function addRange(
-    field: string,
-    min?: number,
-    max?: number,
-    prefix?: string,
-  ) {
-    if (min !== undefined && Number.isFinite(min)) {
-      where.push(`${field} >= @${prefix}_min`);
-      params[`${prefix}_min`] = min;
-    }
-    if (max !== undefined && Number.isFinite(max)) {
-      where.push(`${field} <= @${prefix}_max`);
-      params[`${prefix}_max`] = max;
-    }
-  }
-  addRange("level", filters.level_min, filters.level_max, "level");
-  addRange(
-    "play_cost",
-    filters.play_cost_min,
-    filters.play_cost_max,
-    "play_cost",
-  );
-  addRange("dp", filters.dp_min, filters.dp_max, "dp");
-
-  // Ownership is a property of the (card, printing) pair, so the predicate
-  // differs between the two branches below: collapsed rows count a card as
-  // owned when ANY of its printings is, expanded rows only when that exact
-  // one is. Both are spelled out here; the branches pick one.
-  const ownedFilter = filters.owned && filters.owned_by ? filters.owned : null;
-  if (ownedFilter) params.owned_by = filters.owned_by;
-  const ownsAny = `EXISTS (SELECT 1 FROM user.card_collection cc
-        WHERE cc.user_id = @owned_by AND cc.card_id = cards.id
-          AND cc.quantity > 0)`;
-  const ownsThisPrinting = `EXISTS (SELECT 1 FROM user.card_collection cc
-        WHERE cc.user_id = @owned_by AND cc.card_id = base.id
-          AND cc.variant = COALESCE(ci.variant, '') AND cc.quantity > 0)`;
-  const test = (predicate: string) =>
-    ownedFilter === "yes" ? predicate : `NOT ${predicate}`;
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  // Collapsed rows: fold it into the card-level WHERE. Expanded rows: it has
-  // to wait until after the join, where the printing is known.
-  const collapsedWhereSql = !ownedFilter
-    ? whereSql
-    : whereSql
-      ? `${whereSql} AND ${test(ownsAny)}`
-      : `WHERE ${test(ownsAny)}`;
-  const printingWhereSql = ownedFilter ? `WHERE ${test(ownsThisPrinting)}` : "";
-
-  // Sort
-  const sortField = filters.sort_field
-    ? SORT_FIELDS[filters.sort_field]
-    : undefined;
-  const sortDir: "ASC" | "DESC" = filters.sort_dir === "desc" ? "DESC" : "ASC";
-
-  /**
-   * Relevance, for name searches only.
-   *
-   * Without it the tie-break is level then code, and typing "Agumon" returned
-   * ten Pagumon before the first Agumon — Pagumon is a Lv.2 Digi-Egg, so it
-   * sorted first, and a substring match treats the two as equally good. An
-   * exact name wins, then a name starting with the first term, then a name
-   * carrying ALL the terms, then a code, then a match that only came from a
-   * translated name.
-   *
-   * Tier 2 has to re-test every term against the name: the WHERE clause is
-   * satisfied if each term matched SOMETHING, and a card whose name holds one
-   * term while its code holds the other is a weaker hit than one whose name
-   * holds both.
-   */
-  const nameHasAll = terms.map((_, i) => `name LIKE @q${i}`).join(" AND ");
-  const codeHasAll = terms.map((_, i) => `code LIKE @q${i}`).join(" AND ");
-  const relevanceSql = `
-    CASE
-      WHEN name = @q_exact COLLATE NOCASE THEN 0
-      WHEN name LIKE @q_prefix THEN 1
-      WHEN ${nameHasAll} THEN 2
-      WHEN ${codeHasAll} THEN 3
-      ELSE 4
-    END,`;
-  const rank = terms.length && filters.q_mode === "name" ? relevanceSql : "";
-  // `code` isn't a column here but four expressions — see codeNatural. Every
-  // other sort still falls back to it, so two cards with the same level (or
-  // the same cost, or no DP at all) come out in pack order rather than in
-  // whatever order the text happened to give.
-  const orderSql =
-    filters.sort_field === "code"
-      ? `ORDER BY ${rank} ${codeNatural("code", sortDir)}`
-      : sortField
-        ? `ORDER BY ${rank} ${sortField} ${sortDir} NULLS LAST, ${codeNatural("code")}`
-        : `ORDER BY ${rank} ${setRecency("cards.code")} DESC NULLS LAST, ${codeNatural("code")}`;
-
-  const limit = filters.limit ?? 60;
-  const offset = filters.offset ?? 0;
-
-  // Alt-art variants live in the card_images table (base + _P1/_P2…).
-  //  - Default: ONE tile per card (base image), with variant_count for the badge.
-  //  - show_alt_arts: expand to one tile per image variant. Every tile keeps the
-  //    same card `code` (variants share it); the page links each to ?v=<variant>.
-  const showAll = filters.show_alt_arts === true;
-  const artLang = filters.art_lang ?? "en";
-  params.art_lang = artLang;
-  const VC = `(SELECT COUNT(*) FROM card_images
-                WHERE card_images.code = cards.code
-                  AND card_images.lang = @art_lang)`;
-
-  let rows: DigimonSearchRow[];
-  let total: number;
-
-  if (!showAll) {
-    rows = db()
-      .prepare(
-        `SELECT *, '' AS variant, image_url AS display_image,
-           ${VC} AS variant_count
-         FROM cards ${collapsedWhereSql} ${orderSql} LIMIT @limit OFFSET @offset`,
-      )
-      .all({ ...params, limit, offset }) as DigimonSearchRow[];
-    total = (
-      db()
-        .prepare(`SELECT COUNT(*) as n FROM cards ${collapsedWhereSql}`)
-        .get(params) as { n: number }
-    ).n;
-  } else {
-    // Same relevance rank as above, qualified for the CTE — otherwise ticking
-    // "异画各版本单独显示" would silently lose the ordering.
-    const rankQualified =
-      terms.length && filters.q_mode === "name"
-        ? `
-      CASE
-        WHEN base.name = @q_exact COLLATE NOCASE THEN 0
-        WHEN base.name LIKE @q_prefix THEN 1
-        WHEN ${terms.map((_, i) => `base.name LIKE @q${i}`).join(" AND ")} THEN 2
-        WHEN ${terms.map((_, i) => `base.code LIKE @q${i}`).join(" AND ")} THEN 3
-        ELSE 4
-      END,`
-        : "";
-    const orderQualified =
-      filters.sort_field === "code"
-        ? `ORDER BY ${rankQualified} ${codeNatural("base.code", sortDir)}, ci.variant`
-        : sortField
-          ? `ORDER BY ${rankQualified} base.${sortField} ${sortDir} NULLS LAST, ${codeNatural("base.code")}, ci.variant`
-          : `ORDER BY ${rankQualified} ${setRecency("base.code")} DESC NULLS LAST, ${codeNatural("base.code")}, ci.variant`;
-    rows = db()
-      .prepare(
-        `WITH base AS (SELECT * FROM cards ${whereSql})
-         SELECT base.*,
-           COALESCE(ci.variant, '') AS variant,
-           COALESCE(ci.image_url, base.image_url) AS display_image,
-           (SELECT COUNT(*) FROM card_images
-             WHERE card_images.code = base.code
-               AND card_images.lang = @art_lang) AS variant_count
-         FROM base LEFT JOIN card_images ci
-           ON ci.code = base.code AND ci.lang = @art_lang
-         ${printingWhereSql}
-         ${orderQualified} LIMIT @limit OFFSET @offset`,
-      )
-      .all({ ...params, limit, offset }) as DigimonSearchRow[];
-    total = (
-      db()
-        .prepare(
-          `SELECT COUNT(*) as n FROM (SELECT * FROM cards ${whereSql}) base
-           LEFT JOIN card_images ci
-             ON ci.code = base.code AND ci.lang = @art_lang
-           ${printingWhereSql}`,
-        )
-        .get(params) as { n: number }
-    ).n;
-  }
-
+  const plan = buildSearchQuery(filters);
+  const rows = db()
+    .prepare(plan.rowsSql)
+    .all({
+      ...plan.params,
+      limit: plan.limit,
+      offset: plan.offset,
+    }) as DigimonSearchRow[];
+  const total = (db().prepare(plan.countSql).get(plan.params) as { n: number })
+    .n;
   return { rows, total };
 }
 
@@ -614,32 +165,6 @@ export function getCardImages(code: string, lang = "en"): CardImageVariant[] {
   return stmt.all(code, "en") as CardImageVariant[];
 }
 
-/**
- * Returns how many image variants each given code has, mapped by code.
- * Counted in `lang`, falling back to the English count for codes that have no
- * art in that language (mirrors getCardImages so badges match the gallery).
- */
-export function getCardImageCounts(
-  codes: string[],
-  lang = "en",
-): Map<string, number> {
-  if (codes.length === 0) return new Map();
-  const placeholders = codes.map(() => "?").join(",");
-  const count = (l: string) =>
-    db()
-      .prepare(
-        `SELECT code, COUNT(*) as n FROM card_images
-          WHERE code IN (${placeholders}) AND lang = ? GROUP BY code`,
-      )
-      .all(...codes, l) as { code: string; n: number }[];
-
-  const out = new Map(count(lang).map((r) => [r.code, r.n]));
-  if (lang !== "en") {
-    for (const r of count("en")) if (!out.has(r.code)) out.set(r.code, r.n);
-  }
-  return out;
-}
-
 export function distinct(col: keyof DigimonCard): string[] {
   return (
     db()
@@ -654,24 +179,6 @@ export function distinct(col: keyof DigimonCard): string[] {
  * Every individual product name across the whole card pool, deduped + sorted,
  * for the browse page's set filter.
  */
-/**
- * Official keyword vocabulary for a language, used by EffectText to chip the
- * keywords that are printed WITHOUT brackets (アセンブリ-6, デジクロス-2).
- * Empty until scrape-digimon-keywords.ts has run; the renderer just skips
- * bare-keyword matching in that case.
- */
-export function listKeywords(lang: string): string[] {
-  try {
-    return (
-      db()
-        .prepare(`SELECT keyword FROM card_keywords WHERE lang = ?`)
-        .all(lang) as { keyword: string }[]
-    ).map((r) => r.keyword);
-  } catch {
-    // Table not created yet (fresh DB, scraper never run).
-    return [];
-  }
-}
 
 /**
  * The keyword table the game-knowledge page prints: every keyword the official
@@ -720,8 +227,11 @@ export function listKeywordGlossary(): {
   }
   {
     const seen = new Set<string>();
-    const out: { official: string | null; ja: string | null; zh: string | null }[] =
-      [];
+    const out: {
+      official: string | null;
+      ja: string | null;
+      zh: string | null;
+    }[] = [];
     for (const k of official) {
       if (!k || NON_KEYWORDS.has(k) || seen.has(k)) continue;
       seen.add(k);
@@ -790,45 +300,7 @@ export function distinctNumbers(col: keyof DigimonCard): number[] {
 // deck-meta-update shape) stay below.
 // ────────────────────────────────────────────────────────────────────────
 
-const deckRepo = createDeckRepo<DigimonCard, DigimonDeck>({
-  // Keep `defaultAccent` in lock-step with the createDeck default below.
-  defaultAccent: "#f59e0b",
-  db,
-  /**
-   * The order a deck's cards are read in — the grid, the text export, the
-   * image export and the stats all take it from here.
-   *
-   * Two things were wrong with `level NULLS LAST, code`:
-   *
-   *  - Tamers and Options both have a NULL level, so they landed in one pile
-   *    sorted by code and interleaved with each other. They're the two groups
-   *    a player counts separately.
-   *  - `code` is TEXT, so BT10 sorted before BT2 and -010 before -002. A deck
-   *    holding several sets read as if it had been shuffled.
-   *
-   * So: eggs, then Digimon by level, then Tamers, then Options — the order the
-   * text export already used for its two halves and the one a decklist is
-   * written in. Inside a group, the card number read as a NUMBER: the letters
-   * of the set, then the set's number, then the card's.
-   *
-   * rtrim/ltrim with a character SET (not a prefix) is what splits "BT13" into
-   * "BT" and 13 without regex; CAST stops at the first non-digit, which also
-   * takes care of a `_P1` suffix.
-   */
-  deckCardOrderBy: `
-    CASE c.card_type
-      WHEN 'Digi-Egg' THEN 0
-      WHEN 'Tamer' THEN 2
-      WHEN 'Option' THEN 3
-      ELSE 1
-    END,
-    c.level NULLS LAST,
-    ${codeNatural("c.code")}`,
-  restrictionSource: "digimon",
-  // Digimon stores parallel art in card_images keyed off the base code,
-  // so cards.code IS the restriction identity — no transformation needed.
-  identityForCode: (code) => code,
-});
+const deckRepo = createDeckRepo(db);
 
 export const {
   listDecks,
@@ -836,7 +308,6 @@ export const {
   reorderDecks,
   setDeckPinned,
   setDeckLocked,
-  isDeckLocked,
   setDeckCoverVariant,
   listDeckAdjustments,
   addDeckAdjustment,
@@ -851,7 +322,6 @@ export const {
   getDeckCards,
   getCardPrice,
   setCardPrice,
-  deckCardCount,
   deleteDeck,
   setDeckCardQuantity,
   setDeckCardPurchased,
@@ -893,7 +363,7 @@ export function createDeck(input: {
       id,
       input.name,
       input.notes ?? null,
-      input.accent_color ?? "#f59e0b",
+      input.accent_color ?? DEFAULT_DECK_ACCENT,
       input.accent_color2 ?? null,
       input.user_id,
       input.import_report ?? null,
@@ -924,7 +394,7 @@ export function updateDeckMeta(
 ): void {
   // Name, notes, colours and version are all "the deck", so a lock covers
   // them too — see assertUnlocked in deck-shared.
-  if (isDeckLocked(id)) throw new DeckLockedError(id);
+  if (deckRepo.isDeckLocked(id)) throw new DeckLockedError(id);
   const sets: string[] = [];
   const params: unknown[] = [];
   if (patch.name !== undefined) {
@@ -966,20 +436,8 @@ export function updateDeckMeta(
 // Card collection (per-user, per-variant ownership ledger)
 // ────────────────────────────────────────────────────────────────────────
 
-export type DigimonCollectionRow = {
-  card_id: string;
-  code: string;
-  name: string;
-  color: string | null;
-  rarity: string | null;
-  card_type: string;
-  level: number | null;
-  variant: string; // "" base, "_P1", "_P2" …
-  image_url: string | null;
-  quantity: number;
-};
 
-export function getCardCollectionQty(
+function getCardCollectionQty(
   currentUserId: string,
   cardId: string,
   variant: string,
@@ -1190,7 +648,10 @@ export function getExternalListings(
 export function getShopQuotes(
   cardIds: string[],
   source: string,
-): Map<string, { price_yen: number; in_stock: boolean; item_code: string | null }> {
+): Map<
+  string,
+  { price_yen: number; in_stock: boolean; item_code: string | null }
+> {
   if (cardIds.length === 0) return new Map();
   const placeholders = cardIds.map(() => "?").join(",");
   const rows = db()
