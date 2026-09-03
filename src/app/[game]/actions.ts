@@ -889,35 +889,3 @@ export const adjustCardCollectionAction = formAction(
     bumpCollection(game);
   },
 );
-
-/**
- * Used by the collection-page "quick add" form. Resolves a card code →
- * card_id, then bumps the collection. Returns a friendly error if the code
- * isn't in the DB (instead of throwing — the form wants to show inline
- * feedback rather than blow up into error.tsx).
- */
-export async function adjustCollectionByCodeAction(
-  formData: FormData,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const code = String(formData.get("code") ?? "").trim();
-  const variant = String(formData.get("variant") ?? "");
-  const delta = Number(formData.get("delta") ?? 0);
-  if (!isGameId(game)) return { ok: false, error: "invalid game" };
-  if (!code) return { ok: false, error: "请填编号" };
-  if (!Number.isFinite(delta) || delta === 0) {
-    return { ok: false, error: "数量必须 ≥ 1" };
-  }
-  const card = digimon.getCardByCode(code);
-  if (!card) {
-    return {
-      ok: false,
-      error: `数据库里没找到「${code}」。检查拼写,或先用 scraper 抓一下这一包。`,
-    };
-  }
-  backupBeforeWrite(game);
-  digimon.adjustCardCollection(me.id, card.id, variant, delta);
-  bumpCollection(game);
-  return { ok: true };
-}

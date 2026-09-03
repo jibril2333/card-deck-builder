@@ -64,7 +64,7 @@ export const FIXTURE_DIGIMON_BASE = `
 `;
 
 /** Same code, alt-art printing (_P1). Same id so dedupe should keep the base. */
-export const FIXTURE_DIGIMON_ALT_ART = `
+const FIXTURE_DIGIMON_ALT_ART = `
 <div class="popupCol" id="BT25-001">
   <p class="cardNo">BT25-001</p>
   <p class="cardTitle">Greymon</p>

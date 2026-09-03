@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export type JogressPairCard = {
+type JogressPairCard = {
   id: string;
   code: string;
   name: string;

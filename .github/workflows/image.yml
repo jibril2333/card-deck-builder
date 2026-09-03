@@ -60,6 +60,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx eslint src scripts tests
+      # Dead code: unused files, exports, and dependencies. The pass that made
+      # this green removed 39 exports and three packages; without a gate it
+      # grows back.
+      - run: npx knip
       - run: npx tsc --noEmit
       - run: npx vitest run
       # Chromium only: the suite pins one browser, and installing three would

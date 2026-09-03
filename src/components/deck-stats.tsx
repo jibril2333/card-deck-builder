@@ -1,4 +1,4 @@
-export type StatBar = { label: string; value: number; color?: string };
+type StatBar = { label: string; value: number; color?: string };
 export type StatPanel = { title: string; bars: StatBar[] };
 
 /**

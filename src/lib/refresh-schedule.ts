@@ -17,7 +17,7 @@
  * than one that says so.
  */
 
-export type RefreshFrequency = "daily" | "weekly";
+type RefreshFrequency = "daily" | "weekly";
 
 export type RefreshSchedule = {
   enabled: boolean;

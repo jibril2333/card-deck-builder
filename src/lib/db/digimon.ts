@@ -1,7 +1,7 @@
 import { getDB } from "./connection";
-import type { DigimonCard, DigimonDeck } from "./digimon-types";
+import type { DigimonCard } from "./digimon-types";
 
-export type { DigimonCard, DigimonDeck };
+export type { DigimonCard };
 
 export type { DigimonFilters };
 import {
@@ -17,10 +17,6 @@ import type { CardRuling } from "./rulings-ddl";
 import type { CardLang } from "../card-lang";
 import { splitSetNames } from "../card-sets";
 
-export type DigimonDeckCard = {
-  card_id: string;
-  quantity: number;
-};
 
 const db = () => getDB("digimon");
 
@@ -312,7 +308,6 @@ export const {
   reorderDecks,
   setDeckPinned,
   setDeckLocked,
-  isDeckLocked,
   setDeckCoverVariant,
   listDeckAdjustments,
   addDeckAdjustment,
@@ -327,7 +322,6 @@ export const {
   getDeckCards,
   getCardPrice,
   setCardPrice,
-  deckCardCount,
   deleteDeck,
   setDeckCardQuantity,
   setDeckCardPurchased,
@@ -400,7 +394,7 @@ export function updateDeckMeta(
 ): void {
   // Name, notes, colours and version are all "the deck", so a lock covers
   // them too — see assertUnlocked in deck-shared.
-  if (isDeckLocked(id)) throw new DeckLockedError(id);
+  if (deckRepo.isDeckLocked(id)) throw new DeckLockedError(id);
   const sets: string[] = [];
   const params: unknown[] = [];
   if (patch.name !== undefined) {
@@ -442,18 +436,6 @@ export function updateDeckMeta(
 // Card collection (per-user, per-variant ownership ledger)
 // ────────────────────────────────────────────────────────────────────────
 
-export type DigimonCollectionRow = {
-  card_id: string;
-  code: string;
-  name: string;
-  color: string | null;
-  rarity: string | null;
-  card_type: string;
-  level: number | null;
-  variant: string; // "" base, "_P1", "_P2" …
-  image_url: string | null;
-  quantity: number;
-};
 
 function getCardCollectionQty(
   currentUserId: string,

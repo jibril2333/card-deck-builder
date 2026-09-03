@@ -28,7 +28,7 @@
 
 import * as cheerio from "cheerio";
 
-export type CardrushListing = {
+type CardrushListing = {
   /** Raw goods_name text, trimmed. */
   goods_name: string;
   /** "base" or "parallel". */
@@ -47,7 +47,7 @@ export type CardrushListing = {
  * One entry per unique illustration the card has. Used to populate the
  * detail-page listing table.
  */
-export type CardrushPricePerIllust = {
+type CardrushPricePerIllust = {
   variant_type: "base" | "parallel";
   illustrator: string;
   price_yen: number;

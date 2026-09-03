@@ -140,7 +140,7 @@ function buildDigimonStats(cards: RawDeckCard[]): StatPanel[] {
   ];
 }
 
-export type Loaded = {
+type Loaded = {
   deck: {
     id: string;
     name: string;

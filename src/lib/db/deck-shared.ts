@@ -48,9 +48,6 @@ export {
   DEFAULT_DECK_ACCENT,
   DeckLockedError,
   OwnershipError,
-  type DeckCardRow,
-  type DeckWithCardQty,
-  type DeckWithCover,
 } from "./deck-repo/context";
 
 export function createDeckRepo(db: DbFn) {
