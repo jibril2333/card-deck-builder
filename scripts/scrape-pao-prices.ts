@@ -21,6 +21,7 @@ import { GAMES } from "../src/lib/games";
 import { parsePaoSearchPage } from "../src/lib/scraper/pao";
 import { shopSearchUrl } from "../src/lib/shops";
 import { reportProgress } from "../src/lib/refresh-progress";
+import { recordSourceRun } from "../src/lib/scrape-health";
 
 const UA_HEADER =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
@@ -172,6 +173,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, DELAY_MS));
   }
 
+  if (!args.dryRun) recordSourceRun("PAO 价格", priced);
   console.log(
     `\nDone — priced=${priced}, not-stocked=${none}, error=${errored}` +
       (args.dryRun ? " (dry run, nothing written)" : ""),

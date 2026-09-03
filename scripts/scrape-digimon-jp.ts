@@ -28,6 +28,7 @@ import {
   UPSERT_TRANSLATION_SQL,
 } from "../src/lib/db/translations-ddl";
 import { reportProgress } from "../src/lib/refresh-progress";
+import { recordSourceRun } from "../src/lib/scrape-health";
 
 // CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
 // keeps serving the real one (host writes to the bind-mounted DB corrupt the
@@ -341,6 +342,8 @@ async function main() {
   const all = db.prepare("SELECT COUNT(*) AS n FROM cards").get() as {
     n: number;
   };
+  // Coverage, not `total` — see the cn scraper.
+  recordSourceRun("日文卡表", have.n);
   console.log(
     `[jp] done. upserted ${total}; coverage ${have.n}/${all.n} cards in DB`,
   );

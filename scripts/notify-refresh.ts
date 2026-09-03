@@ -32,6 +32,10 @@ import {
   type RefreshSummary,
 } from "../src/lib/refresh-notify";
 import {
+  buildHealthNotification,
+  healthReport,
+} from "../src/lib/scrape-health";
+import {
   EMPTY_NTFY,
   ntfyReady,
   parseNtfyConfig,
@@ -76,16 +80,35 @@ async function send(note: Notification): Promise<void> {
   console.error(r.ok ? `[ntfy] sent: ${note.title}` : `[ntfy] ${r.error}`);
 }
 
+/**
+ * Tell the phone when a source's yield changed level — died, dropped, or came
+ * back. Silent on every ordinary run; see lib/scrape-health.
+ */
+async function sendHealth(adminUrl: string): Promise<void> {
+  const note = buildHealthNotification(healthReport(), { adminUrl });
+  if (note) await send(note);
+}
+
 async function main() {
   const adminUrl = `${process.env.CDB_PUBLIC_URL ?? "https://deck.raynefall.dev"}/digimon/admin`;
   const [kind, arg, a, b] = process.argv.slice(2);
 
+  // Source health goes out on BOTH paths, and before the run's own result: a
+  // stage that failed outright is the loud case, and the quiet one — a source
+  // that still exits 0 while returning nothing — is exactly what would
+  // otherwise be buried under it.
+  await sendHealth(adminUrl);
+
   if (kind === "failed") {
-    await send(buildFailureNotification(arg || "refresh", Number(a ?? 1), { adminUrl }));
+    await send(
+      buildFailureNotification(arg || "refresh", Number(a ?? 1), { adminUrl }),
+    );
     return;
   }
   if (kind !== "ok") {
-    console.error("usage: notify-refresh.ts ok '<summary json>' [before] [after] | failed <stage> [exit]");
+    console.error(
+      "usage: notify-refresh.ts ok '<summary json>' [before] [after] | failed <stage> [exit]",
+    );
     return;
   }
 

@@ -20,6 +20,7 @@ import {
   type ParsedPair,
 } from "../src/lib/scraper/restrictions";
 import { reportProgress } from "../src/lib/refresh-progress";
+import { recordSourceRun } from "../src/lib/scrape-health";
 
 const SOURCES: Record<
   GameId,
@@ -151,6 +152,7 @@ async function runFor(game: GameId, dryRun: boolean) {
       }
     });
     tx();
+    if (!dryRun) recordSourceRun("禁限", rows.length);
     console.log(
       `  ✓ wrote ${rows.length} restriction row(s) + ${pairs.length} pair edge(s).`,
     );
