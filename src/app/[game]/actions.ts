@@ -14,6 +14,7 @@ import { stripAltArt } from "@/lib/alt-art";
 import { isSearchableQuery } from "@/lib/search-terms";
 import { isEmptyReport, type ImportReport } from "@/lib/import-report";
 import { requireUser } from "@/lib/auth/session";
+import { field, formAction, z } from "./action-kit";
 
 function lib(_game: GameId) {
   return digimon;
@@ -56,86 +57,73 @@ function bumpGame(game: GameId): void {
   revalidatePath(`/${game}`, "layout");
 }
 
-export async function createDeckAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const rawName = String(formData.get("name") ?? "").trim();
-  const notes = String(formData.get("notes") ?? "").trim() || undefined;
-  const accent = String(formData.get("accent_color") ?? "").trim() || undefined;
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  // Empty name is fine — fall back to a generic placeholder. The user can
-  // rename via the meta form afterward; this just keeps the create button
-  // useful when someone clicks it without filling in the input.
-  const name = rawName || "新卡组";
-  const id = lib(game).createDeck({
-    user_id: me.id,
-    name,
-    notes,
-    accent_color: accent,
-  });
-  bumpDeckList(game);
-  redirect(`/${game}/decks/${id}`);
-}
+export const createDeckAction = formAction(
+  { name: field.trimmed, notes: field.trimmed, accent_color: field.trimmed },
+  async ({ me, game, input }) => {
+    // Empty name is fine — fall back to a generic placeholder. The user can
+    // rename via the meta form afterward; this just keeps the create button
+    // useful when someone clicks it without filling in the input.
+    const id = lib(game).createDeck({
+      user_id: me.id,
+      name: input.name || "新卡组",
+      notes: input.notes || undefined,
+      accent_color: input.accent_color || undefined,
+    });
+    bumpDeckList(game);
+    redirect(`/${game}/decks/${id}`);
+  },
+);
 
 // Create a deck without redirecting away from the current page.
 // Used by the in-card "add to deck" widget.
-export async function createDeckQuietAction(
-  formData: FormData,
-): Promise<string> {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const name = String(formData.get("name") ?? "").trim();
-  const accent = String(formData.get("accent_color") ?? "").trim() || undefined;
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  if (!name) throw new Error("name required");
-  const id = lib(game).createDeck({
-    user_id: me.id,
-    name,
-    accent_color: accent,
-  });
-  // bumpGame covers the deck list too (same subtree); the card-detail
-  // "add to deck" widget needs to see the new deck on every card page.
-  bumpGame(game);
-  return id;
-}
+export const createDeckQuietAction = formAction(
+  { name: field.trimmed, accent_color: field.trimmed },
+  async ({ me, game, input }): Promise<string> => {
+    if (!input.name) throw new Error("name required");
+    const id = lib(game).createDeck({
+      user_id: me.id,
+      name: input.name,
+      accent_color: input.accent_color || undefined,
+    });
+    // bumpGame covers the deck list too (same subtree); the card-detail
+    // "add to deck" widget needs to see the new deck on every card page.
+    bumpGame(game);
+    return id;
+  },
+);
 
-export async function updateDeckMetaAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id"));
-  const name = String(formData.get("name") ?? "").trim();
-  // notes follows the same absent/empty/value trinary as accent_color2 below.
-  // It used to read `?? ""`, which meant a post that didn't carry the field
-  // silently blanked the notes — fine when the only caller was a form that
-  // always sent every field, but the banner's inline editors save one field
-  // at a time and editing the title would have wiped the notes with it.
-  const notesRaw = formData.get("notes");
-  const notes: string | undefined =
-    notesRaw === null ? undefined : String(notesRaw);
-  const accent_color = String(formData.get("accent_color") ?? "").trim();
-  // accent_color2 semantics:
-  //   field absent       → undefined  (don't touch — backward compat for old form posts)
-  //   field present, ""  → null       (explicit clear → single-color mode)
-  //   field present, val → string     (set / update)
-  const accent2Raw = formData.get("accent_color2");
-  const accent_color2: string | null | undefined =
-    accent2Raw === null
-      ? undefined
-      : String(accent2Raw).trim() === ""
-        ? null
-        : String(accent2Raw).trim();
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  digimon.updateDeckMeta(me.id, id, {
-    name: name || undefined,
-    notes: notes,
-    accent_color: accent_color || undefined,
-    accent_color2,
-  });
-  bumpDeckAndList(game, id);
-}
+export const updateDeckMetaAction = formAction(
+  {
+    id: field.id,
+    name: field.trimmed,
+    // notes follows the same absent/empty/value trinary as accent_color2
+    // below. A plain `text` field would turn "absent" into "", and the
+    // banner's inline editors save one field at a time — editing the title
+    // would have wiped the notes with it.
+    notes: field.optionalText,
+    accent_color: field.trimmed,
+    // accent_color2 semantics:
+    //   field absent       → undefined  (don't touch — old form posts)
+    //   field present, ""  → null       (explicit clear → single-color mode)
+    //   field present, val → string     (set / update)
+    accent_color2: field.optionalText,
+  },
+  async ({ me, game, input }) => {
+    const accent2 =
+      input.accent_color2 === undefined
+        ? undefined
+        : input.accent_color2.trim() === ""
+          ? null
+          : input.accent_color2.trim();
+    digimon.updateDeckMeta(me.id, input.id, {
+      name: input.name || undefined,
+      notes: input.notes,
+      accent_color: input.accent_color || undefined,
+      accent_color2: accent2,
+    });
+    bumpDeckAndList(game, input.id);
+  },
+);
 
 /**
  * Set (or clear) the pack this deck is built for.
@@ -151,38 +139,30 @@ export async function updateDeckMetaAction(formData: FormData) {
  * `DeckLockedError`), so this action only has to flip the flag — the UI hiding
  * the edit controls is a courtesy, not the mechanism.
  */
-export async function setDeckLockedAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id"));
-  const locked = String(formData.get("locked")) === "1";
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  digimon.setDeckLocked(me.id, id, locked);
-  bumpDeckAndList(game, id);
-}
+export const setDeckLockedAction = formAction(
+  { id: field.id, locked: field.flag },
+  async ({ me, game, input }) => {
+    digimon.setDeckLocked(me.id, input.id, input.locked);
+    bumpDeckAndList(game, input.id);
+  },
+);
 
-export async function setDeckVersionAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id"));
-  const raw = String(formData.get("version") ?? "").trim();
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  digimon.updateDeckMeta(me.id, id, { version: raw || null });
-  bumpDeckAndList(game, id);
-}
+export const setDeckVersionAction = formAction(
+  { id: field.id, version: field.trimmed },
+  async ({ me, game, input }) => {
+    digimon.updateDeckMeta(me.id, input.id, { version: input.version || null });
+    bumpDeckAndList(game, input.id);
+  },
+);
 
-export async function deleteDeckAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id"));
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  lib(game).deleteDeck(me.id, id);
-  bumpDeckList(game);
-  redirect(`/${game}/decks`);
-}
+export const deleteDeckAction = formAction(
+  { id: field.id },
+  async ({ me, game, input }) => {
+    lib(game).deleteDeck(me.id, input.id);
+    bumpDeckList(game);
+    redirect(`/${game}/decks`);
+  },
+);
 
 // ---------- Deck groups (shared physical card pools) ----------
 
@@ -213,104 +193,88 @@ function syncPoolForCard(
   return true;
 }
 
-export async function createGroupAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const name = String(formData.get("name") ?? "").trim() || "新卡池";
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  const id = lib(game).createGroup(me.id, name);
-  // A new group is empty; seed it with any decks ticked on the create form.
-  const deckIds = formData.getAll("deck_id").map(String).filter(Boolean);
-  if (deckIds.length) lib(game).setGroupDecks(me.id, id, deckIds);
-  bumpGroups(game);
-  redirect(`/${game}/groups/${id}`);
-}
+export const createGroupAction = formAction(
+  { name: field.trimmed, deck_id: field.list },
+  async ({ me, game, input }) => {
+    const id = lib(game).createGroup(me.id, input.name || "新卡池");
+    // A new group is empty; seed it with any decks ticked on the create form.
+    if (input.deck_id.length) {
+      lib(game).setGroupDecks(me.id, id, input.deck_id);
+    }
+    bumpGroups(game);
+    redirect(`/${game}/groups/${id}`);
+  },
+);
 
-export async function renameGroupAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id"));
-  const name = String(formData.get("name") ?? "").trim();
-  if (!isGameId(game)) throw new Error("invalid game");
-  if (!name) return;
-  backupBeforeWrite(game);
-  lib(game).renameGroup(me.id, id, name);
-  bumpGroups(game, id);
-}
+export const renameGroupAction = formAction(
+  { id: field.id, name: field.trimmed },
+  async ({ me, game, input }) => {
+    if (!input.name) return;
+    lib(game).renameGroup(me.id, input.id, input.name);
+    bumpGroups(game, input.id);
+  },
+);
 
-export async function deleteGroupAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id"));
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  lib(game).deleteGroup(me.id, id);
-  bumpGroups(game);
-  redirect(`/${game}/decks`);
-}
+export const deleteGroupAction = formAction(
+  { id: field.id },
+  async ({ me, game, input }) => {
+    lib(game).deleteGroup(me.id, input.id);
+    bumpGroups(game);
+    redirect(`/${game}/decks`);
+  },
+);
 
-export async function setGroupDecksAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id"));
-  const deckIds = formData.getAll("deck_id").map(String).filter(Boolean);
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  lib(game).setGroupDecks(me.id, id, deckIds);
-  bumpGroups(game, id);
-}
+export const setGroupDecksAction = formAction(
+  { id: field.id, deck_id: field.list },
+  async ({ me, game, input }) => {
+    lib(game).setGroupDecks(me.id, input.id, input.deck_id);
+    bumpGroups(game, input.id);
+  },
+);
 
 /**
  * Membership from the deck's side: which pools this deck belongs to. Pooling
  * re-levels held counts across the affected pools, so every one of them is
  * revalidated, not just the deck.
  */
-export async function setDeckGroupsAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id"));
-  const groupIds = formData.getAll("group_id").map(String).filter(Boolean);
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  // Pools it is leaving need refreshing too, so read membership before the
-  // write rather than after.
-  const touched = lib(game)
-    .listGroups(me.id)
-    .filter(
-      (g) => g.decks.some((d) => d.id === deckId) || groupIds.includes(g.id),
-    )
-    .map((g) => g.id);
-  lib(game).setDeckGroups(me.id, deckId, groupIds);
-  revalidatePath(`/${game}/decks/${deckId}`);
-  bumpGroups(game);
-  for (const id of touched) revalidatePath(`/${game}/groups/${id}`);
-}
+export const setDeckGroupsAction = formAction(
+  { deck_id: field.id, group_id: field.list },
+  async ({ me, game, input }) => {
+    const { deck_id: deckId, group_id: groupIds } = input;
+    // Pools it is leaving need refreshing too, so read membership before the
+    // write rather than after.
+    const touched = lib(game)
+      .listGroups(me.id)
+      .filter(
+        (g) => g.decks.some((d) => d.id === deckId) || groupIds.includes(g.id),
+      )
+      .map((g) => g.id);
+    lib(game).setDeckGroups(me.id, deckId, groupIds);
+    revalidatePath(`/${game}/decks/${deckId}`);
+    bumpGroups(game);
+    for (const id of touched) revalidatePath(`/${game}/groups/${id}`);
+  },
+);
 
 /** Dismiss a deck's import report — the 知道了 button on its info bar. */
-export async function clearImportReportAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id"));
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  digimon.updateDeckMeta(me.id, deckId, { import_report: null });
-  bumpDeck(game, deckId);
-}
+export const clearImportReportAction = formAction(
+  { deck_id: field.id },
+  async ({ me, game, input }) => {
+    digimon.updateDeckMeta(me.id, input.deck_id, { import_report: null });
+    bumpDeck(game, input.deck_id);
+  },
+);
 
-export async function adjustDeckCardAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id"));
-  const cardId = String(formData.get("card_id"));
-  const delta = Number(formData.get("delta") ?? 0);
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  lib(game).adjustDeckCard(me.id, deckId, cardId, delta);
-  // Pooled deck: a card just added/resized should inherit the pool's held.
-  if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
-  else bumpDeck(game, deckId);
-}
+export const adjustDeckCardAction = formAction(
+  { deck_id: field.id, card_id: field.id, delta: field.step },
+  async ({ me, game, input }) => {
+    const { deck_id: deckId, card_id: cardId } = input;
+    lib(game).adjustDeckCard(me.id, deckId, cardId, input.delta);
+    // Pooled deck: a card just added/resized should inherit the pool's held.
+    if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
+    else bumpDeck(game, deckId);
+  },
+);
 
 /** One deck's worth of shop lookups is fine; a crawl is not. */
 const MAX_CART_LOOKUPS = 80;
@@ -404,78 +368,60 @@ export async function buildCartScriptAction(
   };
 }
 
-export async function reorderDecksAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const idsRaw = String(formData.get("ids") ?? "");
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  const ids = idsRaw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (ids.length === 0) return;
-  lib(game).reorderDecks(me.id, ids);
-  bumpDeckList(game);
-}
+export const reorderDecksAction = formAction(
+  { ids: field.text },
+  async ({ me, game, input }) => {
+    const ids = input.ids
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (ids.length === 0) return;
+    lib(game).reorderDecks(me.id, ids);
+    bumpDeckList(game);
+  },
+);
 
 // ── Deck adjustments ──────────────────────────────────────────────────────
 // The "considering these swaps" scratch list. Its own table, read by nothing
 // else, so none of these touch deck totals / prices / shortfalls / the pool.
 
-export async function addDeckAdjustmentAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id") ?? "");
-  const cardId = String(formData.get("card_id") ?? "");
-  const kind = String(formData.get("kind"));
-  if (!isGameId(game)) throw new Error("invalid game");
-  if (!deckId || !cardId) throw new Error("missing deck_id/card_id");
-  if (kind !== "add" && kind !== "remove") throw new Error("invalid kind");
-  backupBeforeWrite(game);
-  lib(game).addDeckAdjustment(me.id, deckId, cardId, kind);
-  bumpDeck(game, deckId);
-}
+export const addDeckAdjustmentAction = formAction(
+  { deck_id: field.id, card_id: field.id, kind: z.enum(["add", "remove"]) },
+  async ({ me, game, input }) => {
+    lib(game).addDeckAdjustment(
+      me.id,
+      input.deck_id,
+      input.card_id,
+      input.kind,
+    );
+    bumpDeck(game, input.deck_id);
+  },
+);
 
-export async function removeDeckAdjustmentAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id") ?? "");
-  const deckId = String(formData.get("deck_id") ?? "");
-  if (!isGameId(game)) throw new Error("invalid game");
-  if (!id) throw new Error("missing id");
-  backupBeforeWrite(game);
-  lib(game).removeDeckAdjustment(me.id, id);
-  if (deckId) bumpDeck(game, deckId);
-}
+export const removeDeckAdjustmentAction = formAction(
+  { id: field.id, deck_id: field.text },
+  async ({ me, game, input }) => {
+    lib(game).removeDeckAdjustment(me.id, input.id);
+    if (input.deck_id) bumpDeck(game, input.deck_id);
+  },
+);
 
-export async function setDeckAdjustmentQuantityAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id") ?? "");
-  const deckId = String(formData.get("deck_id") ?? "");
-  const quantity = Number(formData.get("quantity"));
-  if (!isGameId(game)) throw new Error("invalid game");
-  if (!id) throw new Error("missing id");
-  if (!Number.isFinite(quantity)) throw new Error("invalid quantity");
-  backupBeforeWrite(game);
-  // The repo clamps the range; this only rejects outright nonsense.
-  lib(game).setDeckAdjustmentQuantity(me.id, id, quantity);
-  if (deckId) bumpDeck(game, deckId);
-}
+export const setDeckAdjustmentQuantityAction = formAction(
+  // The repo clamps the range; `strictNumber` only rejects outright nonsense.
+  { id: field.id, deck_id: field.text, quantity: field.strictNumber },
+  async ({ me, game, input }) => {
+    lib(game).setDeckAdjustmentQuantity(me.id, input.id, input.quantity);
+    if (input.deck_id) bumpDeck(game, input.deck_id);
+  },
+);
 
-export async function setDeckAdjustmentNoteAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const id = String(formData.get("id") ?? "");
-  const deckId = String(formData.get("deck_id") ?? "");
-  const note = String(formData.get("note") ?? "");
-  if (!isGameId(game)) throw new Error("invalid game");
-  if (!id) throw new Error("missing id");
-  backupBeforeWrite(game);
-  lib(game).setDeckAdjustmentNote(me.id, id, note);
-  if (deckId) bumpDeck(game, deckId);
-}
+export const setDeckAdjustmentNoteAction = formAction(
+  { id: field.id, deck_id: field.text, note: field.text },
+  async ({ me, game, input }) => {
+    lib(game).setDeckAdjustmentNote(me.id, input.id, input.note);
+    if (input.deck_id) bumpDeck(game, input.deck_id);
+  },
+);
 
 export type CardPickerHit = {
   id: string;
@@ -547,120 +493,105 @@ export async function searchCardsAction(
  * Pick WHICH printing of the cover card the deck shows — "" for the base art,
  * or a `card_images.variant` key like "_P1" for an alt art.
  */
-export async function setDeckCoverVariantAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id") ?? "");
-  const variant = String(formData.get("variant") ?? "");
-  if (!isGameId(game)) throw new Error("invalid game");
-  if (!deckId) throw new Error("missing deck_id");
-  backupBeforeWrite(game);
-  lib(game).setDeckCoverVariant(me.id, deckId, variant);
-  bumpDeck(game, deckId);
-  bumpDeckList(game);
-}
+export const setDeckCoverVariantAction = formAction(
+  { deck_id: field.id, variant: field.text },
+  async ({ me, game, input }) => {
+    lib(game).setDeckCoverVariant(me.id, input.deck_id, input.variant);
+    bumpDeck(game, input.deck_id);
+    bumpDeckList(game);
+  },
+);
 
 /**
  * Mark a deck as one you actually play ("主力") or just keep on record.
  * Affects the deck list's ordering only — shortfall/diff tools still see
  * every deck.
  */
-export async function setDeckPinnedAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id") ?? "");
-  const pinned = String(formData.get("pinned")) === "1";
-  if (!isGameId(game)) throw new Error("invalid game");
-  if (!deckId) throw new Error("missing deck_id");
-  backupBeforeWrite(game);
-  // Owner-scoped in the repo: someone else's deck id is a silent no-op.
-  lib(game).setDeckPinned(me.id, deckId, pinned);
-  bumpDeckList(game);
-}
+export const setDeckPinnedAction = formAction(
+  { deck_id: field.id, pinned: field.flag },
+  async ({ me, game, input }) => {
+    // Owner-scoped in the repo: someone else's deck id is a silent no-op.
+    lib(game).setDeckPinned(me.id, input.deck_id, input.pinned);
+    bumpDeckList(game);
+  },
+);
 
-export async function setCardPriceAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const cardId = String(formData.get("card_id"));
-  const raw = String(formData.get("price") ?? "").trim();
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  const price = raw === "" ? null : Number(raw);
-  lib(game).setCardPrice(
-    me.id,
-    cardId,
-    price !== null && Number.isFinite(price) ? price : null,
-  );
-  // Price shows on deck pages and the card detail; refresh the whole game segment.
-  bumpGame(game);
-}
-
-export async function setDeckCoverAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id"));
-  const raw = formData.get("card_id");
-  const cardId = raw === null || raw === "" ? null : String(raw);
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  lib(game).setDeckCover(me.id, deckId, cardId);
-  bumpDeckAndList(game, deckId);
-}
-
-export async function setDeckCardQuantityAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id"));
-  const cardId = String(formData.get("card_id"));
-  const quantity = Math.max(0, Number(formData.get("quantity") ?? 0));
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  lib(game).setDeckCardQuantity(me.id, deckId, cardId, quantity);
-  if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
-  else bumpDeck(game, deckId);
-}
-
-export async function adjustDeckCardPurchasedAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id"));
-  const cardId = String(formData.get("card_id"));
-  const delta = Number(formData.get("delta") ?? 0);
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  // Pooled deck: ±1 adjusts the SHARED held count (max across the pool), then
-  // re-applies it to every member deck (each capped at its own quantity).
-  const peers = lib(game).decksSharingPoolWith(me.id, deckId);
-  if (peers.length > 1) {
-    const cur = lib(game).pooledOwnedForCard(peers, cardId);
-    const owned = Math.min(
-      Math.max(0, cur + delta),
-      lib(game).maxNeedForCard(peers, cardId),
+export const setCardPriceAction = formAction(
+  // Empty clears the price, so this can't be a number field — "" and "abc"
+  // both have to arrive here and become null.
+  { card_id: field.id, price: field.trimmed },
+  async ({ me, game, input }) => {
+    const price = input.price === "" ? null : Number(input.price);
+    lib(game).setCardPrice(
+      me.id,
+      input.card_id,
+      price !== null && Number.isFinite(price) ? price : null,
     );
-    lib(game).reconcilePoolCard(peers, cardId, owned);
+    // Price shows on deck pages and the card detail; refresh the whole game
+    // segment.
     bumpGame(game);
-  } else {
-    lib(game).adjustDeckCardPurchased(me.id, deckId, cardId, delta);
-    bumpDeck(game, deckId);
-  }
-}
+  },
+);
+
+export const setDeckCoverAction = formAction(
+  // Absent or empty card_id clears the cover, so it is optional text rather
+  // than an id.
+  { deck_id: field.id, card_id: field.text },
+  async ({ me, game, input }) => {
+    lib(game).setDeckCover(me.id, input.deck_id, input.card_id || null);
+    bumpDeckAndList(game, input.deck_id);
+  },
+);
+
+export const setDeckCardQuantityAction = formAction(
+  { deck_id: field.id, card_id: field.id, quantity: field.count },
+  async ({ me, game, input }) => {
+    const { deck_id: deckId, card_id: cardId } = input;
+    lib(game).setDeckCardQuantity(me.id, deckId, cardId, input.quantity);
+    if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
+    else bumpDeck(game, deckId);
+  },
+);
+
+export const adjustDeckCardPurchasedAction = formAction(
+  { deck_id: field.id, card_id: field.id, delta: field.step },
+  async ({ me, game, input }) => {
+    const { deck_id: deckId, card_id: cardId, delta } = input;
+    // Pooled deck: ±1 adjusts the SHARED held count (max across the pool),
+    // then re-applies it to every member deck (each capped at its own
+    // quantity).
+    const peers = lib(game).decksSharingPoolWith(me.id, deckId);
+    if (peers.length > 1) {
+      const cur = lib(game).pooledOwnedForCard(peers, cardId);
+      const owned = Math.min(
+        Math.max(0, cur + delta),
+        lib(game).maxNeedForCard(peers, cardId),
+      );
+      lib(game).reconcilePoolCard(peers, cardId, owned);
+      bumpGame(game);
+    } else {
+      lib(game).adjustDeckCardPurchased(me.id, deckId, cardId, delta);
+      bumpDeck(game, deckId);
+    }
+  },
+);
 
 /** Set a card's shared held count for a whole pool (from the pool view). */
-export async function setPoolCardOwnedAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const groupId = String(formData.get("group_id"));
-  const cardId = String(formData.get("card_id"));
-  const owned = Math.max(0, Number(formData.get("owned") ?? 0));
-  if (!isGameId(game)) throw new Error("invalid game");
-  // Ownership: getGroup returns undefined unless the caller owns the group.
-  if (!lib(game).getGroup(me.id, groupId)) throw new Error("not found");
-  backupBeforeWrite(game);
-  const members = lib(game).groupMemberDeckIds(groupId);
-  const capped = Math.min(owned, lib(game).maxNeedForCard(members, cardId));
-  lib(game).reconcilePoolCard(members, cardId, capped);
-  bumpGroups(game, groupId);
-}
+export const setPoolCardOwnedAction = formAction(
+  { group_id: field.id, card_id: field.id, owned: field.count },
+  async ({ me, game, input }) => {
+    const { group_id: groupId, card_id: cardId } = input;
+    // Ownership: getGroup returns undefined unless the caller owns the group.
+    if (!lib(game).getGroup(me.id, groupId)) throw new Error("not found");
+    const members = lib(game).groupMemberDeckIds(groupId);
+    const capped = Math.min(
+      input.owned,
+      lib(game).maxNeedForCard(members, cardId),
+    );
+    lib(game).reconcilePoolCard(members, cardId, capped);
+    bumpGroups(game, groupId);
+  },
+);
 
 /**
  * Import a deck from pasted text (digimoncard.io / DCGO / community format).
@@ -918,26 +849,27 @@ export async function importDeckAction(formData: FormData): Promise<{
   };
 }
 
-export async function setDeckCardPurchasedAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const deckId = String(formData.get("deck_id"));
-  const cardId = String(formData.get("card_id"));
-  const purchased = Math.max(0, Number(formData.get("purchased") ?? 0));
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  // If this deck shares a pool, held is a shared count — set it for the whole
-  // pool (each deck capped at its own quantity). Otherwise just this deck.
-  const peers = lib(game).decksSharingPoolWith(me.id, deckId);
-  if (peers.length > 1) {
-    const owned = Math.min(purchased, lib(game).maxNeedForCard(peers, cardId));
-    lib(game).reconcilePoolCard(peers, cardId, owned);
-    bumpGame(game);
-  } else {
-    lib(game).setDeckCardPurchased(me.id, deckId, cardId, purchased);
-    bumpDeck(game, deckId);
-  }
-}
+export const setDeckCardPurchasedAction = formAction(
+  { deck_id: field.id, card_id: field.id, purchased: field.count },
+  async ({ me, game, input }) => {
+    const { deck_id: deckId, card_id: cardId, purchased } = input;
+    // If this deck shares a pool, held is a shared count — set it for the
+    // whole pool (each deck capped at its own quantity). Otherwise just this
+    // deck.
+    const peers = lib(game).decksSharingPoolWith(me.id, deckId);
+    if (peers.length > 1) {
+      const owned = Math.min(
+        purchased,
+        lib(game).maxNeedForCard(peers, cardId),
+      );
+      lib(game).reconcilePoolCard(peers, cardId, owned);
+      bumpGame(game);
+    } else {
+      lib(game).setDeckCardPurchased(me.id, deckId, cardId, purchased);
+      bumpDeck(game, deckId);
+    }
+  },
+);
 
 // ────────────────────────────────────────────────────────────────────────
 // Card collection
@@ -947,29 +879,31 @@ function bumpCollection(game: GameId): void {
   revalidatePath(`/${game}/collection`);
 }
 
-export async function setCardCollectionAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const cardId = String(formData.get("card_id"));
-  const variant = String(formData.get("variant") ?? "");
-  const quantity = Math.max(0, Number(formData.get("quantity") ?? 0));
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  lib(game).setCardCollectionQuantity(me.id, cardId, variant, quantity);
-  bumpCollection(game);
-}
+export const setCardCollectionAction = formAction(
+  { card_id: field.id, variant: field.text, quantity: field.count },
+  async ({ me, game, input }) => {
+    lib(game).setCardCollectionQuantity(
+      me.id,
+      input.card_id,
+      input.variant,
+      input.quantity,
+    );
+    bumpCollection(game);
+  },
+);
 
-export async function adjustCardCollectionAction(formData: FormData) {
-  const me = await requireUser();
-  const game = String(formData.get("game"));
-  const cardId = String(formData.get("card_id"));
-  const variant = String(formData.get("variant") ?? "");
-  const delta = Number(formData.get("delta") ?? 0);
-  if (!isGameId(game)) throw new Error("invalid game");
-  backupBeforeWrite(game);
-  lib(game).adjustCardCollection(me.id, cardId, variant, delta);
-  bumpCollection(game);
-}
+export const adjustCardCollectionAction = formAction(
+  { card_id: field.id, variant: field.text, delta: field.step },
+  async ({ me, game, input }) => {
+    lib(game).adjustCardCollection(
+      me.id,
+      input.card_id,
+      input.variant,
+      input.delta,
+    );
+    bumpCollection(game);
+  },
+);
 
 /**
  * Used by the collection-page "quick add" form. Resolves a card code →
