@@ -28,7 +28,7 @@ import path from "node:path";
 
 export type Level = "ok" | "warn" | "dead";
 
-export type SourceState = {
+type SourceState = {
   /** Row counts from the last few runs, newest last. */
   history: number[];
   level: Level;
@@ -54,7 +54,7 @@ export type SourceHealth = {
 const HISTORY = 5;
 
 /** Under this share of the baseline, a source is suspect. */
-export const DROP_RATIO = 0.7;
+const DROP_RATIO = 0.7;
 
 const FILE = "scrape-health.json";
 
@@ -75,7 +75,7 @@ export function judge(ok: number, baseline: number): Level {
   return ok < baseline * DROP_RATIO ? "warn" : "ok";
 }
 
-export function readStates(): Record<string, SourceState> {
+function readStates(): Record<string, SourceState> {
   try {
     const raw = JSON.parse(fs.readFileSync(file(), "utf8")) as unknown;
     if (!raw || typeof raw !== "object") return {};
