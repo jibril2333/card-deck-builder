@@ -11,7 +11,6 @@ import {
   setDeckCardPurchasedAction,
 } from "@/app/[game]/actions";
 import { colorHex } from "@/lib/games";
-import { shortSetName } from "@/lib/card-sets";
 import { CardPriceInput } from "@/components/card-price-input";
 import { useCardPreview } from "@/components/card-preview";
 import { SearchTargets } from "@/components/search-targets";

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { isGameId, type GameId } from "@/lib/games";
+import { isGameId } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { Playtest, type PlaytestCard } from "@/components/playtest";
 import * as digimon from "@/lib/db/digimon";
@@ -19,15 +19,13 @@ export default async function PlaytestPage({
   const { game, id } = await params;
   if (!isGameId(game)) notFound();
 
-  let deckName: string;
-  let cards: PlaytestCard[];
   const deck = digimon.getDeck(id);
   if (!deck) notFound();
-  deckName = deck.name;
+  const deckName: string = deck.name;
   const cardLang = parseCardLang(
     (await cookies()).get(CARD_LANG_COOKIE)?.value,
   );
-  cards = digimon.overlayDisplay(
+  const cards: PlaytestCard[] = digimon.overlayDisplay(
     digimon.getDeckCards(id).map((c) => ({
       id: c.id,
       code: c.code,

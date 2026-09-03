@@ -65,6 +65,9 @@ export function BackupPanel() {
 
   useEffect(() => {
     let alive = true;
+    // The panel's data comes from an API call; there is nothing to render
+    // until it lands.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load().catch(() => alive && setMsg({ ok: false, text: "读取配置失败" }));
     // The daemon writes its status once a minute; follow it while the page is
     // open so "启用" and "正在复制" don't disagree for ten minutes.

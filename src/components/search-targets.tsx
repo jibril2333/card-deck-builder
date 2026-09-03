@@ -125,7 +125,6 @@ export function SearchTargets({
                   >
                     <div className="w-7 shrink-0 aspect-[5/7] rounded overflow-hidden bg-[var(--color-muted)]">
                       {t.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={t.image_url}
                           alt={t.name}

@@ -2,19 +2,15 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { isGameId, type GameId, colorHex } from "@/lib/games";
+import { isGameId } from "@/lib/games";
 import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
 import { GroupEditor } from "@/components/group-editor";
-import { PoolHeldStepper } from "@/components/pool-held-stepper";
+import { PoolTable } from "@/components/pool-table";
 import { PoolSwap } from "@/components/pool-swap";
 import { requireUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 
 export const dynamic = "force-dynamic";
-
-function lib(_game: GameId) {
-  return digimon;
-}
 
 /**
  * Shared-pool view for a deck group: how many physical copies of each card to
@@ -31,15 +27,15 @@ export default async function GroupPage({
   const { game, id } = await params;
   if (!isGameId(game)) notFound();
 
-  const group = lib(game).getGroup(me.id, id);
+  const group = digimon.getGroup(me.id, id);
   if (!group) notFound();
 
-  const pool = lib(game).getGroupPool(id);
+  const pool = digimon.getGroupPool(id);
   // Reads return every user's decks by design (see deck-shared.ts), but
   // `setGroupDecks` only ever inserts the caller's own — so an unfiltered list
   // offers checkboxes that silently do nothing. Harmless while this is a
   // single-account install; not once a friend has an account.
-  const allDecks = lib(game)
+  const allDecks = digimon
     .listDecksWithCover(me.id)
     .filter((d) => d.user_id === me.id)
     .map((d) => ({
@@ -52,17 +48,15 @@ export default async function GroupPage({
     }));
 
   // Localize names per the language cookie.
-  const cardLang = parseCardLang((await cookies()).get(CARD_LANG_COOKIE)?.value);
+  const cardLang = parseCardLang(
+    (await cookies()).get(CARD_LANG_COOKIE)?.value,
+  );
   const tMap = digimon.getDisplayTranslations(
     pool.map((c) => c.code),
     cardLang,
   );
 
   const memberDecks = group.decks;
-  const deckColor = (d: (typeof memberDecks)[number]) =>
-    d.accent_color2
-      ? `linear-gradient(135deg, ${d.accent_color}, ${d.accent_color2})`
-      : d.accent_color;
 
   // Split egg vs main, sort: most-shared first, then biggest need, then code.
   const decorate = pool.map((c) => {
@@ -90,145 +84,6 @@ export default async function GroupPage({
   const separateTotal = decorate.reduce((s, c) => s + c.separate, 0);
   const saved = separateTotal - needTotal;
   const missingTotal = decorate.reduce((s, c) => s + c.missing, 0);
-
-  type Row = (typeof decorate)[number];
-
-  const colCount = 1 + memberDecks.length + 3;
-
-  function CardRow({ c }: { c: Row }) {
-    return (
-      <tr
-        className={`border-b border-[var(--color-border)]/50 ${
-          c.deckCount > 1 ? "bg-[var(--color-accent)]/5" : ""
-        }`}
-      >
-        <td className="py-1.5 pr-3">
-          <Link
-            href={`/${game}/card/${c.code
-              .split("/")
-              .map(encodeURIComponent)
-              .join("/")}`}
-            className="flex items-center gap-2 hover:underline"
-          >
-            {/* Fixed width+height (not aspect-ratio): the thumbnail is a flex
-                item, and aspect-ratio + a %-height <img> on a flex item is a
-                circular dependency that collapses the image. */}
-            <span className="w-7 h-10 shrink-0 rounded overflow-hidden bg-[var(--color-muted)] block">
-              {c.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={c.image_url}
-                  alt={c.name}
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
-              ) : null}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[10px] font-mono text-[var(--color-muted-fg)]">
-                {c.code}
-              </span>
-              <span className="block truncate">{c.name}</span>
-            </span>
-          </Link>
-        </td>
-        {memberDecks.map((d) => {
-          const q = c.perDeck[d.id] ?? 0;
-          const binds = q === c.need && q > 0;
-          return (
-            <td
-              key={d.id}
-              className={`py-1.5 px-1.5 text-center tabular-nums ${
-                q === 0
-                  ? "text-[var(--color-border)]"
-                  : binds
-                    ? "font-bold text-[var(--color-fg)]"
-                    : "text-[var(--color-muted-fg)]"
-              }`}
-            >
-              {q === 0 ? "·" : q}
-            </td>
-          );
-        })}
-        <td className="py-1.5 px-2 text-center tabular-nums font-bold">
-          {c.need}
-        </td>
-        <td className="py-1.5 px-2 text-center">
-          <PoolHeldStepper
-            game={game}
-            groupId={id}
-            cardId={c.card_id}
-            owned={c.owned}
-            need={c.need}
-          />
-        </td>
-        <td
-          className={`py-1.5 px-2 text-center tabular-nums ${
-            c.missing > 0 ? "text-red-500 font-medium" : "text-[var(--color-muted-fg)]"
-          }`}
-        >
-          {c.missing > 0 ? c.missing : "✓"}
-        </td>
-      </tr>
-    );
-  }
-
-  // One table for eggs + mains so their columns line up (separate tables size
-  // their columns independently). A full-width label row separates sections.
-  function PoolTable() {
-    const sections: { label: string; rows: Row[] }[] = [];
-    if (eggs.length) sections.push({ label: "蛋卡", rows: eggs });
-    sections.push({ label: eggs.length ? "主卡组" : "", rows: mains });
-    return (
-      <div className="overflow-x-auto mt-5">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left text-xs text-[var(--color-muted-fg)] border-b border-[var(--color-border)]">
-              <th className="py-1.5 pr-3">卡</th>
-              {memberDecks.map((d) => (
-                <th key={d.id} className="py-1.5 px-1.5 text-center">
-                  <span className="inline-flex items-center gap-1">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: deckColor(d) }}
-                    />
-                    <span className="max-w-[6rem] truncate">{d.name}</span>
-                  </span>
-                </th>
-              ))}
-              <th className="py-1.5 px-2 text-center font-semibold text-[var(--color-fg)]">
-                需备
-              </th>
-              <th className="py-1.5 px-2 text-center whitespace-nowrap">
-                持有(共享)
-              </th>
-              <th className="py-1.5 px-2 text-center">缺</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sections.map((sec) => (
-              <Fragment key={sec.label || "main"}>
-                {sec.label ? (
-                  <tr>
-                    <td
-                      colSpan={colCount}
-                      className="pt-3 pb-1 text-xs font-semibold text-[var(--color-muted-fg)]"
-                    >
-                      {sec.label}
-                    </td>
-                  </tr>
-                ) : null}
-                {sec.rows.map((c) => (
-                  <CardRow key={c.card_id} c={c} />
-                ))}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -288,7 +143,13 @@ export default async function GroupPage({
               />
             ) : null}
 
-            <PoolTable />
+            <PoolTable
+              game={game}
+              groupId={id}
+              memberDecks={memberDecks}
+              eggs={eggs}
+              mains={mains}
+            />
           </>
         )}
       </main>

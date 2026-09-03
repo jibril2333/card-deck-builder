@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useTransition } from "react";
 import { logoutAction } from "@/lib/auth/actions";
