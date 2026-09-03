@@ -362,6 +362,35 @@ and a daily run costs almost nothing. Cards cardrush has no listing for (~115)
 are re-checked every run, since "we looked and found nothing" isn't recorded —
 that's about two minutes, and worth it to pick them up when they do appear.
 
+### A source that stops yielding, without failing
+
+A scraper that cannot reach the site fails loudly and the daemon says so. The
+case `src/lib/scrape-health.ts` exists for is the quiet one: the page still
+returns 200, the script still exits 0, and the selector it was written against
+now matches nothing — the run "succeeds" with 12 rows instead of 4,400.
+
+Each scrape records what it got (`recordSourceRun(source, n)`) into
+`data.nosync/scrape-health.json`, and is judged against its own recent best:
+
+- **dead** — nothing at all, when it used to return something
+- **warn** — under 70% of that baseline
+- **ok** — everything else, including a first run with no history
+
+Two decisions worth keeping:
+
+- The baseline is the BEST of the last five runs, not the previous one. Judged
+  against the previous run, a source can decay a few percent a day forever and
+  never trip, and one bad run moves the goalposts for the next.
+- What a source reports must be a **stock, not a flow**. The CN/JP scrapes
+  report coverage (how many cards have text), not upserts — upserts count what
+  changed, and a quiet week would read as a dead source. Prices report cards
+  priced; rulings, Q&A rows; the banlist, its row count.
+
+`notify-refresh.ts` pushes on a CHANGE of level — including the recovery — so a
+source that is dead for a week says so once, the same way the refresh
+notification stays quiet on a week with no changes. The admin panel lists the
+sources that are not `ok` and nothing when they all are.
+
 ### Push notifications (ntfy)
 
 The refresh pushes to ntfy at the end of a run (`scripts/notify-refresh.ts`).

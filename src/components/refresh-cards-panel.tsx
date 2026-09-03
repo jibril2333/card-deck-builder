@@ -17,6 +17,13 @@ type Status = {
     total: number;
     note?: string;
   }[];
+  /** Per-source yield, worst first — see lib/scrape-health. */
+  health?: {
+    source: string;
+    ok: number;
+    baseline: number;
+    level: "ok" | "warn" | "dead";
+  }[];
 };
 
 const STAGE_LABELS = REFRESH_STAGES;
@@ -138,10 +145,16 @@ export function RefreshCardsPanel() {
         body: JSON.stringify({ stages: selected }),
       });
       if (!r.ok) {
-        const body = (await r.json().catch(() => null)) as { error?: string } | null;
+        const body = (await r.json().catch(() => null)) as {
+          error?: string;
+        } | null;
         setError(body?.error ?? `请求失败（${r.status}）`);
       } else {
-        setStatus((s) => ({ ...(s ?? { state: "running" }), state: "running", running: true }));
+        setStatus((s) => ({
+          ...(s ?? { state: "running" }),
+          state: "running",
+          running: true,
+        }));
       }
     } catch {
       setError("网络错误");
@@ -151,7 +164,9 @@ export function RefreshCardsPanel() {
   }
 
   const toggle = (id: string) =>
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+    setSelected((s) =>
+      s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
+    );
 
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-4">
@@ -202,12 +217,46 @@ export function RefreshCardsPanel() {
       </div>
 
       {running ? <RunProgress status={status} /> : null}
+      <SourceHealth status={status} />
       {running ? (
         <p className="text-xs text-[var(--color-muted-fg)]">
           更新期间站点会短暂重启
         </p>
       ) : null}
       {error ? <p className="text-xs text-red-500">{error}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * The sources that came back with less than they used to.
+ *
+ * Only the bad ones, and nothing at all when every source is healthy: a green
+ * list of seven scrapers is the kind of panel people stop reading, and then
+ * stop noticing when a row turns red.
+ */
+function SourceHealth({ status }: { status: Status | null }) {
+  const bad = (status?.health ?? []).filter((h) => h.level !== "ok");
+  if (bad.length === 0) return null;
+  return (
+    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-1">
+      <div className="text-xs font-medium text-amber-600 dark:text-amber-400">
+        抓取来源结果变少
+      </div>
+      {bad.map((h) => (
+        <div
+          key={h.source}
+          className="flex items-baseline justify-between gap-3 text-xs"
+        >
+          <span>{h.source}</span>
+          <span className="tabular-nums text-[var(--color-muted-fg)]">
+            {h.ok} / 过去 {h.baseline}
+          </span>
+        </div>
+      ))}
+      <p className="text-[11px] text-[var(--color-muted-fg)]">
+        抓取没有报错,是结果变少了 —— 多半是对方页面改版。
+      </p>
     </div>
   );
 }

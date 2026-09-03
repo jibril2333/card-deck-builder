@@ -3,6 +3,7 @@ import path from "node:path";
 import { isAdmin } from "@/lib/auth/admin";
 import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
 import { clearProgress, readProgress } from "@/lib/refresh-progress";
+import { healthReport } from "@/lib/scrape-health";
 
 /**
  * Admin endpoint behind the "更新卡牌数据" button.
@@ -81,6 +82,9 @@ export async function GET() {
     // that has finished are numbers pretending to be news. Plural: the price
     // stage runs its two scrapes at once.
     progress: running ? readProgress() : [],
+    // Always: a source that stopped returning rows is a fact about the data
+    // sitting in the database right now, not about the run in flight.
+    health: healthReport(),
   });
 }
 
@@ -115,7 +119,10 @@ export async function POST(req: Request) {
     fs.writeFileSync(REQUEST_FILE, stages.join(" "), "utf8");
   } catch (err) {
     console.error("[admin/refresh] could not write request file:", err);
-    return Response.json({ ok: false, error: "无法写入请求文件" }, { status: 500 });
+    return Response.json(
+      { ok: false, error: "无法写入请求文件" },
+      { status: 500 },
+    );
   }
 
   return Response.json({ ok: true, stages: stages.length ? stages : STAGES });
