@@ -65,6 +65,10 @@ jobs:
       # Chromium only: the suite pins one browser, and installing three would
       # be two minutes spent on engines nothing is asserted against.
       - run: npx playwright install --with-deps chromium
+      # The UI is Chinese and Japanese. Without these the runner renders every
+      # card name in a fallback face with different metrics, and the layout
+      # assertions measure something no user will ever see.
+      - run: sudo apt-get install -y --no-install-recommends fonts-noto-cjk
       - run: npx playwright test
       - if: failure()
         uses: actions/upload-artifact@v4

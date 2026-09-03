@@ -67,9 +67,18 @@ for (const url of ["/digimon", "/digimon/collection", "/digimon/decks"]) {
       return {
         count: kids.length,
         perRow: tops.filter((t) => t === tops[0]).length,
-        // Nothing may overflow its tile — the caption is the likeliest, being
-        // the only part with a text minimum.
-        overflow: kids.some((k) => k.scrollWidth > k.clientWidth + 1),
+        // The GRID may not overflow, and neither may the page.
+        //
+        // This used to ask whether any TILE overflowed its own box, which is
+        // a question about font metrics, not about layout: the caption is
+        // `truncate`, so its scrollWidth is larger than its clientWidth
+        // whenever the name is long — true on a CI runner with different
+        // fonts, false on the author's Mac. What actually breaks a phone
+        // layout is a column that content has forced wider than its share,
+        // and that shows up here.
+        overflow:
+          g.scrollWidth > g.clientWidth + 1 ||
+          document.documentElement.scrollWidth > window.innerWidth + 1,
       };
     });
     // A row can only hold as many as exist: this fixture's deck list may have
