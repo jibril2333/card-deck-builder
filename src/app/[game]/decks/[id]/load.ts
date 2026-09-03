@@ -494,10 +494,16 @@ export async function loadDeckView({ game, id, sp, me }: DeckViewParams) {
   const restrictionIssues = digimon.deckRestrictionIssues(loaded.deck.id);
   const issueByCardId = new Map(restrictionIssues.map((i) => [i.card_id, i]));
 
+  // Both halves come from the rows already read at the top of this function.
+  // The egg count used to re-run `getDeckCards` — the most expensive query in
+  // the app, eight correlated subqueries a row for the two shops' prices —
+  // three hundred lines away from the call that had already answered it. Cost
+  // aside, `main` was then a subtraction across two reads: a write landing
+  // between them (a ± in another tab, an import) made the deck's own size come
+  // out a card short.
   const total = loaded.cards.reduce((s, c) => s + c.quantity, 0);
   const eggs = loaded.isDigimon
-    ? digimon
-        .getDeckCards(loaded.deck.id)
+    ? cards
         .filter((c) => c.card_type === "Digi-Egg")
         .reduce((s, c) => s + c.quantity, 0)
     : 0;
