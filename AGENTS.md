@@ -151,9 +151,26 @@ Runs happen three ways, all of them inside the container:
    Don't "simplify" this by mounting the socket.
 3. **By hand** — `docker exec <container> node /app/scripts-dist/refresh-daemon.js --once cards sets`.
 
-Admin access is an explicit allowlist, `CDB_ADMIN_EMAILS`, set in the NAS's
-`.env`. It fails closed: unset means nobody is an admin. Plain "logged in" is
-not enough — accounts go to friends, and a refresh is an hour of scraping.
+Admin comes from either of two places, and plain "logged in" is not one of
+them — accounts go to friends, and a refresh is an hour of scraping that
+rewrites the live card database:
+
+- `CDB_ADMIN_EMAILS`, an explicit allowlist in the NAS's `.env`. It survives
+  the account row being rebuilt from a backup, which is why it is checked
+  first.
+- `users.is_admin` on the account row. This is how the first-run bootstrap
+  grants it — an empty account table gets an `admin@localhost` account whose
+  password is random and printed once to the container log (see
+  `db/bootstrap-admin.ts`). Without it a fresh deployment had no way in at
+  all: registration needs an invite code, invite codes need a shell on the
+  host, and the allowlist needs a variable a new operator has no reason to
+  know about.
+
+Still fails closed: neither one set means nobody is an admin, so the panels
+disappear rather than opening to everyone. The bootstrap deliberately does NOT
+ship a fixed `admin/admin` — the image is published and these deployments sit
+on public URLs. `CDB_ADMIN_PASSWORD` sets it explicitly when that is wanted,
+`CDB_BOOTSTRAP_ADMIN=off` disables the account entirely.
 
 Progress/results land in `data.nosync/refresh-status.json` (read by the admin
 UI) and `data.nosync/refresh.log`.

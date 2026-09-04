@@ -138,6 +138,14 @@ export function findSession(token: string): Session | null {
   return row;
 }
 
+/** Whether the account row itself carries the admin flag — see auth/admin. */
+export function isAdminAccount(userId: string): boolean {
+  const row = authDb()
+    .prepare(`SELECT is_admin FROM user.users WHERE id = ?`)
+    .get(userId) as { is_admin: number } | undefined;
+  return !!row?.is_admin;
+}
+
 export function deleteSession(token: string): void {
   authDb().prepare(`DELETE FROM user.sessions WHERE id = ?`).run(token);
 }

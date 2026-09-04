@@ -2,6 +2,7 @@ import fs from "node:fs";
 import Database from "better-sqlite3";
 import { GAMES, type GameId } from "@/lib/games";
 import { runMigrations } from "./migrations";
+import { bootstrapAdmin } from "./bootstrap-admin";
 import { maybeDailyBackup } from "./backup";
 
 // Cache connections across HMR reloads in dev.
@@ -41,6 +42,7 @@ export function getDB(game: GameId): Database.Database {
     // by streaming the WAL, had nothing to stream. See scripts/backup-daemon.
     db.pragma("user.journal_mode = WAL");
     runMigrations(db);
+    bootstrapAdmin(db);
     cache[game] = db;
   }
   return db;

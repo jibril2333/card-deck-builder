@@ -1,4 +1,5 @@
 import { getCurrentUser } from "./session";
+import { isAdminAccount } from "./repo";
 
 /**
  * Whether the signed-in user may run privileged maintenance (right now: the
@@ -7,10 +8,16 @@ import { getCurrentUser } from "./session";
  * The app is published to the internet through a Cloudflare tunnel and
  * accounts are handed out to friends, so "is logged in" is NOT a sufficient
  * gate — a refresh restarts the container and rewrites the card database.
- * Admins are named explicitly in CDB_ADMIN_EMAILS (comma-separated).
+ * Two ways to be one, checked in this order:
  *
- * Fails CLOSED: with the variable unset nobody is an admin, so forgetting to
- * configure it disables the button rather than exposing it to everyone.
+ *   · named in CDB_ADMIN_EMAILS (comma-separated) — the deployment says who,
+ *     and it keeps working if the account row is ever rebuilt from a backup;
+ *   · `users.is_admin` on the account row — how the first-run bootstrap grants
+ *     it, so a fresh install has an administrator without anyone having to
+ *     know about the variable.
+ *
+ * Still fails CLOSED: no allowlist and no flag means nobody is an admin, so a
+ * misconfiguration hides the buttons rather than exposing them.
  */
 function adminEmails(): string[] {
   return (process.env.CDB_ADMIN_EMAILS ?? "")
@@ -20,9 +27,9 @@ function adminEmails(): string[] {
 }
 
 export async function isAdmin(): Promise<boolean> {
-  const allowed = adminEmails();
-  if (allowed.length === 0) return false;
   const me = await getCurrentUser();
   if (!me?.email) return false;
-  return allowed.includes(me.email.toLowerCase());
+  const allowed = adminEmails();
+  if (allowed.includes(me.email.toLowerCase())) return true;
+  return isAdminAccount(me.id);
 }

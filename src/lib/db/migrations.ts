@@ -1303,6 +1303,27 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 42,
+    name: "users.is_admin",
+    up: (db) => {
+      // Admin used to be decided ONLY by the CDB_ADMIN_EMAILS allowlist, which
+      // meant a fresh deployment had no administrator at all: the person who
+      // registered the first account could not reach the refresh button, the
+      // backup settings or the notification settings, and nothing on screen
+      // said why. The flag makes it a property of the account, so the
+      // first-run bootstrap can grant it; the allowlist still works and is
+      // still checked first.
+      const cols = (
+        db.prepare("PRAGMA user.table_info(users)").all() as { name: string }[]
+      ).map((c) => c.name);
+      if (!cols.includes("is_admin")) {
+        db.exec(
+          "ALTER TABLE user.users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
+        );
+      }
+    },
+  },
 ];
 
 export const TARGET_SCHEMA_VERSION = MIGRATIONS.reduce(
