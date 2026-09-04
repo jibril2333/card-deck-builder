@@ -22,6 +22,17 @@ on:
     paths-ignore:
       - "**/*.md"
       - ".gitignore"
+  # A pull request runs the gate and nothing else: `build`, `merge` and
+  # `deploy-nas` are all conditioned on this not being a PR. That is what makes
+  # the trigger safe on a public repository — a fork's PR gets a read-only
+  # token and no secrets, and the jobs that would need either never start.
+  # The point is to see the check on the PR page instead of finding out after
+  # the merge, which is how two red mains happened on 2026-09-03.
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - ".gitignore"
   workflow_dispatch:
     inputs:
       tag:
@@ -30,7 +41,9 @@ on:
         default: latest
 
 concurrency:
-  group: ghcr-image
+  # Per ref, not global: with one shared group a pull request's run would
+  # cancel the run for main that is publishing the image.
+  group: ghcr-image-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -93,6 +106,10 @@ jobs:
   # but it's the machine this whole exercise is trying to stop depending on,
   # and it has to be awake.
   build:
+    # Not on pull requests: pushing by digest needs a writable GHCR token,
+    # which a fork's PR does not get, and an image built from an unmerged
+    # branch is not wanted in the registry either.
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
