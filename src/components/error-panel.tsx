@@ -42,10 +42,31 @@ export function ErrorPanel({
   const [copied, setCopied] = useState(false);
   const stale = isStaleBuildError(error);
 
-  // Log to the dev console so it's easy to inspect
+  // Log to the dev console so it's easy to inspect, and report it so the
+  // failure leaves something behind: an error thrown in the browser never
+  // reaches the server's log, and "it showed an error page a few times today"
+  // is not something anyone can act on. Fire and forget — a diagnostic must
+  // not add a second failure to the one on screen.
   useEffect(() => {
     console.error("[error boundary]", error);
-  }, [error]);
+    try {
+      void fetch("/api/client-error", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+          url: window.location.href,
+          name: error.name,
+          message: error.message,
+          digest: error.digest,
+          stack: error.stack,
+          stale,
+        }),
+      }).catch(() => {});
+    } catch {
+      /* offline, blocked, or no fetch — the console line is still there */
+    }
+  }, [error, stale]);
 
   // A tab left open across a deploy: reload it and the new build answers.
   // Once, though — the stamp is what stops a reload loop when the reload does
