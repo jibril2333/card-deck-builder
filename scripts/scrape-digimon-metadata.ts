@@ -36,6 +36,7 @@ import {
   formatSanityReport,
 } from "../src/lib/scraper/sanity";
 import { reportProgress } from "../src/lib/refresh-progress";
+import { recordSourceRun } from "../src/lib/scrape-health";
 
 // CDB_DATA_DIR lets a long run write a COPY of the DB while the prod container
 // keeps serving the real one (host writes to the bind-mounted DB corrupt the
@@ -234,6 +235,10 @@ async function main() {
 
   let totalInserted = 0;
   let totalUpdated = 0;
+  /** Prefixes this site has no page for yet — announced, not yet listed. */
+  const unpublished: string[] = [];
+  /** Cards the site returned across every prefix — this run's yield. */
+  let seen = 0;
   const startedAt = Date.now();
   reportProgress(
     { script: "scrape-digimon-metadata", done: 0, total: prefixes.length },
@@ -257,6 +262,21 @@ async function main() {
       cards = cards.filter((c) => c.code.startsWith(pfx + "-"));
       if (needCodes) cards = cards.filter((c) => needCodes!.has(c.code));
 
+      // A set the official site has no page for yet. EX-13 was announced with
+      // eight cards revealed elsewhere months before Bandai listed any of
+      // them here, and every night it produced "SANITY FAILED — no cards
+      // parsed", which is the same line a real breakage prints. An expected
+      // error every night is how a real one gets ignored, so an empty result
+      // for ONE prefix is reported as what it is. The case the gate exists
+      // for — the markup changed and nothing parses anywhere — is caught by
+      // the run total below, which goes to zero.
+      if (cards.length === 0) {
+        unpublished.push(pfx);
+        process.stdout.write("这个站还没有这一包\n");
+        await new Promise((r) => setTimeout(r, 600));
+        continue;
+      }
+
       // Sanity-check the batch before touching the DB. Abort if structural
       // health is below thresholds (e.g. selectors changed and 100% of names
       // are empty) — better to fail loudly than silently nuke real data.
@@ -268,6 +288,7 @@ async function main() {
           `sanity check failed for set ${pfx}; aborting before any DB writes`,
         );
       }
+      seen += cards.length;
       if (report.issues.length > 0) {
         process.stdout.write("\n");
         console.warn(formatSanityReport(report));
@@ -286,8 +307,17 @@ async function main() {
   }
 
   const elapsed = (Date.now() - startedAt) / 1000;
+  if (unpublished.length > 0) {
+    console.log(
+      `\n这个站还没有这些包(已公布但官网未上架):${unpublished.join(" ")}`,
+    );
+  }
+  // The yield, not the change count: `inserted + updated` is near zero on a
+  // quiet week and would read as a dead source. `seen` is what the site
+  // returned, and it only collapses if the site or the parser does.
+  recordSourceRun("英文卡表", seen);
   console.log(
-    `\nTotal: inserted=${totalInserted}, updated=${totalUpdated} in ${elapsed.toFixed(0)}s.`,
+    `\nTotal: seen=${seen}, inserted=${totalInserted}, updated=${totalUpdated} in ${elapsed.toFixed(0)}s.`,
   );
 
   db.close();

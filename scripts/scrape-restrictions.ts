@@ -152,7 +152,7 @@ async function runFor(game: GameId, dryRun: boolean) {
       }
     });
     tx();
-    if (!dryRun) recordSourceRun("禁限", rows.length);
+    recordSourceRun("禁限", rows.length);
     console.log(
       `  ✓ wrote ${rows.length} restriction row(s) + ${pairs.length} pair edge(s).`,
     );

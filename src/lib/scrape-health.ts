@@ -91,6 +91,23 @@ function writeStates(states: Record<string, SourceState>): void {
 }
 
 /**
+ * Flags that narrow a run to a subset of what it normally covers.
+ *
+ * A partial run's yield must never become a baseline, and must never be judged
+ * against one: `--only=BT1-084` legitimately returns one card, and comparing
+ * that to yesterday's 4,391 would fire a priority-5 "this source is dead" at
+ * whoever was debugging one card by hand. The check lives here rather than at
+ * each call site so a scraper added later gets it without knowing to ask.
+ */
+const NARROWING = ["--only", "--limit", "--missing", "--codes", "--dry-run"];
+
+export function isPartialRun(argv: string[] = process.argv.slice(2)): boolean {
+  return argv.some((a) =>
+    NARROWING.some((flag) => a === flag || a.startsWith(`${flag}=`)),
+  );
+}
+
+/**
  * Record one source's result and return how it looks.
  *
  * Called at the end of a scrape script with the number that matters for that
@@ -98,7 +115,16 @@ function writeStates(states: Record<string, SourceState>): void {
  * doesn't matter as long as the same one is passed every run: this compares a
  * source against itself, never against another source.
  */
-export function recordSourceRun(source: string, ok: number): SourceHealth {
+export function recordSourceRun(
+  source: string,
+  ok: number,
+  opts: { partial?: boolean } = {},
+): SourceHealth {
+  const partial = opts.partial ?? isPartialRun();
+  if (partial) {
+    console.log(`[health] ${source}: 局部运行,不计入基线`);
+    return { source, ok, baseline: 0, level: "ok", was: null };
+  }
   const states = readStates();
   const prev = states[source];
   const history = prev?.history ?? [];

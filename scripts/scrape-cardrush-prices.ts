@@ -294,7 +294,7 @@ async function main() {
   const elapsed = (Date.now() - startedAt) / 1000;
   // A shop that changes its markup returns 200 with no listings on every
   // card, and the run still "succeeds" — this is what notices.
-  if (!args.dryRun) recordSourceRun("Cardrush 价格", success);
+  recordSourceRun("Cardrush 价格", success);
   console.log(
     `\nDone in ${elapsed.toFixed(0)}s — success=${success}, ` +
       `no-listings=${zeroListings}, error=${errored}.` +

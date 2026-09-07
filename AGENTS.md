@@ -447,6 +447,21 @@ source that is dead for a week says so once, the same way the refresh
 notification stays quiet on a week with no changes. The admin panel lists the
 sources that are not `ok` and nothing when they all are.
 
+A run narrowed by `--only`, `--limit`, `--missing`, `--codes` or `--dry-run`
+records nothing: `--only=BT1-084` legitimately returns one card, and judging
+that against yesterday's 4,391 would fire a priority-5 "this source is dead" at
+whoever was debugging one card by hand. `isPartialRun()` decides, in
+`scrape-health.ts` rather than at each call site, so a scraper added later gets
+it without knowing to ask.
+
+An empty result for ONE set is not a failure, it is a set the site has not
+published yet: EX-13 was announced with eight cards revealed elsewhere months
+before Bandai listed any of them, and until this was fixed the English scrape
+printed `SANITY FAILED — no cards parsed` every night — the same line a real
+breakage prints. The metadata scraper now reports those prefixes separately,
+and the case the gate exists for (the markup changed and nothing parses
+anywhere) shows up as the run total going to zero.
+
 ### Push notifications (ntfy)
 
 The refresh pushes to ntfy at the end of a run (`scripts/notify-refresh.ts`).

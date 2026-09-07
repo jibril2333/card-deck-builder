@@ -173,7 +173,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, DELAY_MS));
   }
 
-  if (!args.dryRun) recordSourceRun("PAO 价格", priced);
+  recordSourceRun("PAO 价格", priced);
   console.log(
     `\nDone — priced=${priced}, not-stocked=${none}, error=${errored}` +
       (args.dryRun ? " (dry run, nothing written)" : ""),

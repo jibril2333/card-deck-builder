@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   buildHealthNotification,
+  isPartialRun,
   describeHealth,
   healthReport,
   judge,
@@ -186,6 +187,36 @@ describe("across processes", () => {
     expect(note?.title).toContain("没有结果");
     // Reading it again does not re-fire: nothing has changed since.
     recordSourceRun("Cardrush 价格", 0);
+    expect(
+      buildHealthNotification(healthReport(), { adminUrl: "https://x/admin" }),
+    ).toBeNull();
+  });
+});
+
+describe("局部运行", () => {
+  it("认得出把范围收窄的那些参数", () => {
+    for (const flag of [
+      "--only=BT1-084",
+      "--only",
+      "--limit=50",
+      "--missing",
+      "--codes=BT1-001",
+      "--dry-run",
+    ]) {
+      expect(isPartialRun([flag]), flag).toBe(true);
+    }
+    expect(isPartialRun([])).toBe(false);
+    expect(isPartialRun(["--verbose", "cards"])).toBe(false);
+  });
+
+  it("不把局部结果写进基线,也不拿它去判定", () => {
+    // `--only=BT1-084` 合理地只返回一张卡。拿它跟昨天的 4391 比,会给正在手工
+    // 调一张卡的人推一条 priority-5 的「来源已死」。
+    recordSourceRun("Cardrush 价格", 4391);
+    const partial = recordSourceRun("Cardrush 价格", 1, { partial: true });
+    expect(partial.level).toBe("ok");
+    // 历史里只有那次完整运行。
+    expect(healthReport()[0]).toMatchObject({ source: "Cardrush 价格", ok: 4391 });
     expect(
       buildHealthNotification(healthReport(), { adminUrl: "https://x/admin" }),
     ).toBeNull();
