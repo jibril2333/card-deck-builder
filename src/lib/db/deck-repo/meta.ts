@@ -107,10 +107,14 @@ export function createMeta(
    * it had never been in. Where it ended up was a function of every drag it had
    * ever been part of, which is not something anyone can predict.
    *
-   * So a deck that changes section goes to the END of the one it arrives in.
-   * That is a rule you can state in a sentence and see happen: star it, it
-   * appears at the bottom of 主力卡组; unstar it, at the bottom of 其他卡组.
-   * Nothing else moves.
+   * So a deck that changes section lands somewhere stated, and nothing else
+   * changes places:
+   *
+   *   · star it   → the END of 主力卡组. It joins a list you keep on purpose;
+   *     appending is the move that leaves that list as you arranged it.
+   *   · unstar it → the FRONT of 其他卡组. It is the deck you just had in
+   *     hand, and 其他卡组 is the long list — putting it back at the bottom of
+   *     forty decks is the same as losing it.
    *
    * Silently does nothing for a deck the caller doesn't own — same as before,
    * and what the list's ★ relies on.
@@ -126,20 +130,36 @@ export function createMeta(
         .prepare(`SELECT 1 FROM user.decks WHERE id = ? AND user_id = ?`)
         .get(deckId, currentUserId);
       if (!owned) return;
-      // Last place in the destination section. `-1 + 1` puts the first deck of
-      // an empty section at 0, which is where a section starts.
-      const { next } = db()
-        .prepare(
-          `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM user.decks
-            WHERE user_id = ? AND pinned = ? AND id <> ?`,
-        )
-        .get(currentUserId, flag, deckId) as { next: number };
+      let place: number;
+      if (pinned) {
+        // Last place among the starred. `-1 + 1` puts the first deck of an
+        // empty section at 0, which is where a section starts.
+        place = (
+          db()
+            .prepare(
+              `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM user.decks
+                WHERE user_id = ? AND pinned = 1 AND id <> ?`,
+            )
+            .get(currentUserId, deckId) as { next: number }
+        ).next;
+      } else {
+        // First place among the rest: everyone there moves down one and the
+        // arriving deck takes 0. Shifting rather than counting down from zero
+        // keeps the section numbered 0..n, the same as a drag leaves it.
+        db()
+          .prepare(
+            `UPDATE user.decks SET sort_order = sort_order + 1
+              WHERE user_id = ? AND pinned = 0 AND id <> ?`,
+          )
+          .run(currentUserId, deckId);
+        place = 0;
+      }
       db()
         .prepare(
           `UPDATE user.decks SET pinned = ?, sort_order = ?
             WHERE id = ? AND user_id = ?`,
         )
-        .run(flag, next, deckId, currentUserId);
+        .run(flag, place, deckId, currentUserId);
     });
     tx();
   }

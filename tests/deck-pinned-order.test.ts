@@ -6,8 +6,9 @@
  * deck and it landed third among the others, in the middle of a list it had
  * never been in, at a spot decided by every drag it had ever been part of.
  *
- * The rule these pin down: a deck arriving in a section goes to the end of it,
- * and nothing else moves.
+ * The rule these pin down: starring appends to 主力卡组, unstarring returns the
+ * deck to the FRONT of 其他卡组 — it is the one you just had in hand, and the
+ * other list is the long one — and nothing else changes places.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFile } from "node:child_process";
@@ -101,16 +102,14 @@ describe("starring", () => {
 });
 
 describe("unstarring", () => {
-  it("puts the deck at the end of 其他卡组", async () => {
+  it("puts the deck at the front of 其他卡组", async () => {
     const U = "u-unstar";
     const out = await repo(`
       ${setup(U)}
-      // A is FIRST among the starred; under one shared sequence it used to
-      // land first among the others too.
       digimon.setDeckPinned(U, a, false);
       out.s = sections(U);
     `);
-    expect(out.s).toEqual({ pinned: ["B"], others: ["C", "D", "A"] });
+    expect(out.s).toEqual({ pinned: ["B"], others: ["A", "C", "D"] });
   }, 120_000);
 
   it("lands in the same place every time it is toggled", async () => {
@@ -130,9 +129,9 @@ describe("unstarring", () => {
     // The whole point: repeating the gesture repeats the result.
     expect(out.second).toEqual(out.first);
     expect(out.third).toEqual(out.first);
-    expect((out.first as { on: unknown }).on).toEqual({
-      pinned: ["A", "B", "C"],
-      others: ["D"],
+    expect(out.first).toEqual({
+      on: { pinned: ["A", "B", "C"], others: ["D"] },
+      off: { pinned: ["A", "B"], others: ["C", "D"] },
     });
   }, 120_000);
 
@@ -146,11 +145,8 @@ describe("unstarring", () => {
       digimon.setDeckPinned(U, d, true);
       out.refilled = sections(U);
     `);
-    expect(out.emptied).toEqual({ pinned: [], others: ["C", "D", "A", "B"] });
-    expect(out.refilled).toEqual({
-      pinned: ["D"],
-      others: ["C", "A", "B"],
-    });
+    expect(out.emptied).toEqual({ pinned: [], others: ["B", "A", "C", "D"] });
+    expect(out.refilled).toEqual({ pinned: ["D"], others: ["B", "A", "C"] });
   }, 120_000);
 });
 
