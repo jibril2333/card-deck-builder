@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { reorderDecksAction, setDeckPinnedAction } from "@/app/[game]/actions";
+import { edgeScrollSpeed } from "@/lib/edge-scroll";
 import {
   deckCountBadge,
   deckIsComplete,
@@ -97,6 +98,40 @@ export function DecksGrid({
     side: "before" | "after";
   } | null>(null);
   const draggedRef = useRef(false);
+  /** The pointer's viewport Y during a drag — read by the scroll loop below. */
+  const dragY = useRef(0);
+
+  /**
+   * Hold a tile near the top or bottom of the window and the page scrolls.
+   *
+   * The list is longer than the window, so the tile being moved and the place
+   * it is going are rarely on screen together; without this, moving a deck
+   * from the bottom of the list to the top is drop, scroll, pick up again.
+   *
+   * A `dragover` listener on the window rather than on the tiles: the pointer
+   * spends most of a drag over the gaps between them, and over the page
+   * margins when it is at an edge. The loop runs only while this grid has a
+   * drag of its own — the page renders two of these, and both scrolling at
+   * once would move twice as fast.
+   */
+  useEffect(() => {
+    if (!dragId) return;
+    const follow = (e: DragEvent) => {
+      dragY.current = e.clientY;
+    };
+    let frame = 0;
+    const tick = () => {
+      const dy = edgeScrollSpeed(dragY.current, window.innerHeight);
+      if (dy !== 0) window.scrollBy(0, dy);
+      frame = requestAnimationFrame(tick);
+    };
+    window.addEventListener("dragover", follow);
+    frame = requestAnimationFrame(tick);
+    return () => {
+      window.removeEventListener("dragover", follow);
+      cancelAnimationFrame(frame);
+    };
+  }, [dragId]);
 
   // Keep local order in sync if server data changes (e.g. new deck added).
   // React 19 docs' recommended pattern: compare during render and call
@@ -236,6 +271,10 @@ export function DecksGrid({
                 d.mine
                   ? (e) => {
                       draggedRef.current = true;
+                      // Seed the scroll loop with where the drag began; until
+                      // the first dragover it would otherwise read 0 and take
+                      // the page to the top.
+                      dragY.current = e.clientY;
                       setDragId(d.id);
                       e.dataTransfer.effectAllowed = "move";
                       e.dataTransfer.setData("text/plain", d.id);
