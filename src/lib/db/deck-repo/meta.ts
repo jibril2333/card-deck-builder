@@ -98,14 +98,50 @@ export function createMeta(
     if (r.changes === 0) throw new OwnershipError(deckId);
   }
 
+  /**
+   * Mark a deck as one you actually play, or stop.
+   *
+   * The two sections are two grids with two orderings, but `sort_order` is one
+   * number, so a deck used to carry its old position across: unstar the third
+   * starred deck and it landed third among the others, in the middle of a list
+   * it had never been in. Where it ended up was a function of every drag it had
+   * ever been part of, which is not something anyone can predict.
+   *
+   * So a deck that changes section goes to the END of the one it arrives in.
+   * That is a rule you can state in a sentence and see happen: star it, it
+   * appears at the bottom of 主力卡组; unstar it, at the bottom of 其他卡组.
+   * Nothing else moves.
+   *
+   * Silently does nothing for a deck the caller doesn't own — same as before,
+   * and what the list's ★ relies on.
+   */
   function setDeckPinned(
     currentUserId: string,
     deckId: string,
     pinned: boolean,
   ): void {
-    db()
-      .prepare(`UPDATE user.decks SET pinned = ? WHERE id = ? AND user_id = ?`)
-      .run(pinned ? 1 : 0, deckId, currentUserId);
+    const flag = pinned ? 1 : 0;
+    const tx = db().transaction(() => {
+      const owned = db()
+        .prepare(`SELECT 1 FROM user.decks WHERE id = ? AND user_id = ?`)
+        .get(deckId, currentUserId);
+      if (!owned) return;
+      // Last place in the destination section. `-1 + 1` puts the first deck of
+      // an empty section at 0, which is where a section starts.
+      const { next } = db()
+        .prepare(
+          `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM user.decks
+            WHERE user_id = ? AND pinned = ? AND id <> ?`,
+        )
+        .get(currentUserId, flag, deckId) as { next: number };
+      db()
+        .prepare(
+          `UPDATE user.decks SET pinned = ?, sort_order = ?
+            WHERE id = ? AND user_id = ?`,
+        )
+        .run(flag, next, deckId, currentUserId);
+    });
+    tx();
   }
 
   /**
