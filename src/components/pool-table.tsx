@@ -58,8 +58,6 @@ export function PoolTable({
   const sections: { label: string; rows: PoolRow[] }[] = [];
   if (eggs.length) sections.push({ label: "蛋卡", rows: eggs });
   sections.push({ label: eggs.length ? "主卡组" : "", rows: mains });
-  if (eggs.length) sections.push({ label: "蛋卡", rows: eggs });
-  sections.push({ label: eggs.length ? "主卡组" : "", rows: mains });
   return (
     <div className="overflow-x-auto mt-5">
       <table className="w-full text-sm border-collapse">

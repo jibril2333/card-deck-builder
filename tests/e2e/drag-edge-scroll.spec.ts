@@ -82,18 +82,24 @@ test("holding a deck at the bottom edge scrolls down, and at the top scrolls bac
 
   await startDrag(page);
   await hold(page, 395);
-  const down = await page.evaluate(() => window.scrollY);
-  expect(down, "拖到底部应当向下滚").toBeGreaterThan(0);
+  expect(
+    await page.evaluate(() => window.scrollY),
+    "拖到底部应当向下滚",
+  ).toBeGreaterThan(0);
 
-  // Back to the middle: the page holds still.
-  await hold(page, 200, 400);
-  expect(await page.evaluate(() => window.scrollY)).toBe(down);
+  // Back to the middle: the page holds still. Read AFTER the move has taken
+  // effect — the loop keeps running on the previous position until the next
+  // dragover lands, so a value read before that is a frame or two stale.
+  await hold(page, 200, 300);
+  const still = await page.evaluate(() => window.scrollY);
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => window.scrollY), "中间不滚").toBe(still);
 
   await hold(page, 5);
   expect(
     await page.evaluate(() => window.scrollY),
     "拖到顶部应当向上滚",
-  ).toBeLessThan(down);
+  ).toBeLessThan(still);
 
   // And it stops when the drag does.
   // And it stops when the drag does — parked away from both edges, so a loop

@@ -242,3 +242,65 @@ test("banner: edit in place, no shift, colours and exports where asked", async (
   await expect(page.getByRole("menuitem", { name: /文本/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /删除卡组/ })).toBeVisible();
 });
+
+/**
+ * 对照表本身:每张卡一行,蛋卡和主卡组分开。
+ *
+ * The specs above cover the plumbing — pooling a deck, the member picker, the
+ * banner. None of them looks at the table, which is how a refactor that pushed
+ * both sections onto the list twice shipped: every card rendered twice, with an
+ * egg sitting in the middle of the main deck.
+ */
+test("lists each card once, eggs in their own section", async ({ page }) => {
+  const stamp = Date.now().toString().slice(-5);
+  const build = async (name: string, cards: [string, string, number][]) => {
+    await page.goto("/digimon/decks");
+    await page.getByPlaceholder("卡组名").fill(name);
+    await page.getByRole("button", { name: /创建/ }).click();
+    await page.waitForURL(/\/digimon\/decks\/[a-z0-9-]+/i);
+    const url = page.url();
+    await page.getByRole("link", { name: /🛠 组建/ }).click();
+    for (const [code, cardName, n] of cards) {
+      await page.getByPlaceholder("搜卡加入卡组…").fill(code);
+      const hit = page.getByLabel(`加入卡组 ${cardName}`);
+      for (let i = 0; i < n; i++) await hit.click();
+      await expect(
+        page.locator(".card-grid > div").filter({ hasText: code }),
+      ).toBeVisible();
+    }
+    return url;
+  };
+
+  const a = await build(`TBL A ${stamp}`, [
+    ["BT1-084", "Omnimon", 3],
+    ["BT1-001", "Yokomon", 2],
+  ]);
+  const b = await build(`TBL B ${stamp}`, [
+    ["BT1-084", "Omnimon", 1],
+    ["BT1-021", "MetalGreymon", 4],
+  ]);
+
+  await page.goto("/digimon/decks");
+  await page.getByRole("button", { name: /新建卡池/ }).click();
+  await page.waitForURL(/\/digimon\/groups\/[a-z0-9-]+/i);
+  const pool = new URL(page.url()).pathname;
+  for (const url of [a, b]) {
+    await page.goto(url);
+    await page.getByLabel("共享卡池").selectOption({ index: 1 });
+    await expect(page.getByLabel("打开卡池")).toBeVisible();
+  }
+
+  await page.goto(pool);
+  const rows = page.locator("table tbody tr");
+  // Three cards, each once, plus the two section labels.
+  for (const code of ["BT1-084", "BT1-001", "BT1-021"]) {
+    await expect(rows.filter({ hasText: code })).toHaveCount(1);
+  }
+  // The egg is under 蛋卡, above everything the main deck runs.
+  const text = (await rows.allInnerTexts()).join("\n");
+  expect(text.indexOf("蛋卡")).toBeLessThan(text.indexOf("BT1-001"));
+  expect(text.indexOf("BT1-001")).toBeLessThan(text.indexOf("主卡组"));
+  expect(text.indexOf("主卡组")).toBeLessThan(text.indexOf("BT1-084"));
+  // Most-shared first: BT1-084 is in both decks, BT1-021 in one.
+  expect(text.indexOf("BT1-084")).toBeLessThan(text.indexOf("BT1-021"));
+});
