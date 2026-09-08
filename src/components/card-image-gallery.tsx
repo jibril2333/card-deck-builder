@@ -80,7 +80,7 @@ export function CardImageGallery({
               </span>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-1.5 max-w-[300px] mx-auto md:mx-0">
+          <div className="art-strip max-w-[300px] mx-auto md:mx-0">
             {variants.map((v, i) => {
               const isActive = i === active;
               const foreign = !!(cardLang && v.lang && v.lang !== cardLang);
@@ -96,7 +96,7 @@ export function CardImageGallery({
                   key={`${v.image_url}-${i}`}
                   type="button"
                   onClick={() => setActive(i)}
-                  className={`w-12 aspect-[5/7] rounded overflow-hidden border-2 transition-all cursor-pointer relative ${
+                  className={`aspect-[5/7] rounded overflow-hidden border-2 transition-all cursor-pointer relative ${
                     isActive
                       ? "border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40"
                       : "border-[var(--color-border)] hover:border-[var(--color-fg)] opacity-70 hover:opacity-100"

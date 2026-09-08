@@ -52,7 +52,7 @@ export function CoverVariantPicker({
       <div className="text-xs text-[var(--color-muted-fg)] mb-1.5">
         封面异画（{arts.length} 种）
       </div>
-      <div className={`flex flex-wrap gap-1.5 ${pending ? "opacity-60" : ""}`}>
+      <div className={`art-strip ${pending ? "opacity-60" : ""}`}>
         {arts.map((a) => {
           const active = a.variant === current;
           return (
@@ -63,7 +63,7 @@ export function CoverVariantPicker({
               disabled={pending}
               title={a.variant ? `异画 ${a.variant.replace("_", "")}` : "原版"}
               aria-pressed={active}
-              className={`w-11 aspect-[5/7] rounded overflow-hidden border-2 transition-all cursor-pointer relative disabled:cursor-wait ${
+              className={`aspect-[5/7] rounded overflow-hidden border-2 transition-all cursor-pointer relative disabled:cursor-wait ${
                 active
                   ? "border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40"
                   : "border-[var(--color-border)] hover:border-[var(--color-fg)] opacity-70 hover:opacity-100"

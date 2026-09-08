@@ -6,6 +6,9 @@
  * cards. Every card grid goes to four across below `sm`.
  */
 import { expect, test } from "@playwright/test";
+import Database from "better-sqlite3";
+import fs from "node:fs";
+import path from "node:path";
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -143,4 +146,62 @@ test("banlist: four to a row, trigger card included", async ({ page }) => {
   // the first tile of the same grid.
   expect(r.triggerTile).toBeGreaterThan(0);
   expect(r.triggerTile).toBeLessThanOrEqual((r.tile ?? 0) + 2);
+});
+
+/**
+ * The art pickers follow the same count.
+ *
+ * A card page's 异画 strip is sized for the space beside a full-size card; on a
+ * phone nothing sits beside it, and five thumbnails at 48px was the one place
+ * card art came in a different width from every other page.
+ *
+ * The variants are inserted here rather than in the fixture: alt art on a
+ * shared card would change what a dozen other specs see, and this one needs
+ * them for four assertions.
+ */
+test.describe("art strip", () => {
+  const DIR = fs.readFileSync("tests/e2e/.datadir", "utf8").trim();
+  const STUB =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const withDb = (fn: (db: Database.Database) => void) => {
+    const db = new Database(path.join(DIR, "digimon.db"));
+    try {
+      fn(db);
+    } finally {
+      db.close();
+    }
+  };
+
+  test.beforeEach(() =>
+    withDb((db) => {
+      const ins = db.prepare(
+        `INSERT OR IGNORE INTO card_images (code, lang, variant, image_url)
+         VALUES ('BT1-084', 'en', ?, ?)`,
+      );
+      for (const v of ["", "_P1", "_P2", "_P3", "_P4", "_P5"]) ins.run(v, STUB);
+    }),
+  );
+  test.afterEach(() =>
+    withDb((db) => {
+      db.prepare(`DELETE FROM card_images WHERE code = 'BT1-084'`).run();
+    }),
+  );
+
+  test("four to a row, like every other page of card art", async ({ page }) => {
+    await page.goto("/digimon/card/BT1-084");
+    const strip = page.locator(".art-strip");
+    await expect(strip).toBeVisible();
+    expect(
+      await strip.evaluate((g) => {
+        const kids = [...g.children];
+        const tops = kids.map((k) => Math.round(k.getBoundingClientRect().top));
+        return {
+          count: kids.length,
+          perRow: tops.filter((t) => t === tops[0]).length,
+          // Wide enough to tap and to tell the arts apart.
+          width: Math.round(kids[0].getBoundingClientRect().width) > 60,
+        };
+      }),
+    ).toEqual({ count: 6, perRow: 4, width: true });
+  });
 });

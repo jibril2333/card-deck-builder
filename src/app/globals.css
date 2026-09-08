@@ -296,6 +296,21 @@ body::before {
   gap: 0.75rem;
 }
 
+/* The art pickers: the alt-art strip on a card page, the cover picker on a
+ * deck. A row of small thumbnails beside the full-size card on a desktop, and
+ * on a phone the same four-to-a-row every other page of card art uses — a
+ * fifth thumbnail squeezed into 48px is the odd one out, and the phone has the
+ * width to spend now that nothing sits beside it. */
+.art-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.art-strip > * {
+  width: 3rem;
+}
+
 /* Every card grid, on a phone — a narrow window AND a coarse pointer. A
  * desktop window dragged this narrow keeps the auto-fill sizing above, which
  * at 500px is three ordinary tiles rather than four tiny ones with 9px
@@ -311,6 +326,18 @@ body::before {
  * name at nearly a third of the card's width and truncate it anyway
  * ("DemiDevi…"), which reads as broken rather than dense. */
 @media (max-width: 639px) and (pointer: coarse) {
+  .art-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* The desktop strip is capped so it doesn't crowd the card next to it;
+       on a phone it is the only thing on its line. */
+    max-width: none;
+  }
+
+  .art-strip > * {
+    width: auto;
+  }
+
   .card-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.375rem;

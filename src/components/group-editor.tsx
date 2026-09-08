@@ -145,7 +145,7 @@ export function GroupEditor({
               art long before their name is read, and the page is up to 1500px
               wide — two columns of text left most of it empty and made a
               dozen decks a scroll. */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
+          <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
             {allDecks.map((d) => {
               const on = picked.has(d.id);
               return (
