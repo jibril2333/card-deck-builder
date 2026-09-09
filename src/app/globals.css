@@ -296,6 +296,17 @@ body::before {
   gap: 0.75rem;
 }
 
+/* 共享卡池:桌面看对照表,手机看每卡一块。
+ *
+ * Both are in the DOM and the media query picks one — see pool-table.tsx for
+ * why the choice is made here rather than in JavaScript. The desktop half is
+ * the default so a browser that matches neither branch (no `pointer` support)
+ * gets the table.
+ */
+.pool-blocks {
+  display: none;
+}
+
 /* The art pickers: the alt-art strip on a card page, the cover picker on a
  * deck. A row of small thumbnails beside the full-size card on a desktop, and
  * on a phone the same four-to-a-row every other page of card art uses — a
@@ -326,6 +337,13 @@ body::before {
  * name at nearly a third of the card's width and truncate it anyway
  * ("DemiDevi…"), which reads as broken rather than dense. */
 @media (max-width: 639px) and (pointer: coarse) {
+  .pool-wide {
+    display: none;
+  }
+  .pool-blocks {
+    display: block;
+  }
+
   .art-strip {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
