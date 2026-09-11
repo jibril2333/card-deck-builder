@@ -74,6 +74,36 @@ export function createMeta(
   }
 
   /**
+   * One deck with the same cover art and owner columns the list resolves.
+   *
+   * The native API's deck detail needs exactly what a list row carries, and
+   * running `listDecksWithCover` to pick one deck out of it reads every deck
+   * in the database to answer a single-row question.
+   */
+  function getDeckWithCover(deckId: string): DeckWithCover | undefined {
+    return db()
+      .prepare(
+        `SELECT d.*,
+                COALESCE(
+                  (SELECT ci.image_url FROM card_images ci
+                    WHERE ci.code = c.code
+                      AND ci.variant = COALESCE(d.cover_variant, '')
+                    ORDER BY (ci.lang = 'ja') DESC, (ci.lang = 'en') DESC
+                    LIMIT 1),
+                  c.image_url)
+                AS cover_image_url,
+                c.code AS cover_code,
+                u.id AS owner_id,
+                u.display_name AS owner_name
+         FROM user.decks d
+         LEFT JOIN cards c ON c.id = d.cover_card_id
+         LEFT JOIN user.users u ON u.id = d.user_id
+         WHERE d.id = ?`,
+      )
+      .get(deckId) as DeckWithCover | undefined;
+  }
+
+  /**
    * Mark a deck as one the owner actually plays (pinned) or just keeps on
    * record. Owner-scoped: the WHERE clause makes this a no-op for anyone
    * else's deck, so a forged deck id can't touch another user's row.
@@ -390,6 +420,7 @@ export function createMeta(
   }
 
   return {
+    getDeckWithCover,
     listDecks,
     listDecksWithCover,
     setDeckLocked,

@@ -14,6 +14,7 @@
  *   pricing       ← nothing            (a typed price)
  *   adjustments   ← locks              (调整备忘)
  *   pools         ← nothing            (共享卡池)
+ *   revision      ← nothing            (the API's edit-state version)
  *
  * `assertUnlocked` and `clampQuantityToRestriction` are dependencies, not
  * API: they are destructured away before the modules are spread, so the
@@ -42,6 +43,7 @@ import { createMeta } from "./deck-repo/meta";
 import { createPools } from "./deck-repo/pools";
 import { createPricing } from "./deck-repo/pricing";
 import { createRestrictions } from "./deck-repo/restrictions";
+import { createRevision } from "./deck-repo/revision";
 import type { DbFn } from "./deck-repo/context";
 
 export {
@@ -63,5 +65,6 @@ export function createDeckRepo(db: DbFn) {
     ...createPricing(db),
     ...createAdjustments(db, { assertUnlocked }),
     ...createPools(db),
+    ...createRevision(db),
   };
 }

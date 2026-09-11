@@ -75,6 +75,21 @@ export function describeWait(retryAfterMs: number): string {
 
 const attempts: Attempts = new Map();
 
+/**
+ * The client's address as the tunnel reports it, from any header lookup.
+ *
+ * Everything arrives from Cloudflare, so the socket's peer is useless and the
+ * forwarded headers are what carry the caller. Missing headers collapse
+ * everyone into one bucket, which throttles too much rather than too little.
+ *
+ * Takes a getter rather than a `Headers` so both callers can use it: a Server
+ * Action reads `next/headers`, an API route reads the Request it was handed.
+ */
+export function addressFrom(get: (name: string) => string | null): string {
+  const forwarded = get("cf-connecting-ip") ?? get("x-forwarded-for");
+  return forwarded?.split(",")[0]?.trim() || "unknown";
+}
+
 export type LoginKeys = { email: string; address: string };
 
 /** Both keys must pass; the longer wait is the one reported. */

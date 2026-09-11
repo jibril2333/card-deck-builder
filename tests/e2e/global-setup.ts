@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   createE2ESession,
+  seedApiUser,
   seedJogressDeck,
   seedVersionDeck,
   seedViolatingDeck,
@@ -44,6 +45,8 @@ export default async function globalSetup() {
   // A deck already labelled BT-01 that holds a ZZ-03 card — see seedVersionDeck.
   seedVersionDeck(digimonUserDb, userId);
   seedJogressDeck(digimonUserDb, userId);
+  // A second account with a real password, for the native API specs.
+  seedApiUser(digimonUserDb);
 
   // Persist a Playwright storageState file pointing at that session. Fixed
   // path under the project so playwright.config.ts can reference it

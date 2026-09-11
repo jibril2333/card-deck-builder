@@ -13,6 +13,7 @@
  * is the kind that affects users — not just an internal refactor.
  */
 
+import bcrypt from "bcryptjs";
 import Database from "better-sqlite3";
 import { CARD_TRANSLATIONS_DDL } from "../../../src/lib/db/translations-ddl";
 
@@ -677,6 +678,42 @@ export function createE2ESession(dbPath: string): {
       `INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)`,
     ).run(sessionToken, userId, expiresAt.toISOString());
     return { userId, sessionToken, expiresAt };
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * An account the native API can actually log in as.
+ *
+ * `createE2ESession` deliberately writes a password hash that cannot match,
+ * because the browser specs skip the login form. `POST /api/v1/session` is
+ * the login form, so it needs one real bcrypt hash — and a second account,
+ * which is also what makes the "a friend may read but not write" case
+ * testable at all.
+ *
+ * The cost is one bcrypt hash at 10 rounds in global setup, about 60ms.
+ */
+export const API_USER = {
+  email: "api@test.local",
+  password: "api-fixture-passphrase",
+  display_name: "API Tester",
+} as const;
+
+export function seedApiUser(dbPath: string): string {
+  const db = new Database(dbPath);
+  try {
+    const id = `api-user-${Date.now()}`;
+    db.prepare(
+      `INSERT INTO users (id, email, password_hash, display_name)
+       VALUES (?, ?, ?, ?)`,
+    ).run(
+      id,
+      API_USER.email,
+      bcrypt.hashSync(API_USER.password, 10),
+      API_USER.display_name,
+    );
+    return id;
   } finally {
     db.close();
   }
