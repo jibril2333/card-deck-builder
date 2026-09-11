@@ -16,6 +16,21 @@
  * theory. A held edit rewrites every member deck's row, so two phones on two
  * decks of the same pool are writing the same cards.
  *
+ * ## What is deliberately NOT in the transaction
+ *
+ * Reading the deck back. Those three steps are all the atomicity the write
+ * needs; assembling the response is fifty priced rows and the pool's held
+ * counts, and running it inside the transaction held a write lock — and,
+ * because the driver is synchronous, the whole event loop — for the length
+ * of the most expensive query in the app, on every tap of a ± button.
+ *
+ * What that gives up is narrow and not worth the cost: another writer can
+ * land between the commit and the read, so the client may be handed a state
+ * one edit newer than the one its own write produced. That state is correct,
+ * and it carries the revision that goes with it, so the next write checks
+ * against the right thing. The alternative — serialising every reader behind
+ * every writer — buys a stricter promise than the client can use.
+ *
  * ## Adjustments
  *
  * The repo clamps silently — a fourth copy of a card limited to one is
@@ -65,7 +80,7 @@ export function writeDeck(opts: {
   // the day's first write, not about this one.
   backupBeforeWrite("digimon");
 
-  const run = getDB("digimon").transaction((): DeckDetail => {
+  const adjustments = getDB("digimon").transaction((): Adjustment[] => {
     const deck = digimon.getDeck(deckId);
     if (!deck) throw notFound("卡组不存在。");
     // A friend may read this deck. Writing it is 403 whoever asks, and the
@@ -81,13 +96,12 @@ export function writeDeck(opts: {
       );
     }
 
-    const adjustments = opts.apply({ deckId, meId, deck });
-    const after = deckDetail(deckId, meId, langs, adjustments);
-    if (!after) throw notFound("卡组不存在。");
-    return after;
-  });
+    return opts.apply({ deckId, meId, deck });
+  })();
 
-  return run();
+  const after = deckDetail(deckId, meId, langs, adjustments);
+  if (!after) throw notFound("卡组不存在。");
+  return after;
 }
 
 /** Pull `expected_revision` out of a body, or say which rule it broke. */

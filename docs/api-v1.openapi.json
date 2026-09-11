@@ -2358,7 +2358,7 @@
           "adjustments"
         ],
         "additionalProperties": false,
-        "description": "revision 是不透明编辑状态版本，覆盖共享关系及成员状态，不含价格/翻译/图片时间。GET adjustments 为空；成功写入可包含裁剪原因。"
+        "description": "revision 是不透明的编辑状态版本。覆盖 name / notes / locked、每张卡的数量与已收集,以及同一共享卡池内其他卡组的同类状态和锁定状态;不含置顶、封面、配色、卡包版本、价格、翻译与图片抓取时间 —— 这些改变不会使一次写入变得不安全,放进去只会制造假冲突。GET 时 adjustments 为空;写入成功时可能带有裁剪原因。"
       },
       "CreateDeck": {
         "type": "object",

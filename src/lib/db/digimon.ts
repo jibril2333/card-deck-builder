@@ -17,7 +17,6 @@ import type { CardRuling } from "./rulings-ddl";
 import type { CardLang } from "../card-lang";
 import { splitSetNames } from "../card-sets";
 
-
 const db = () => getDB("digimon");
 
 export type DigimonSearchRow = DigimonCard & {
@@ -352,6 +351,7 @@ export const {
   groupMemberDeckIds,
   decksSharingPoolWith,
   pooledOwnedForCard,
+  pooledOwnedForCards,
   maxNeedForCard,
   reconcilePoolCard,
   deckRevisionState,
@@ -457,7 +457,6 @@ export function updateDeckMeta(
 // ────────────────────────────────────────────────────────────────────────
 // Card collection (per-user, per-variant ownership ledger)
 // ────────────────────────────────────────────────────────────────────────
-
 
 function getCardCollectionQty(
   currentUserId: string,
@@ -982,7 +981,7 @@ export type DeckRestrictionIssue =
     };
 
 /**
- * Which cards in a deck the CURRENT banlist disagrees with.
+ * Which cards in these decks the CURRENT banlist disagrees with.
  *
  * Read-only, and reported rather than corrected. `clampQuantityToRestriction`
  * already caps quantities as they're written, but it only runs on a write — a
@@ -993,89 +992,89 @@ export type DeckRestrictionIssue =
  * Digimon's identity is the card code itself (alt-art printings live in
  * `card_images`, not as separate `cards` rows — 4404 rows, 4404 distinct
  * codes), so a row-by-row comparison is the whole check.
- */
-export function deckRestrictionIssues(deckId: string): DeckRestrictionIssue[] {
-  const over = db()
-    .prepare(
-      `SELECT dc.card_id, c.code, c.name, dc.quantity, r.max_count, r.status
-         FROM user.deck_cards dc
-         JOIN cards c ON c.id = dc.card_id
-         JOIN card_restrictions r
-           ON r.source = 'digimon' AND r.identity = c.code
-        WHERE dc.deck_id = ? AND dc.quantity > r.max_count
-        ORDER BY r.max_count, c.code`,
-    )
-    .all(deckId) as Omit<
-    Extract<DeckRestrictionIssue, { kind: "over_limit" }>,
-    "kind"
-  >[];
-
-  // Both halves of a banned pair present in the same deck. Reported against
-  // the BANNED card rather than the trigger: the trigger is legal on its own,
-  // and it's the other one you'd take out.
-  const pairs = db()
-    .prepare(
-      `SELECT cb.id AS card_id, cb.code, cb.name,
-              ca.code AS with_code, ca.name AS with_name
-         FROM banned_pairs p
-         JOIN cards ca ON ca.code = p.trigger_identity
-         JOIN cards cb ON cb.code = p.banned_identity
-         JOIN user.deck_cards da ON da.deck_id = ? AND da.card_id = ca.id
-         JOIN user.deck_cards dbc ON dbc.deck_id = da.deck_id AND dbc.card_id = cb.id
-        WHERE p.source = 'digimon'
-        ORDER BY cb.code`,
-    )
-    .all(deckId) as Omit<
-    Extract<DeckRestrictionIssue, { kind: "pair" }>,
-    "kind"
-  >[];
-
-  return [
-    ...over.map((o) => ({ kind: "over_limit" as const, ...o })),
-    ...pairs.map((p) => ({ kind: "pair" as const, ...p })),
-  ];
-}
-
-/**
- * How many issues each of many decks has, in one query.
  *
- * The deck list renders 48 tiles; asking per deck would be 48 round trips to
- * decide whether to draw a dot.
+ * Batched over decks because both callers are lists: the deck grid renders 48
+ * tiles and the native API's deck list returns every readable deck, and
+ * asking per deck is 96 round trips to draw one page.
  */
-export function deckIssueCounts(deckIds: string[]): Map<string, number> {
-  const out = new Map<string, number>();
+export function deckRestrictionIssuesFor(
+  deckIds: string[],
+): Map<string, DeckRestrictionIssue[]> {
+  const out = new Map<string, DeckRestrictionIssue[]>();
+  for (const id of deckIds) out.set(id, []);
   if (deckIds.length === 0) return out;
-  for (const id of deckIds) out.set(id, 0);
 
   for (let i = 0; i < deckIds.length; i += 400) {
     const chunk = deckIds.slice(i, i + 400);
     const ph = chunk.map(() => "?").join(",");
-    const rows = db()
+
+    const over = db()
       .prepare(
-        `SELECT deck_id, SUM(n) AS n FROM (
-           SELECT dc.deck_id, COUNT(*) AS n
-             FROM user.deck_cards dc
-             JOIN cards c ON c.id = dc.card_id
-             JOIN card_restrictions r
-               ON r.source = 'digimon' AND r.identity = c.code
-            WHERE dc.deck_id IN (${ph}) AND dc.quantity > r.max_count
-            GROUP BY dc.deck_id
-           UNION ALL
-           SELECT da.deck_id, COUNT(*) AS n
-             FROM banned_pairs p
-             JOIN cards ca ON ca.code = p.trigger_identity
-             JOIN cards cb ON cb.code = p.banned_identity
-             JOIN user.deck_cards da ON da.card_id = ca.id
-             JOIN user.deck_cards dbc
-               ON dbc.deck_id = da.deck_id AND dbc.card_id = cb.id
-            WHERE p.source = 'digimon' AND da.deck_id IN (${ph})
-            GROUP BY da.deck_id
-         ) GROUP BY deck_id`,
+        `SELECT dc.deck_id, dc.card_id, c.code, c.name, dc.quantity,
+                r.max_count, r.status
+           FROM user.deck_cards dc
+           JOIN cards c ON c.id = dc.card_id
+           JOIN card_restrictions r
+             ON r.source = 'digimon' AND r.identity = c.code
+          WHERE dc.deck_id IN (${ph}) AND dc.quantity > r.max_count
+          ORDER BY r.max_count, c.code`,
       )
-      .all(...chunk, ...chunk) as { deck_id: string; n: number }[];
-    for (const r of rows) out.set(r.deck_id, r.n);
+      .all(...chunk) as (Omit<
+      Extract<DeckRestrictionIssue, { kind: "over_limit" }>,
+      "kind"
+    > & { deck_id: string })[];
+    for (const { deck_id, ...o } of over) {
+      out.get(deck_id)?.push({ kind: "over_limit", ...o });
+    }
+
+    // Both halves of a banned pair present in the same deck. Reported against
+    // the BANNED card rather than the trigger: the trigger is legal on its
+    // own, and it's the other one you'd take out.
+    const pairs = db()
+      .prepare(
+        `SELECT da.deck_id, cb.id AS card_id, cb.code, cb.name,
+                ca.code AS with_code, ca.name AS with_name
+           FROM banned_pairs p
+           JOIN cards ca ON ca.code = p.trigger_identity
+           JOIN cards cb ON cb.code = p.banned_identity
+           JOIN user.deck_cards da ON da.deck_id IN (${ph}) AND da.card_id = ca.id
+           JOIN user.deck_cards dbc
+             ON dbc.deck_id = da.deck_id AND dbc.card_id = cb.id
+          WHERE p.source = 'digimon'
+          ORDER BY cb.code`,
+      )
+      .all(...chunk) as (Omit<
+      Extract<DeckRestrictionIssue, { kind: "pair" }>,
+      "kind"
+    > & { deck_id: string })[];
+    for (const { deck_id, ...pr } of pairs) {
+      out.get(deck_id)?.push({ kind: "pair", ...pr });
+    }
   }
   return out;
+}
+
+/** One deck's issues — see `deckRestrictionIssuesFor`. */
+export function deckRestrictionIssues(deckId: string): DeckRestrictionIssue[] {
+  return deckRestrictionIssuesFor([deckId]).get(deckId) ?? [];
+}
+
+/**
+ * How many issues each of many decks has.
+ *
+ * The deck list only draws a dot, so it used to run its own COUNT query —
+ * two ways to ask one question, and the row-returning one then grew a second
+ * caller in the API. Counting what the batch read returns keeps the rule in
+ * one place; the rows are the violations themselves, which on a real
+ * database is a handful across every deck.
+ */
+export function deckIssueCounts(deckIds: string[]): Map<string, number> {
+  return new Map(
+    [...deckRestrictionIssuesFor(deckIds)].map(([id, issues]) => [
+      id,
+      issues.length,
+    ]),
+  );
 }
 
 export type JapaneseFacts = {

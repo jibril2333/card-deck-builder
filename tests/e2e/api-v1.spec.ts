@@ -310,6 +310,49 @@ test("a write needs the current revision, and one write invalidates it", async (
   expect((await read.json()).deck.name).toBe("改过的名字");
 });
 
+/**
+ * The version's other half: it must NOT fire on a change no write depends on.
+ *
+ * Pinning is the case that made this a rule. The star lives on the decks
+ * page, the API does not offer pinning at all, and a revision that covered
+ * it meant tidying the deck list in the browser made the phone refuse the
+ * card edit it had already queued. False conflicts are not free: the client
+ * answers them by discarding its state and re-reading.
+ */
+test("a change the API cannot make does not invalidate its revision", async ({
+  page,
+  request,
+}) => {
+  // This deck has to belong to the BROWSER's account: the star is only
+  // drawn on your own decks, and the browser is signed in as the other
+  // fixture user.
+  const token = friendToken();
+  const deck = await makeDeck(request, token, `置顶 ${Date.now()}`);
+
+  // The phone has read the deck. Now the browser pins it — a deck-list
+  // change, not a deck change.
+  await page.goto("/digimon/decks");
+  // The star sits outside the tile's <a>, so the tile carries an aria-label
+  // to scope to — see decks-grid.tsx.
+  const tile = page.getByRole("group", { name: deck.deck.name });
+  await tile.getByTitle("标记为主力卡组").click();
+  await expect(tile.getByTitle("取消主力")).toBeVisible();
+
+  // Same revision, and the write the phone had queued still lands.
+  const reread = await request.get(`/api/v1/decks/${deck.deck.id}`, {
+    headers: auth(token),
+  });
+  expect((await reread.json()).revision).toBe(deck.revision);
+  const queued = await request.put(
+    `/api/v1/decks/${deck.deck.id}/cards/BT1-084`,
+    {
+      headers: auth(token),
+      data: { expected_revision: deck.revision, quantity: 1 },
+    },
+  );
+  expect(queued.status(), await queued.text()).toBe(200);
+});
+
 test("a locked deck refuses edits and can still be unlocked", async ({
   request,
 }) => {

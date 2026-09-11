@@ -317,6 +317,27 @@ export function createPools(db: DbFn) {
     return r.owned;
   }
 
+  /**
+   * The same, for every card in the pool at once.
+   *
+   * The deck detail needs the pool's held count beside each of fifty cards,
+   * and asking per card is fifty statements to answer one question.
+   */
+  function pooledOwnedForCards(deckIds: string[]): Map<string, number> {
+    const out = new Map<string, number>();
+    if (deckIds.length === 0) return out;
+    const rows = db()
+      .prepare(
+        `SELECT card_id, COALESCE(MAX(MIN(purchased, quantity)), 0) AS owned
+           FROM user.deck_cards
+          WHERE deck_id IN (${deckIds.map(() => "?").join(",")})
+          GROUP BY card_id`,
+      )
+      .all(...deckIds) as { card_id: string; owned: number }[];
+    for (const r of rows) out.set(r.card_id, r.owned);
+    return out;
+  }
+
   /** Highest quantity any of the decks runs of a card (the pool's `need`). */
   function maxNeedForCard(deckIds: string[], cardId: string): number {
     if (deckIds.length === 0) return 0;
@@ -411,6 +432,7 @@ export function createPools(db: DbFn) {
     groupMemberDeckIds,
     decksSharingPoolWith,
     pooledOwnedForCard,
+    pooledOwnedForCards,
     maxNeedForCard,
     reconcilePoolCard,
   };

@@ -118,23 +118,33 @@ Four decisions carry the rest of it:
   on its own removes CSRF from this surface outright.
 
 - **`expected_revision` is a hash, not a counter** (`lib/deck-revision.ts`).
-  It covers the deck's editable metadata, every card's quantity and held
-  count, the lock, the pools the deck is in, and the same card/lock state of
-  every deck it shares a pool with; it excludes prices, translations and art
-  timestamps, so the nightly price scrape cannot make an open deck page start
-  refusing edits. Being derived from the rows is what lets it see the
-  WEBSITE's writes — a counter only this API incremented would let the app
-  overwrite a change made in the browser a minute earlier. Not to be confused
-  with `decks.version`, which is a pack code (`BT-26`).
+  Being derived from the rows is what lets it see the WEBSITE's writes — a
+  counter only this API incremented would let the app overwrite a change made
+  in the browser a minute earlier. Not to be confused with `decks.version`,
+  which is a pack code (`BT-26`).
+
+  What it covers is narrow on purpose: **a field belongs in it only if a
+  concurrent change to that field could make the write wrong.** That is
+  name / notes / locked, every card's quantity and held count, and the same
+  card and lock state of every deck sharing a pool with this one. Everything
+  else is out — including `pinned`, which was in the first version and meant
+  that clicking a star in the browser made the phone refuse the card edit it
+  had queued. A field no write depends on prevents no lost update; it only
+  manufactures conflicts, and the client answers a conflict by throwing its
+  state away and re-reading. Prices and translations are out for the loud
+  version of the same argument: the nightly scrape touches thousands of rows.
 
 - **One write path, shared with the website.** `lib/deck-write.ts` holds the
   four deck-card operations and their 共享卡池 consequences; `actions.ts`
   and the routes both call it. A second copy of "a ± moves the POOL's held
   count, then re-levels every member deck capped at its own quantity" is the
   one duplication this codebase cannot afford. The route wraps it in
-  `lib/api/decks.ts`, which does the version check and the change inside ONE
-  SQLite transaction — better-sqlite3 is synchronous, so that is a real
-  critical section as long as nothing inside it awaits.
+  `lib/api/decks.ts`, which puts the version check and the change — and
+  nothing else — inside ONE SQLite transaction. better-sqlite3 is
+  synchronous, so that is a real critical section as long as nothing inside
+  it awaits, and it is also why reading the deck back is left OUTSIDE it:
+  that read is fifty priced rows, and holding a write lock plus the event
+  loop for it on every ± tap bought a promise the client cannot use.
 
 - **Clamps are reported, not silent.** The repo caps a quantity against the
   banlist and writes the capped number; the website's optimistic number just

@@ -246,8 +246,10 @@ function owner(deck: DeckRow, meId: string): Owner {
  * numbers because "this deck has a problem" is not something a reader can
  * act on, and `card_ids` lets the client point at the offending rows.
  */
-function deckIssues(deckId: string): Issue[] {
-  return digimon.deckRestrictionIssues(deckId).map((i) =>
+function issuesFrom(
+  raw: ReturnType<typeof digimon.deckRestrictionIssues>,
+): Issue[] {
+  return raw.map((i) =>
     i.kind === "over_limit"
       ? {
           code: "OVER_LIMIT",
@@ -268,6 +270,7 @@ export function deckSummaries(meId: string): DeckSummary[] {
   const ids = decks.map((d) => d.id);
   const counts = digimon.deckMainEggCounts(ids);
   const missing = digimon.deckMissingCounts(ids);
+  const issues = digimon.deckRestrictionIssuesFor(ids);
   return decks.map((d) => {
     const c = counts.get(d.id) ?? { main: 0, egg: 0 };
     return {
@@ -280,7 +283,7 @@ export function deckSummaries(meId: string): DeckSummary[] {
       main_count: c.main,
       egg_count: c.egg,
       missing_count: missing.get(d.id) ?? 0,
-      issues: deckIssues(d.id),
+      issues: issuesFrom(issues.get(d.id) ?? []),
     };
   });
 }
@@ -319,6 +322,9 @@ export function deckDetail(
     ? digimon.decksSharingPoolWith(deck.user_id, deckId)
     : [];
   const shared = peers.length > 1;
+  const pooledOwned = shared
+    ? digimon.pooledOwnedForCards(peers)
+    : new Map<string, number>();
 
   let mainCount = 0;
   let eggCount = 0;
@@ -343,9 +349,7 @@ export function deckDetail(
       quantity: r.quantity,
       purchased: r.purchased,
       missing,
-      owned_control_value: shared
-        ? digimon.pooledOwnedForCard(peers, r.id)
-        : r.purchased,
+      owned_control_value: shared ? (pooledOwned.get(r.id) ?? 0) : r.purchased,
       shared,
       price_yen: r.price,
       price_source:
@@ -379,7 +383,7 @@ export function deckDetail(
     main_count: mainCount,
     egg_count: eggCount,
     missing_count: missingTotal,
-    issues: deckIssues(deckId),
+    issues: issuesFrom(digimon.deckRestrictionIssues(deckId)),
   };
 
   return {

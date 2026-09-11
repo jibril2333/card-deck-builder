@@ -23,12 +23,6 @@ const base: RevisionState = {
     name: "红混",
     notes: "店赛用",
     locked: false,
-    pinned: true,
-    version: "BT-26",
-    accent_color: "#f59e0b",
-    accent_color2: null,
-    cover_card_id: "c-omni",
-    cover_variant: "",
   },
   cards: [
     { deck_id: "d1", card_id: "c-omni", quantity: 3, purchased: 1 },
@@ -70,11 +64,6 @@ describe("deckRevision", () => {
     ["the note", (s) => (s.deck.notes = "改了")],
     ["a blank note vs no note", (s) => (s.deck.notes = "")],
     ["the lock", (s) => (s.deck.locked = true)],
-    ["the pin", (s) => (s.deck.pinned = false)],
-    ["the pack version", (s) => (s.deck.version = "BT-25")],
-    ["the accent", (s) => (s.deck.accent_color = "#000000")],
-    ["the cover", (s) => (s.deck.cover_card_id = "c-agu")],
-    ["the cover printing", (s) => (s.deck.cover_variant = "_P1")],
     ["a quantity", (s) => (s.cards[0].quantity = 2)],
     ["a held count", (s) => (s.cards[0].purchased = 0)],
     ["a card being removed", (s) => s.cards.splice(1, 1)],
@@ -109,6 +98,26 @@ describe("deckRevision", () => {
       expect(deckRevision(edit(change))).not.toBe(deckRevision(base));
     });
   }
+
+  /**
+   * The other half of the rule: a field the API cannot edit has no business
+   * invalidating a write. `pinned` used to be in here, so a star clicked in
+   * the browser made the phone refuse the card edit it had queued — a
+   * conflict that was not a conflict.
+   *
+   * A pure function cannot be shown to ignore a field it was never given,
+   * so what this pins is the list itself; the behaviour it stands for is
+   * asserted against a real deck in api-v1.spec ("pinning a deck in the
+   * browser does not invalidate the app's revision").
+   */
+  it("covers four deck fields and no more", () => {
+    expect(Object.keys(base.deck).sort()).toEqual([
+      "id",
+      "locked",
+      "name",
+      "notes",
+    ]);
+  });
 
   it("does not collide on a swapped deck id and card id", () => {
     // A naive join of the fields with no separator would hash these two the

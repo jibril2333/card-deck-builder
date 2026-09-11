@@ -25,23 +25,13 @@ export function createRevision(db: DbFn) {
   function deckRevisionState(deckId: string): RevisionState | null {
     const deck = db()
       .prepare(
-        `SELECT id, name, notes, locked, pinned, version,
-                accent_color, accent_color2, cover_card_id, cover_variant
-           FROM user.decks WHERE id = ?`,
+        // Four columns, not the whole row: the version covers what a write
+        // can collide with, and `lib/deck-revision` says why the rest is
+        // deliberately absent.
+        `SELECT id, name, notes, locked FROM user.decks WHERE id = ?`,
       )
       .get(deckId) as
-      | {
-          id: string;
-          name: string;
-          notes: string | null;
-          locked: number;
-          pinned: number;
-          version: string | null;
-          accent_color: string;
-          accent_color2: string | null;
-          cover_card_id: string | null;
-          cover_variant: string | null;
-        }
+      | { id: string; name: string; notes: string | null; locked: number }
       | undefined;
     if (!deck) return null;
 
@@ -81,12 +71,6 @@ export function createRevision(db: DbFn) {
         name: deck.name,
         notes: deck.notes,
         locked: !!deck.locked,
-        pinned: !!deck.pinned,
-        version: deck.version,
-        accent_color: deck.accent_color,
-        accent_color2: deck.accent_color2,
-        cover_card_id: deck.cover_card_id,
-        cover_variant: deck.cover_variant ?? "",
       },
       cards,
       members: members.map((m) => ({

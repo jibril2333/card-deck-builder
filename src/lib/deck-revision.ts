@@ -19,16 +19,25 @@
  *
  * ## What goes in, and what must not
  *
- * In: the deck's editable metadata, its cards' quantities and held counts,
- * the lock flag, which pools it belongs to, and the same card/lock state of
- * every deck it shares a pool with. That last part is not decoration — a held
- * edit re-levels the peers, so a peer's state is genuinely part of what this
- * deck's next write depends on.
+ * The test is narrow on purpose: **a field belongs here only if a concurrent
+ * change to it could make this write wrong.** That is the API's three
+ * editable fields (name, notes, locked), every card's quantity and held
+ * count, and — this is the part that is easy to miss — the same card and
+ * lock state of every deck sharing a pool with this one, because a held edit
+ * re-levels the peers.
  *
- * Out: prices, translations, art, `updated_at`. A price scrape runs nightly
- * and touches thousands of rows; if a quote could invalidate a revision, the
- * reader's open deck page would start refusing edits every night for reasons
- * that have nothing to do with them.
+ * Everything else stays out, and the reason is not thrift. A field in here
+ * that no write depends on does not prevent a lost update; it only produces
+ * conflicts that are not conflicts. `pinned` was the clearest case: the API
+ * does not offer pinning, so including it meant a star clicked in the
+ * browser would make the phone refuse the card edit it had queued —
+ * a false alarm bought with nothing. Cover art, accent colours and the pack
+ * version are the same argument with a lower click rate.
+ *
+ * Prices, translations and art timestamps are out for a louder version of
+ * the same reason: the nightly price scrape touches thousands of rows, and a
+ * quote could otherwise make every open deck page start refusing edits every
+ * night.
  *
  * ## Why it is opaque
  *
@@ -44,12 +53,6 @@ type RevisionDeck = {
   name: string;
   notes: string | null;
   locked: boolean;
-  pinned: boolean;
-  version: string | null;
-  accent_color: string;
-  accent_color2: string | null;
-  cover_card_id: string | null;
-  cover_variant: string;
 };
 
 /** One `deck_cards` row, from this deck or from a pooled peer. */
@@ -92,18 +95,7 @@ function canonical(state: RevisionState): string {
     )
     .map((m) => [m.group_id, m.deck_id, m.locked ? 1 : 0]);
   return JSON.stringify({
-    deck: [
-      d.id,
-      d.name,
-      d.notes ?? "",
-      d.locked ? 1 : 0,
-      d.pinned ? 1 : 0,
-      d.version ?? "",
-      d.accent_color,
-      d.accent_color2 ?? "",
-      d.cover_card_id ?? "",
-      d.cover_variant ?? "",
-    ],
+    deck: [d.id, d.name, d.notes ?? "", d.locked ? 1 : 0],
     cards,
     members,
   });
