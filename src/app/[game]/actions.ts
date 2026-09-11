@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isGameId, type GameId, GAMES } from "@/lib/games";
 import * as digimon from "@/lib/db/digimon";
+import * as deckWrite from "@/lib/deck-write";
 import { buildSetOrder, deckVersionOf } from "@/lib/deck-version";
 import { backupBeforeWrite } from "@/lib/db/connection";
 import { parseDeckText } from "@/lib/deck-formats";
@@ -168,25 +169,13 @@ function bumpGroups(game: GameId, groupId?: string): void {
 }
 
 /**
- * After a card's quantity changes in a pooled deck, make ONLY THAT DECK inherit
- * the pool's existing shared-held count (capped at its own quantity), so a
- * freshly-added copy shows as already-owned. We deliberately do NOT reconcile
- * the other member decks here: a quantity edit must never change how many
- * copies you physically hold, so it must never lower a sibling deck's held.
- * (Held only changes via explicit held edits — purchase mode ± / the pool
- * stepper, which DO reconcile the whole pool.) No-op for non-pooled decks.
+ * A pooled write bleeds outside this deck — every member deck's held count
+ * can move — so the whole game segment is revalidated rather than one page.
+ * See lib/deck-write for the rules themselves.
  */
-function syncPoolForCard(
-  game: GameId,
-  userId: string,
-  deckId: string,
-  cardId: string,
-): boolean {
-  const peers = digimon.decksSharingPoolWith(userId, deckId);
-  if (peers.length <= 1) return false;
-  const owned = digimon.pooledOwnedForCard(peers, cardId);
-  digimon.reconcilePoolCard([deckId], cardId, owned);
-  return true;
+function bumpWrite(game: GameId, deckId: string, r: { pooled: boolean }): void {
+  if (r.pooled) bumpGame(game);
+  else bumpDeck(game, deckId);
 }
 
 export const createGroupAction = formAction(
@@ -265,10 +254,8 @@ export const adjustDeckCardAction = formAction(
   { deck_id: field.id, card_id: field.id, delta: field.step },
   async ({ me, game, input }) => {
     const { deck_id: deckId, card_id: cardId } = input;
-    digimon.adjustDeckCard(me.id, deckId, cardId, input.delta);
-    // Pooled deck: a card just added/resized should inherit the pool's held.
-    if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
-    else bumpDeck(game, deckId);
+    const r = deckWrite.adjustCardQuantity(me.id, deckId, cardId, input.delta);
+    bumpWrite(game, deckId, r);
   },
 );
 
@@ -538,9 +525,8 @@ export const setDeckCardQuantityAction = formAction(
   { deck_id: field.id, card_id: field.id, quantity: field.count },
   async ({ me, game, input }) => {
     const { deck_id: deckId, card_id: cardId } = input;
-    digimon.setDeckCardQuantity(me.id, deckId, cardId, input.quantity);
-    if (syncPoolForCard(game, me.id, deckId, cardId)) bumpGame(game);
-    else bumpDeck(game, deckId);
+    const r = deckWrite.setCardQuantity(me.id, deckId, cardId, input.quantity);
+    bumpWrite(game, deckId, r);
   },
 );
 
@@ -548,22 +534,8 @@ export const adjustDeckCardPurchasedAction = formAction(
   { deck_id: field.id, card_id: field.id, delta: field.step },
   async ({ me, game, input }) => {
     const { deck_id: deckId, card_id: cardId, delta } = input;
-    // Pooled deck: ±1 adjusts the SHARED held count (max across the pool),
-    // then re-applies it to every member deck (each capped at its own
-    // quantity).
-    const peers = digimon.decksSharingPoolWith(me.id, deckId);
-    if (peers.length > 1) {
-      const cur = digimon.pooledOwnedForCard(peers, cardId);
-      const owned = Math.min(
-        Math.max(0, cur + delta),
-        digimon.maxNeedForCard(peers, cardId),
-      );
-      digimon.reconcilePoolCard(peers, cardId, owned);
-      bumpGame(game);
-    } else {
-      digimon.adjustDeckCardPurchased(me.id, deckId, cardId, delta);
-      bumpDeck(game, deckId);
-    }
+    const r = deckWrite.adjustCardPurchased(me.id, deckId, cardId, delta);
+    bumpWrite(game, deckId, r);
   },
 );
 
@@ -841,18 +813,8 @@ export const setDeckCardPurchasedAction = formAction(
   { deck_id: field.id, card_id: field.id, purchased: field.count },
   async ({ me, game, input }) => {
     const { deck_id: deckId, card_id: cardId, purchased } = input;
-    // If this deck shares a pool, held is a shared count — set it for the
-    // whole pool (each deck capped at its own quantity). Otherwise just this
-    // deck.
-    const peers = digimon.decksSharingPoolWith(me.id, deckId);
-    if (peers.length > 1) {
-      const owned = Math.min(purchased, digimon.maxNeedForCard(peers, cardId));
-      digimon.reconcilePoolCard(peers, cardId, owned);
-      bumpGame(game);
-    } else {
-      digimon.setDeckCardPurchased(me.id, deckId, cardId, purchased);
-      bumpDeck(game, deckId);
-    }
+    const r = deckWrite.setCardPurchased(me.id, deckId, cardId, purchased);
+    bumpWrite(game, deckId, r);
   },
 );
 

@@ -11,22 +11,23 @@ import {
 } from "./repo";
 import { clearSessionCookie, setSessionCookie } from "./session";
 import {
+  addressFrom,
   checkLogin,
   describeWait,
   recordFailure,
   recordSuccess,
 } from "./throttle";
 
-export type AuthResult =
-  | { ok: true }
-  | { ok: false; error: string };
+export type AuthResult = { ok: true } | { ok: false; error: string };
 
 // ────────────────────────────────────────────────────────────────────────
 // Register
 // ────────────────────────────────────────────────────────────────────────
 
 export async function registerAction(formData: FormData): Promise<AuthResult> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
   const password = String(formData.get("password") ?? "");
   const displayName = String(formData.get("display_name") ?? "").trim();
   const inviteCode = String(formData.get("invite") ?? "").trim();
@@ -111,17 +112,10 @@ export async function loginAction(formData: FormData): Promise<AuthResult> {
   return { ok: true };
 }
 
-/**
- * The client's address as the tunnel reports it.
- *
- * Everything arrives from Cloudflare, so the socket's peer is useless; the
- * forwarded headers are what carry the caller. Missing headers collapse
- * everyone into one bucket, which throttles too much rather than too little.
- */
+/** The client's address as the tunnel reports it — see throttle.addressFrom. */
 async function clientAddress(): Promise<string> {
   const h = await headers();
-  const forwarded = h.get("cf-connecting-ip") ?? h.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || "unknown";
+  return addressFrom((name) => h.get(name));
 }
 
 // ────────────────────────────────────────────────────────────────────────

@@ -96,6 +96,70 @@ pure pieces (query building, field parsing, diffing, keyword derivation),
 that needs an e2e edited is not a refactor**. Unit tests may change — they test
 implementations. e2e must not — it tests what the app does.
 
+## The native API (`/api/v1`)
+
+A second client — an iOS app, in its own repository — reads and writes the
+same decks as the website. The contract lives HERE, as
+`docs/api-v1.openapi.json`, and the client builds against a copy of it; two
+repositories editing one contract is how the two halves stop agreeing.
+
+Eight endpoints: `/meta`, `/session` (POST/GET/DELETE), `/cards`,
+`/cards/{id}`, `/decks` (GET/POST), `/decks/{id}` (GET/PATCH),
+`/decks/{id}/cards/{card_id}` (PUT), `/decks/{id}/export`. Everything except
+`/meta` and the login needs `Authorization: Bearer <token>`.
+
+Four decisions carry the rest of it:
+
+- **The token is a `user.sessions` row** — the same table the website's
+  cookie points into, created by the same `createSession`. No app account
+  table, no second password store; `DELETE /session` removes that one row, so
+  signing out on the phone leaves the browser signed in. The cookie is
+  deliberately NOT accepted: requiring a header the browser will not attach
+  on its own removes CSRF from this surface outright.
+
+- **`expected_revision` is a hash, not a counter** (`lib/deck-revision.ts`).
+  It covers the deck's editable metadata, every card's quantity and held
+  count, the lock, the pools the deck is in, and the same card/lock state of
+  every deck it shares a pool with; it excludes prices, translations and art
+  timestamps, so the nightly price scrape cannot make an open deck page start
+  refusing edits. Being derived from the rows is what lets it see the
+  WEBSITE's writes — a counter only this API incremented would let the app
+  overwrite a change made in the browser a minute earlier. Not to be confused
+  with `decks.version`, which is a pack code (`BT-26`).
+
+- **One write path, shared with the website.** `lib/deck-write.ts` holds the
+  four deck-card operations and their 共享卡池 consequences; `actions.ts`
+  and the routes both call it. A second copy of "a ± moves the POOL's held
+  count, then re-levels every member deck capped at its own quantity" is the
+  one duplication this codebase cannot afford. The route wraps it in
+  `lib/api/decks.ts`, which does the version check and the change inside ONE
+  SQLite transaction — better-sqlite3 is synchronous, so that is a real
+  critical section as long as nothing inside it awaits.
+
+- **Clamps are reported, not silent.** The repo caps a quantity against the
+  banlist and writes the capped number; the website's optimistic number just
+  snaps back, which a phone cannot show. Every write answers with the whole
+  deck plus `adjustments` — `COPY_LIMIT` / `BANNED_PAIR` / `HELD_CAPPED`,
+  each with `requested`, `actual` and a sentence to display.
+
+`POST /decks` takes the new deck's UUID from the client (`client_request_id`)
+and returns 201 once, then 200 with the same deck for every retry. A phone
+that loses the response cannot otherwise tell "created" from "not created",
+and both blind recoveries are wrong.
+
+`tests/e2e/api-v1.spec.ts` drives all of this over HTTP, including a test
+that every response's keys match the published schema exactly — a contract
+document that drifts from the server is worse than none.
+`tests/e2e/api-v1-pool.spec.ts` makes a pool in the browser and edits it over
+HTTP, which is the actual arrangement and also proves the two surfaces share
+one implementation.
+
+**Cloudflare stands in front of this.** The tunnel's bot protection answers
+non-browser requests with a 1010 challenge page, which reaches the client as
+HTML where JSON was expected. `/api/v1/*` needs a WAF skip rule in the
+Cloudflare dashboard before a phone on mobile data can reach it; nothing in
+this repository can do that.
+
 ## Refreshing card data
 
 **Go through the daemon — don't run scrapers by hand against a live DB.** It

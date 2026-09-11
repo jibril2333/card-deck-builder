@@ -83,10 +83,13 @@ export function getCardTranslation(
 export function getDisplayTranslations(
   codes: string[],
   lang: CardLang,
-): Map<string, { name: string | null; image_url: string | null }> {
+): Map<
+  string,
+  { name: string | null; image_url: string | null; card_type: string | null }
+> {
   const out = new Map<
     string,
-    { name: string | null; image_url: string | null }
+    { name: string | null; image_url: string | null; card_type: string | null }
   >();
   if (lang === "en" || codes.length === 0) return out;
   const unique = [...new Set(codes)];
@@ -95,16 +98,23 @@ export function getDisplayTranslations(
     const chunk = unique.slice(i, i + 500);
     const rows = db()
       .prepare(
-        `SELECT code, name, image_url FROM card_translations
+        // `card_type` rides along for the native API, which sends the
+        // displayed type beside the canonical one. The grids ignore it.
+        `SELECT code, name, image_url, card_type FROM card_translations
          WHERE lang = ? AND code IN (${chunk.map(() => "?").join(",")})`,
       )
       .all(lang, ...chunk) as {
       code: string;
       name: string | null;
       image_url: string | null;
+      card_type: string | null;
     }[];
     for (const r of rows)
-      out.set(r.code, { name: r.name, image_url: r.image_url });
+      out.set(r.code, {
+        name: r.name,
+        image_url: r.image_url,
+        card_type: r.card_type,
+      });
   }
   return out;
 }
@@ -303,6 +313,7 @@ export function distinctNumbers(col: keyof DigimonCard): number[] {
 const deckRepo = createDeckRepo(db);
 
 export const {
+  getDeckWithCover,
   listDecks,
   listDecksWithCover,
   reorderDecks,
@@ -320,15 +331,16 @@ export const {
   getCompletedDeckIds,
   getDeck,
   getDeckCards,
+  getDeckCardCounts,
   getCardPrice,
   setCardPrice,
   deleteDeck,
   setDeckCardQuantity,
   setDeckCardPurchased,
   adjustDeckCardPurchased,
-  adjustDeckCard,
   listRestrictions,
   listBannedPairs,
+  explainQuantityCap,
   listGroups,
   getGroup,
   createGroup,
@@ -342,6 +354,7 @@ export const {
   pooledOwnedForCard,
   maxNeedForCard,
   reconcilePoolCard,
+  deckRevisionState,
 } = deckRepo;
 
 export function createDeck(input: {
@@ -352,8 +365,17 @@ export function createDeck(input: {
   accent_color2?: string | null;
   /** Serialized `ImportReport` — only the importer sets this. */
   import_report?: string | null;
+  /**
+   * The new deck's id, when the CALLER has one to give.
+   *
+   * The native API's create is idempotent: the client generates a UUID, and
+   * a retry after a lost response has to land on the same deck rather than
+   * make a second one. That only works if the id comes from the request.
+   * Everything else keeps generating its own.
+   */
+  id?: string;
 }): string {
-  const id = crypto.randomUUID();
+  const id = input.id ?? crypto.randomUUID();
   db()
     .prepare(
       `INSERT INTO user.decks (id, name, notes, accent_color, accent_color2, user_id, import_report)
@@ -754,6 +776,35 @@ export function deckMainEggCounts(
       )
       .all(...chunk) as { deck_id: string; egg: number; main: number }[];
     for (const r of rows) out.set(r.deck_id, { main: r.main, egg: r.egg });
+  }
+  return out;
+}
+
+/**
+ * Copies still to buy, per deck: `quantity - min(purchased, quantity)` summed.
+ *
+ * Its own query rather than a column on `deckMainEggCounts` because the two
+ * answer different questions and not every caller wants both — the deck grid
+ * needs the legality counts on every tile, the native API's deck list needs
+ * this as well. `min` caps a stale over-purchase so a deck that once ran four
+ * copies and now runs two cannot report negative shopping.
+ */
+export function deckMissingCounts(deckIds: string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const id of deckIds) out.set(id, 0);
+  if (deckIds.length === 0) return out;
+  for (let i = 0; i < deckIds.length; i += 500) {
+    const chunk = deckIds.slice(i, i + 500);
+    const rows = db()
+      .prepare(
+        `SELECT deck_id,
+                COALESCE(SUM(quantity - MIN(purchased, quantity)), 0) AS missing
+           FROM user.deck_cards
+          WHERE deck_id IN (${chunk.map(() => "?").join(",")})
+          GROUP BY deck_id`,
+      )
+      .all(...chunk) as { deck_id: string; missing: number }[];
+    for (const r of rows) out.set(r.deck_id, r.missing);
   }
   return out;
 }

@@ -159,11 +159,30 @@ export function createRestrictions(db: DbFn) {
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
-  function clampQuantityToRestriction(
+  /**
+   * The clamp, with its reasoning kept rather than thrown away.
+   *
+   * `clampQuantityToRestriction` is this function's `.allowed`, and the two
+   * must never diverge — the website silently writes the clamped number,
+   * while the native API has to tell the reader WHY the number it asked for
+   * is not the number it got (「限 1 张,已保留 1 张」). One implementation,
+   * two readings of the same result.
+   */
+  function explainQuantityCap(
     deckId: string,
     cardId: string,
     requested: number,
-  ): number {
+  ): {
+    /** What the deck may hold of this card right now. */
+    allowed: number;
+    /** The cap the limit is expressed as, before other copies are counted. */
+    cap: number;
+    /** Why `allowed` is below `requested`, or null when it is not. */
+    reason:
+      "banned" | "banned_pair" | "limited" | "self_limit" | "standard" | null;
+    /** The other card that outlaws this one, for `banned_pair`. */
+    conflictsWith: string[];
+  } {
     const standardMax = 4;
     const restriction = getRestrictionFor(cardId);
     // A banlist entry always wins: an official restriction on one of these
@@ -192,15 +211,49 @@ export function createRestrictions(db: DbFn) {
     }
     const allowed = Math.max(0, cap - otherSum);
     const capped = Math.min(requested, allowed);
-    if (capped <= 0) return 0;
+    const why = restriction
+      ? cap === 0
+        ? ("banned" as const)
+        : ("limited" as const)
+      : selfLimit !== null
+        ? ("self_limit" as const)
+        : ("standard" as const);
+    if (capped <= 0) {
+      return {
+        allowed: 0,
+        cap,
+        reason: requested > 0 ? why : null,
+        conflictsWith: [],
+      };
+    }
 
     // Banned-pair check is independent of cap. Only matters when the
     // caller wants quantity > 0; if they're zeroing the card out we let
     // the removal proceed.
     const pairConflicts = findBannedPairConflicts(deckId, cardId);
-    if (pairConflicts.length > 0) return 0;
+    if (pairConflicts.length > 0) {
+      return {
+        allowed: 0,
+        cap,
+        reason: "banned_pair",
+        conflictsWith: pairConflicts,
+      };
+    }
 
-    return capped;
+    return {
+      allowed: capped,
+      cap,
+      reason: capped < requested ? why : null,
+      conflictsWith: [],
+    };
+  }
+
+  function clampQuantityToRestriction(
+    deckId: string,
+    cardId: string,
+    requested: number,
+  ): number {
+    return explainQuantityCap(deckId, cardId, requested).allowed;
   }
 
   /**
@@ -298,6 +351,7 @@ export function createRestrictions(db: DbFn) {
     selfDeclaredCopyLimit,
     listRestrictions,
     listBannedPairs,
+    explainQuantityCap,
     clampQuantityToRestriction,
   };
 }

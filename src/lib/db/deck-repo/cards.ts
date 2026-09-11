@@ -97,6 +97,28 @@ export function createCards(
       .all(deckId, deckId, deckId) as DeckCardRow[];
   }
 
+  /**
+   * One deck-card row's two numbers.
+   *
+   * `getDeckCards` answers this too, but it is the most expensive query in
+   * the app — eight correlated subqueries per row for the two shops' prices —
+   * and a write path that only needs "what does it hold now" should not pay
+   * for the whole deck's pricing to find out.
+   */
+  function getDeckCardCounts(
+    deckId: string,
+    cardId: string,
+  ): { quantity: number; purchased: number } {
+    const row = db()
+      .prepare(
+        `SELECT quantity, purchased FROM user.deck_cards
+          WHERE deck_id = ? AND card_id = ?`,
+      )
+      .get(deckId, cardId) as
+      { quantity: number; purchased: number } | undefined;
+    return row ?? { quantity: 0, purchased: 0 };
+  }
+
   function deckCardCount(deckId: string): number {
     const r = db()
       .prepare(
@@ -199,32 +221,12 @@ export function createCards(
     return next;
   }
 
-  function adjustDeckCard(
-    currentUserId: string,
-    deckId: string,
-    cardId: string,
-    delta: number,
-  ): number {
-    assertUnlocked(deckId);
-    const cur =
-      (
-        db()
-          .prepare(
-            `SELECT quantity FROM user.deck_cards WHERE deck_id = ? AND card_id = ?`,
-          )
-          .get(deckId, cardId) as { quantity: number } | undefined
-      )?.quantity ?? 0;
-    const next = Math.max(0, cur + delta);
-    setDeckCardQuantity(currentUserId, deckId, cardId, next);
-    return next;
-  }
-
   return {
     getDeckCards,
+    getDeckCardCounts,
     deckCardCount,
     setDeckCardQuantity,
     setDeckCardPurchased,
     adjustDeckCardPurchased,
-    adjustDeckCard,
   };
 }

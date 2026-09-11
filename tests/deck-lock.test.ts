@@ -15,6 +15,10 @@ import { seedDigimonDb, seedUserDb } from "./e2e/fixtures/seed";
  * `db/digimon.ts` directly, in a child process against throwaway databases,
  * with no browser and no Server Action in between — if the gate were only in
  * the components, every expectation here would fail.
+ *
+ * `lib/deck-write` is in here too: it is the layer the website's actions and
+ * the native API both write through, so a lock that the repo enforces but
+ * that layer routes around would be a hole in both at once.
  */
 const ROOT = process.cwd();
 let dir: string;
@@ -25,6 +29,7 @@ async function repo(body: string): Promise<Record<string, unknown>> {
   fs.writeFileSync(
     script,
     `import * as digimon from "${ROOT}/src/lib/db/digimon";
+     import * as deckWrite from "${ROOT}/src/lib/deck-write";
      import { DeckLockedError } from "${ROOT}/src/lib/db/deck-shared";
      const out: Record<string, unknown> = {};
      const attempt = (name: string, fn: () => void) => {
@@ -65,7 +70,7 @@ describe("a locked deck", () => {
       digimon.setDeckLocked("u1", deckId, true);
 
       attempt("addCard",   () => digimon.setDeckCardQuantity("u1", deckId, "BT1-085", 1));
-      attempt("adjust",    () => digimon.adjustDeckCard("u1", deckId, "BT1-084", 1));
+      attempt("adjust",    () => deckWrite.adjustCardQuantity("u1", deckId, "BT1-084", 1));
       attempt("purchased", () => digimon.setDeckCardPurchased("u1", deckId, "BT1-084", 1));
       attempt("rename",    () => digimon.updateDeckMeta("u1", deckId, { name: "改名" }));
       attempt("version",   () => digimon.updateDeckMeta("u1", deckId, { version: "BT-26" }));
