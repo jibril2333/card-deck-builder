@@ -5,9 +5,10 @@
  * (`--set=EX12`), which means a new set only lands in the app once someone
  * notices it exists — BT26 had been out for a while with zero cards in the DB
  * before this script was written. This one asks digimoncard.io for its whole
- * catalogue (an empty `n=` query returns all ~9.7k rows in a single response —
- * no cap, no pagination), diffs it against `cards`, and reports/imports
- * whatever is new. Run it on a schedule and new sets import themselves.
+ * catalogue in a single response (no cap, no pagination — see
+ * `fetchCatalogue` for the query that selects it), diffs it against `cards`,
+ * and reports/imports whatever is new. Run it on a schedule and new sets
+ * import themselves.
  *
  * Two safety properties matter here:
  *
@@ -61,8 +62,17 @@ const DB_PATH = path.join(
  * If the API ever returns a short list (outage, upstream regression), importing
  * it is harmless — we only insert — but the *report* would be misleading and a
  * scheduled run would look like it succeeded. Bail loudly instead.
+ *
+ * Counted in distinct MODERN codes, after de-duplication — not in raw rows.
+ * The floor used to be 5000 rows, set when the response repeated every card
+ * once per printing (~9.7k rows). Since 2026-09 the API returns one row per
+ * id: 5085 rows, of which 618 are the 1999-era games `MODERN_CODE` discards.
+ * A row floor would then sit 85 above the day's count, so upstream pruning
+ * those legacy lines — which would lose us nothing — would read as a partial
+ * catalogue and fail the whole refresh. What a partial response actually
+ * threatens is modern cards: 4467 of them that day.
  */
-const MIN_EXPECTED_ROWS = 5000;
+const MIN_EXPECTED_MODERN = 4000;
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
@@ -81,14 +91,7 @@ async function main() {
     { script: "sync-cards", done: 1, total: 3, note: `整理 ${all.length} 行` },
     true,
   );
-  if (all.length < MIN_EXPECTED_ROWS) {
-    throw new Error(
-      `only ${all.length} rows (expected ≥${MIN_EXPECTED_ROWS}) — refusing to ` +
-        `treat a partial catalogue as authoritative`,
-    );
-  }
-
-  // Rows repeat per printing with identical values; collapse by id.
+  // Rows may repeat per printing with identical values; collapse by id.
   const byCode = new Map<string, ApiCard>();
   for (const c of all) {
     const id = c?.id;
@@ -152,6 +155,12 @@ async function main() {
     `[sync] ${byCode.size} distinct modern-DCG codes ` +
       `(${new Set(all.map((c) => c?.id).filter(Boolean)).size - byCode.size} legacy/other filtered out)`,
   );
+  if (byCode.size < MIN_EXPECTED_MODERN) {
+    throw new Error(
+      `only ${byCode.size} modern codes (expected ≥${MIN_EXPECTED_MODERN}) — ` +
+        `refusing to treat a partial catalogue as authoritative`,
+    );
+  }
 
   const db = new Database(DB_PATH);
   try {

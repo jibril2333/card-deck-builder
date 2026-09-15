@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { toCardRow, type ApiCard } from "@/lib/scraper/digimoncardio";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  fetchCatalogue,
+  toCardRow,
+  type ApiCard,
+} from "@/lib/scraper/digimoncardio";
 
 /**
  * digimoncard.io returns ONE "second effect block" per card and leaves it to
@@ -193,5 +197,76 @@ describe("toCardRow files an ACE card's Overflow as a special rule", () => {
     );
     expect(r.inherited_effect).toBe("[Your Turn] +1000 DP.");
     expect(r.special_rule).toBe("");
+  });
+});
+
+describe("toCardRow keeps every trait", () => {
+  it("includes the fifth trait the API added in 2026-09", () => {
+    // Nine EX12 cards carry one — EX12-047 is Shaman / … / Shambala / TB —
+    // and the mapping stopped at the fourth, dropping it without a trace.
+    const r = toCardRow(
+      api({
+        digi_type: "Shaman",
+        digi_type2: "Mage",
+        digi_type3: "Ancient",
+        digi_type4: "Shambala",
+        digi_type5: "TB",
+      }),
+    );
+    expect(r.digi_types).toBe("Shaman / Mage / Ancient / Shambala / TB");
+  });
+
+  it("still maps a row captured before the field existed", () => {
+    const r = toCardRow(api({ digi_type: "Dragon" }));
+    expect(r.digi_types).toBe("Dragon");
+  });
+});
+
+/**
+ * The query the whole-catalogue sync sends.
+ *
+ * An empty `n=` returned every card until 2026-09-11, when the API began
+ * answering it with 422 and the nightly refresh failed at its first stage for
+ * five days running. Nothing in the response gave it away beforehand, so the
+ * only defence is to never send one.
+ */
+describe("fetchCatalogue", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function sentQueries(): string[] {
+    const sent: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL) => {
+        sent.push(new URL(String(url)).searchParams.get("n") ?? "<absent>");
+        return new Response("[]", {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+    return sent;
+  }
+
+  it("never sends a blank n — asks for everything with a hyphen instead", async () => {
+    const sent = sentQueries();
+    await fetchCatalogue();
+    await fetchCatalogue("");
+    await fetchCatalogue("   ");
+    expect(sent).toEqual(["-", "-", "-"]);
+  });
+
+  it("passes a real query through untouched", async () => {
+    const sent = sentQueries();
+    await fetchCatalogue("EX12");
+    expect(sent).toEqual(["EX12"]);
+  });
+
+  it("reports the status when the API refuses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}", { status: 422 })),
+    );
+    await expect(fetchCatalogue()).rejects.toThrow("digimoncard.io HTTP 422");
   });
 });

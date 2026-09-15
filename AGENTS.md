@@ -115,8 +115,13 @@ Stages: `cards` (discover/import new cards) · `text` (zh+ja) · `art` (en+ja al
 arts) · `rulings` · `prices` · `restrictions`.
 
 `scripts/sync-cards.ts` is what makes new sets appear on their own: it diffs
-digimoncard.io's entire catalogue (empty `n=` query → all ~9.7k rows, no cap or
-pagination) against `cards`. `MODERN_CODE` in
+digimoncard.io's entire catalogue (one response, no cap or pagination) against
+`cards`. The query that selects everything is `n=-` — every card id contains a
+hyphen. It used to be an empty `n=`, until the API began answering that with
+422 on 2026-09-11 and five nightly refreshes died at their first stage. The
+sanity floor counts distinct modern codes, not rows, for the same reason: the
+response stopped repeating each card per printing at the same time, and a row
+floor written against ~9.7k rows sat 85 above the new count. `MODERN_CODE` in
 `src/lib/scraper/digimoncardio.ts` keeps out the 1999-era Bandai games the same
 API serves (`BO-`, `DD-`, `DV-`, `MD-`, `MO-`, `DM-`, bare `ST-`).
 

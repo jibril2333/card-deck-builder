@@ -27,6 +27,9 @@ export type ApiCard = {
   digi_type2: string | null;
   digi_type3: string | null;
   digi_type4: string | null;
+  /** Added upstream in 2026-09; nine EX12 cards carry a fifth trait. Optional
+   *  because rows captured before then have no such key at all. */
+  digi_type5?: string | null;
   form: string | null;
   dp: number | null;
   attribute: string | null;
@@ -42,22 +45,38 @@ export type ApiCard = {
 };
 
 /**
- * Fetch from the API. `query` is the fuzzy `n=` search; an EMPTY query returns
- * the ENTIRE catalogue (~9.7k rows) in one response — there is no result cap
- * and no pagination, which is what makes whole-catalogue diffing practical.
+ * The query that returns the whole catalogue.
  *
- * Rows are NOT unique by id: every alternate printing of a card comes back as
- * its own row with identical field values, so de-duplicating by id (or letting
- * the upsert collapse them) is safe and order-independent.
+ * Until 2026-09-11 that was an EMPTY `n=`; the API now answers it with 422
+ * "The n field must have a value", and five nightly refreshes failed at their
+ * first stage before anyone read why. `n` is matched against the card id as
+ * well as the name, and every id contains a hyphen, so `-` selects every row:
+ * measured the day the change landed, it returned 5085 rows covering all 4397
+ * modern codes the database already held, with none missing.
+ *
+ * `%` and `_` return the same rows, but only because the API passes them
+ * through to a SQL LIKE unescaped — a bug on their side that could be fixed
+ * at any time. A hyphen in every card id is a property of the data.
+ */
+const FULL_CATALOGUE_QUERY = "-";
+
+/**
+ * Fetch from the API. `query` is the fuzzy `n=` search, matched against name
+ * and id; omitted or blank, it asks for the entire catalogue in one response —
+ * there is no result cap and no pagination, which is what makes
+ * whole-catalogue diffing practical.
+ *
+ * Rows used to repeat per alternate printing with identical values; since
+ * the 2026-09 change they come back one per id. De-duplicating by id stays
+ * in the callers either way — it is safe and order-independent.
  */
 export async function fetchCatalogue(query = ""): Promise<ApiCard[]> {
-  const res = await fetch(
-    `${DIGIMONCARDIO_API}?n=${encodeURIComponent(query)}`,
-    {
-      headers: { "user-agent": UA },
-      redirect: "follow",
-    },
-  );
+  // A blank `n` is a 422 now, not "everything" — never send one.
+  const n = query.trim() || FULL_CATALOGUE_QUERY;
+  const res = await fetch(`${DIGIMONCARDIO_API}?n=${encodeURIComponent(n)}`, {
+    headers: { "user-agent": UA },
+    redirect: "follow",
+  });
   if (!res.ok) throw new Error(`digimoncard.io HTTP ${res.status}`);
   const rows = (await res.json()) as ApiCard[];
   if (!Array.isArray(rows))
@@ -241,7 +260,13 @@ export function toCardRow(c: ApiCard): CardRow {
     attribute: c.attribute ?? "",
     form: c.form ?? "",
     stage: c.stage ?? "",
-    digi_types: [c.digi_type, c.digi_type2, c.digi_type3, c.digi_type4]
+    digi_types: [
+      c.digi_type,
+      c.digi_type2,
+      c.digi_type3,
+      c.digi_type4,
+      c.digi_type5,
+    ]
       .filter((t) => t && t.trim())
       .join(" / "),
     evolution_cost: evoCost,
