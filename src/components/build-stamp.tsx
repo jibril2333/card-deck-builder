@@ -1,4 +1,8 @@
+"use client";
+
 import type { BuildInfo } from "@/lib/build-info";
+import { INTL_LOCALE } from "@/lib/i18n/locale";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * The running build, at the bottom of the sidebar under everything else.
@@ -13,8 +17,9 @@ import type { BuildInfo } from "@/lib/build-info";
  * server wrapper (components/sidebar.tsx).
  */
 export function BuildStamp({ info: b }: { info: BuildInfo }) {
+  const { locale, m } = useI18n();
   const date = b.builtAt
-    ? new Date(b.builtAt).toLocaleDateString("zh-CN", {
+    ? new Date(b.builtAt).toLocaleDateString(INTL_LOCALE[locale], {
         month: "numeric",
         day: "numeric",
         timeZone: "Asia/Tokyo",
@@ -31,7 +36,7 @@ export function BuildStamp({ info: b }: { info: BuildInfo }) {
   if (!b.url) {
     return (
       <div className="px-1 text-[10px] text-[var(--color-muted-fg)]/70">
-        开发版
+        {m.nav.devBuild}
       </div>
     );
   }
@@ -40,7 +45,7 @@ export function BuildStamp({ info: b }: { info: BuildInfo }) {
       href={b.url}
       target="_blank"
       rel="noreferrer"
-      title={`版本 ${b.sha}${b.builtAt ? ` · 构建于 ${b.builtAt}` : ""}`}
+      title={m.nav.buildTitle(b.sha ?? "", b.builtAt ?? null)}
       className="px-1 text-[10px] text-[var(--color-muted-fg)]/70 hover:text-[var(--color-fg)] transition-colors"
     >
       {text}

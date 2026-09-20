@@ -1,3 +1,5 @@
+import { getMessages } from "@/lib/i18n/server";
+
 type StatBar = { label: string; value: number; color?: string };
 export type StatPanel = { title: string; bars: StatBar[] };
 
@@ -9,12 +11,13 @@ export type StatPanel = { title: string; bars: StatBar[] };
  * carry the same information in a fraction of the height and read fine at
  * 300px wide, so the panel can live beside the deck instead of below it.
  */
-export function DeckStats({ panels }: { panels: StatPanel[] }) {
+export async function DeckStats({ panels }: { panels: StatPanel[] }) {
+  const m = await getMessages();
   const nonEmpty = panels.filter((p) => p.bars.length > 0);
   if (nonEmpty.length === 0) return null;
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-4">
-      <h2 className="text-sm font-semibold">卡组分布</h2>
+      <h2 className="text-sm font-semibold">{m.deckCards.distribution}</h2>
       {nonEmpty.map((p) => (
         <Panel key={p.title} panel={p} />
       ))}

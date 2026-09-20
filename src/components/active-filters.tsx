@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { colorHex } from "@/lib/games";
 import { splitTerms } from "@/lib/search-terms";
+import { useI18n } from "@/lib/i18n/client";
 
 export type ChipSpec =
   | {
@@ -29,6 +30,7 @@ export function ActiveFilters({
   basePath: string;
   specs: ChipSpec[];
 }) {
+  const { m } = useI18n();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -159,7 +161,7 @@ export function ActiveFilters({
           key: `sort=${raw}`,
           node: (
             <>
-              <span className="opacity-70">排序:</span> {label} {dir}
+              <span className="opacity-70">{m.filters.sortPrefix}</span> {label} {dir}
             </>
           ),
           onRemove: () => removeKeys(spec.key),

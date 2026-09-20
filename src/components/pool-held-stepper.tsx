@@ -3,6 +3,7 @@
 import { useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setPoolCardOwnedAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * +/- stepper for a card's SHARED held count in a pool. Writing here sets the
@@ -22,6 +23,7 @@ export function PoolHeldStepper({
   owned: number;
   need: number;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useOptimistic(owned);
@@ -49,7 +51,7 @@ export function PoolHeldStepper({
         onClick={() => set(optimistic - 1)}
         disabled={optimistic <= 0}
         className="w-6 h-6 rounded border border-[var(--color-border)] text-sm leading-none disabled:opacity-30 hover:bg-[var(--color-muted)] cursor-pointer"
-        aria-label="少一张"
+        aria-label={m.pool.minusOne}
       >
         −
       </button>
@@ -65,7 +67,7 @@ export function PoolHeldStepper({
         onClick={() => set(optimistic + 1)}
         disabled={full}
         className="w-6 h-6 rounded border border-[var(--color-border)] text-sm leading-none disabled:opacity-30 hover:bg-[var(--color-muted)] cursor-pointer"
-        aria-label="多一张"
+        aria-label={m.pool.plusOne}
       >
         ＋
       </button>

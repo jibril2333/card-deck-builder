@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * The search filters, which are a sidebar on a desktop and a bottom sheet on a
@@ -30,6 +31,7 @@ export function FilterPanel({
   activeCount: number;
   children: React.ReactNode;
 }) {
+  const { m } = useI18n();
   const [open, setOpen] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
 
@@ -135,7 +137,7 @@ export function FilterPanel({
         className="hidden narrow:flex w-full h-10 mb-3 px-3 rounded-md border border-[var(--color-border)] bg-[var(--color-card)] items-center justify-between text-sm cursor-pointer"
       >
         <span className="flex items-center gap-2 font-medium">
-          🔍 筛选
+          {m.filters.filterButton}
           {activeCount > 0 ? (
             <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-xs font-bold">
               {activeCount}
@@ -150,7 +152,7 @@ export function FilterPanel({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="筛选"
+        aria-label={m.filters.filter}
         aria-expanded={open}
         className="hidden touch:flex fixed right-4 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-40 w-13 h-13 rounded-full bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-xl shadow-lg items-center justify-center cursor-pointer"
       >

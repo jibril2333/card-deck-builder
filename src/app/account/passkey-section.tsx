@@ -9,6 +9,7 @@ import {
   deletePasskeyAction,
   finishRegisterPasskeyAction,
 } from "@/lib/auth/passkey-actions";
+import { useI18n } from "@/lib/i18n/client";
 
 type PasskeyRow = {
   id: string;
@@ -34,6 +35,7 @@ export function PasskeySection({
 }: {
   credentials: PasskeyRow[];
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -58,11 +60,11 @@ export function PasskeySection({
         router.refresh();
       });
     } catch (e) {
-      const msg = (e as Error).message ?? "Passkey 注册失败";
+      const msg = (e as Error).message ?? m.account.passkeyRegisterFailed;
       // Browsers throw "NotAllowedError" when the user cancels — don't
       // make that look like a real error.
       if (msg.includes("NotAllowedError") || msg.includes("aborted")) {
-        setError("已取消");
+        setError(m.account.cancelled);
       } else {
         setError(msg);
       }
@@ -70,7 +72,7 @@ export function PasskeySection({
   }
 
   async function remove(id: string) {
-    if (!confirm("确认删除这个 Passkey?之后必须用其它方式登录。")) return;
+    if (!confirm(m.account.confirmDeletePasskey)) return;
     startTransition(async () => {
       await deletePasskeyAction(id);
       router.refresh();
@@ -80,7 +82,7 @@ export function PasskeySection({
   return (
     <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3">
       <div>
-        <h2 className="text-sm font-semibold">Passkey 登录</h2>
+        <h2 className="text-sm font-semibold">{m.account.passkeyHeading}</h2>
       </div>
 
       <div className="flex gap-2 items-end">
@@ -89,20 +91,20 @@ export function PasskeySection({
             htmlFor="passkey-label"
             className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)] block mb-1"
           >
-            名称(可选)
+            {m.account.nameOptional}
           </label>
           <input
             id="passkey-label"
             type="text"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="如:Mac Touch ID / iPhone"
+            placeholder={m.account.passkeyNamePlaceholder}
             maxLength={40}
             className="w-full h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
           />
         </div>
         <Button onClick={enroll} disabled={pending}>
-          {pending ? "处理中…" : "＋ 添加 Passkey"}
+          {pending ? m.account.working : m.account.addPasskey}
         </Button>
       </div>
 
@@ -114,7 +116,7 @@ export function PasskeySection({
 
       {credentials.length === 0 ? (
         <div className="text-sm text-[var(--color-muted-fg)] py-4 text-center border border-dashed border-[var(--color-border)] rounded-md">
-          暂无 Passkey。
+          {m.account.noPasskeys}
         </div>
       ) : (
         <ul className="divide-y divide-[var(--color-border)] border-y border-[var(--color-border)] -mx-5">
@@ -126,14 +128,14 @@ export function PasskeySection({
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">{c.label}</div>
                 <div className="text-[10px] text-[var(--color-muted-fg)] tabular-nums">
-                  添加于 {c.created_at.slice(0, 10)}
+                  {m.account.addedOn(c.created_at.slice(0, 10))}
                   {c.last_used_at ? (
                     <>
                       {" "}
-                      · 上次使用 {c.last_used_at.slice(0, 10)}
+                      {m.account.lastUsed(c.last_used_at.slice(0, 10))}
                     </>
                   ) : (
-                    " · 未使用"
+                    m.account.neverUsed
                   )}
                 </div>
               </div>
@@ -143,7 +145,7 @@ export function PasskeySection({
                 disabled={pending}
                 className="shrink-0 text-xs text-red-600 hover:text-red-700 dark:text-red-400 disabled:opacity-50 cursor-pointer"
               >
-                删除
+                {m.account.delete}
               </button>
             </li>
           ))}

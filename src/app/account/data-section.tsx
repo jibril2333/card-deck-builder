@@ -3,10 +3,11 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  describeExport,
+  exportCounts,
   isUserExport,
   type ImportReport,
 } from "@/lib/user-data";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Carry this account's work to another install of the app, or keep a copy.
@@ -32,6 +33,7 @@ import {
  * "does what's arriving look like what left?"
  */
 export function DataSection({ mine }: { mine: string }) {
+  const { m } = useI18n();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<{
@@ -53,10 +55,10 @@ export function DataSection({ mine }: { mine: string }) {
     try {
       const parsed = JSON.parse(text);
       if (!isUserExport(parsed)) throw new Error("not an export");
-      setFile({ name: f.name, text, summary: describeExport(parsed) });
+      setFile({ name: f.name, text, summary: m.account.counts(exportCounts(parsed)) });
     } catch {
       setFile(null);
-      setMsg({ ok: false, text: "这个文件不是本站导出的数据" });
+      setMsg({ ok: false, text: m.account.notAnExport });
     }
   }
 
@@ -79,12 +81,12 @@ export function DataSection({ mine }: { mine: string }) {
         body: JSON.stringify({ data: JSON.parse(file.text), replace }),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) throw new Error(j.error ?? "导入失败");
+      if (!r.ok || !j.ok) throw new Error(j.error ?? m.account.importFailed);
       // Order matters: clear() resets the message along with the picked file,
       // so the result has to be set after it, not before.
       clear();
       setReport(j.report as ImportReport);
-      setMsg({ ok: true, text: "导入完成" });
+      setMsg({ ok: true, text: m.account.importDone });
       router.refresh();
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
@@ -98,10 +100,10 @@ export function DataSection({ mine }: { mine: string }) {
 
   return (
     <section
-      aria-label="数据搬运"
+      aria-label={m.account.dataHeading}
       className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3"
     >
-      <h2 className="text-sm font-semibold">数据搬运</h2>
+      <h2 className="text-sm font-semibold">{m.account.dataHeading}</h2>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <a
@@ -112,7 +114,7 @@ export function DataSection({ mine }: { mine: string }) {
           <span aria-hidden className="text-lg leading-none">
             ⇣
           </span>
-          导出
+          {m.account.export}
           <span className="text-xs text-[var(--color-muted-fg)]">{mine}</span>
         </a>
 
@@ -154,7 +156,7 @@ export function DataSection({ mine }: { mine: string }) {
               <span aria-hidden className="text-lg leading-none">
                 ⇡
               </span>
-              导入
+              {m.account.import}
             </>
           )}
         </label>
@@ -172,7 +174,7 @@ export function DataSection({ mine }: { mine: string }) {
                 : "bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
             }`}
           >
-            {busy ? "导入中…" : replace ? "清空并导入" : "合并导入"}
+            {busy ? m.account.importing : replace ? m.account.replaceImport : m.account.mergeImport}
           </button>
           {/* The consequence is carried by the button, which renders 合并导入
               or 清空并导入 depending on this box. */}
@@ -182,14 +184,14 @@ export function DataSection({ mine }: { mine: string }) {
               checked={replace}
               onChange={(e) => setReplace(e.target.checked)}
             />
-            先清空本站数据
+            {m.account.clearFirst}
           </label>
           <button
             type="button"
             onClick={clear}
             className="ml-auto h-8 px-2 rounded-md text-xs text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:bg-[var(--color-muted)] cursor-pointer"
           >
-            取消
+            {m.account.cancel}
           </button>
         </div>
       ) : null}
@@ -208,17 +210,13 @@ export function DataSection({ mine }: { mine: string }) {
       {report ? (
         <div className="text-xs text-[var(--color-muted-fg)] space-y-1">
           <div>
-            卡组 +{report.decks.created}
-            {report.decks.updated
-              ? ` · 更新 ${report.decks.updated}`
-              : ""} · {report.cards} 条卡片记录
-            {report.groups ? ` · ${report.groups} 个卡池` : ""}
-            {report.collection ? ` · ${report.collection} 条收藏` : ""}
-            {report.prices ? ` · ${report.prices} 条价格` : ""}
+            {m.account.reportDecks(report.decks.created, report.decks.updated)}
+            {" · "}
+            {m.account.reportRest(report)}
           </div>
           {report.missingCards.length ? (
             <div className="text-amber-600 dark:text-amber-400">
-              本站没有的卡 {report.missingCards.length}:{" "}
+              {m.account.missingCards(report.missingCards.length)}{" "}
               <span className="font-mono">
                 {report.missingCards.slice(0, 8).join(" ")}
                 {report.missingCards.length > 8 ? " …" : ""}
@@ -227,7 +225,7 @@ export function DataSection({ mine }: { mine: string }) {
           ) : null}
           {report.conflicts.length ? (
             <div className="text-amber-600 dark:text-amber-400">
-              属于别的账号,已跳过:{report.conflicts.join("、")}
+              {m.account.conflicts(report.conflicts)}
             </div>
           ) : null}
         </div>

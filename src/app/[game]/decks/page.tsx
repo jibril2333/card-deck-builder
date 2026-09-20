@@ -1,14 +1,14 @@
 import { ScrollMemory } from "@/components/scroll-memory";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { isGameId, GAMES } from "@/lib/games";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { getLocale } from "@/lib/i18n/server";
 import { DecksToolbar } from "@/components/decks-toolbar";
 import { DecksGrid } from "@/components/decks-grid";
 import { GroupsStrip } from "@/components/groups-strip";
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import { deckIsComplete } from "@/lib/deck-legality";
+import { getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,7 @@ export default async function DecksPage({
 }: {
   params: Promise<{ game: string }>;
 }) {
+  const m = await getMessages();
   // Anon users see the page in read-only mode. `me === null` cascades into:
   //   - empty `completedDeckIds` (no ✓ tick anywhere)
   //   - every `mine` flag false (no draggable reorder, no edit tools)
@@ -65,9 +66,7 @@ export default async function DecksPage({
   // list here as well; it moved to the deck page, where it loads the one deck
   // you picked.
   const lib = digimon;
-  const cardLang = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
+  const cardLang = await getLocale();
   const deckCardLists = decks
     .filter((d) => d.mine && d.pinned)
     .map((d) => ({
@@ -118,7 +117,7 @@ export default async function DecksPage({
         ) : (
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold">
-              卡组浏览{" "}
+              {m.decks.browseTitle}{" "}
               <span className="text-[var(--color-muted-fg)] font-normal text-sm">
                 ({decks.length})
               </span>
@@ -127,7 +126,7 @@ export default async function DecksPage({
               href={`/login?next=/${game}/decks`}
               className="text-xs text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] underline"
             >
-              登录后可创建 / 编辑
+              {m.decks.loginToEdit}
             </a>
           </div>
         )}
@@ -138,7 +137,7 @@ export default async function DecksPage({
 
         {decks.length === 0 ? (
           <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">
-            暂无卡组
+            {m.decks.noDecks}
           </div>
         ) : (
           <>
@@ -185,13 +184,13 @@ export default async function DecksPage({
                       <section className="mb-6">
                         <header className="flex items-baseline justify-between mb-2">
                           <h2 className="text-sm font-semibold text-[var(--color-accent)] uppercase tracking-wide">
-                            ★ 主力卡组{" "}
+                            {m.decks.pinned}{" "}
                             <span className="text-[var(--color-muted-fg)] font-normal normal-case">
                               ({mineDecks.filter((d) => d.pinned).length})
                             </span>
                           </h2>
                           <span className="text-[11px] text-[var(--color-muted-fg)]">
-                            提示：拖动封面可调整顺序 · 点 ★ 取消
+                            {m.decks.tipPinned}
                           </span>
                         </header>
                         <DecksGrid
@@ -205,7 +204,7 @@ export default async function DecksPage({
                         <section className="mb-6">
                           <header className="mb-2">
                             <h2 className="text-sm font-semibold text-[var(--color-muted-fg)] uppercase tracking-wide">
-                              其他卡组{" "}
+                              {m.decks.others}{" "}
                               <span className="text-[var(--color-muted-fg)] font-normal normal-case">
                                 ({mineDecks.filter((d) => !d.pinned).length})
                               </span>
@@ -224,14 +223,14 @@ export default async function DecksPage({
                     <section className="mb-6">
                       <header className="flex items-baseline justify-between mb-2">
                         <h2 className="text-sm font-semibold text-[var(--color-muted-fg)] uppercase tracking-wide">
-                          我的卡组{" "}
+                          {m.decks.mine}{" "}
                           <span className="text-[var(--color-muted-fg)] font-normal normal-case">
                             ({mineDecks.length})
                           </span>
                         </h2>
                         {mineDecks.length > 1 ? (
                           <span className="text-[11px] text-[var(--color-muted-fg)]">
-                            提示：拖动封面可调整顺序 · 点 ★ 标为主力
+                            {m.decks.tipMine}
                           </span>
                         ) : null}
                       </header>
@@ -252,9 +251,9 @@ export default async function DecksPage({
                     >
                       <header className="mb-2">
                         <h2 className="text-sm font-semibold text-[var(--color-muted-fg)] uppercase tracking-wide">
-                          朋友的卡组{" "}
+                          {m.decks.friends}{" "}
                           <span className="text-[var(--color-muted-fg)] font-normal normal-case">
-                            ({otherDecks.length}) · 只能浏览
+                            {m.decks.friendsCount(otherDecks.length)}
                           </span>
                         </h2>
                       </header>
@@ -269,7 +268,7 @@ export default async function DecksPage({
                     <section className="mb-6 pt-6 border-t border-[var(--color-border)]">
                       <header className="mb-2">
                         <h2 className="text-sm font-semibold text-[var(--color-muted-fg)] uppercase tracking-wide">
-                          封存{" "}
+                          {m.decks.archived}{" "}
                           <span className="font-normal normal-case">
                             ({legacyDecks.length})
                           </span>

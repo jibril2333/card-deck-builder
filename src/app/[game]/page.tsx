@@ -1,8 +1,7 @@
 import { Pagination } from "@/components/pagination";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { isGameId } from "@/lib/games";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { getLocale } from "@/lib/i18n/server";
 import {
   pickStr,
   pickList,
@@ -16,6 +15,7 @@ import { FilterForm, type FilterField } from "@/components/filter-form";
 import { FilterPanel } from "@/components/filter-panel";
 import { ActiveFilters, type ChipSpec } from "@/components/active-filters";
 import * as digimon from "@/lib/db/digimon";
+import { getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +28,10 @@ export default async function CardsPage({
   params: Promise<{ game: string }>;
   searchParams: Promise<SearchParamsRecord>;
 }) {
+  const m = await getMessages();
   const { game } = await params;
   if (!isGameId(game)) notFound();
-  const cardLang = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
+  const cardLang = await getLocale();
   const sp = await searchParams;
   const page = Math.max(1, pickNum(sp, "page") ?? 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -57,23 +56,23 @@ export default async function CardsPage({
     {
       type: "search",
       key: "q",
-      label: "关键词",
-      placeholder: "名称 / 编号 · 空格分词",
+      label: m.filters.keyword,
+      placeholder: m.filters.keywordPlaceholder,
       wideKey: "q_all",
-      wideLabel: "同时搜索效果和特征",
+      wideLabel: m.filters.searchEffectsAndTraits,
     },
     {
       type: "multi",
       key: "color",
-      label: "颜色",
+      label: m.filters.color,
       options: colors,
       colorChips: true,
       maxSelect: 2,
     },
-    { type: "multi", key: "card_type", label: "类型", options: types },
-    { type: "multi", key: "rarity", label: "稀有度", options: rarities },
-    { type: "range", key: "level", label: "等级", options: levels },
-    { type: "range", key: "play_cost", label: "费用", options: playCosts },
+    { type: "multi", key: "card_type", label: m.filters.type, options: types },
+    { type: "multi", key: "rarity", label: m.filters.rarity, options: rarities },
+    { type: "range", key: "level", label: m.filters.level, options: levels },
+    { type: "range", key: "play_cost", label: m.filters.cost, options: playCosts },
     {
       type: "range",
       key: "dp",
@@ -83,35 +82,35 @@ export default async function CardsPage({
     {
       type: "boolean",
       key: "has_inherited",
-      label: "只看有继承效果的卡",
+      label: m.filters.onlyInherited,
     },
     {
       type: "boolean",
       key: "has_security",
-      label: "只看有安全区效果的卡",
+      label: m.filters.onlySecurity,
     },
     {
       type: "boolean",
       key: "show_alt_arts",
-      label: "异画各版本单独显示",
+      label: m.filters.altArtsSeparate,
     },
     {
       type: "group",
       key: "more",
-      label: "更多筛选",
+      label: m.filters.moreFilters,
       fields: [
         { type: "multi", key: "form", label: "Form", options: forms },
         { type: "multi", key: "stage", label: "Stage", options: stages },
         {
           type: "multi",
           key: "attribute",
-          label: "属性",
+          label: m.filters.attribute,
           options: attributes,
         },
         {
           type: "multi-scroll",
           key: "set",
-          label: "卡包 / Card Set",
+          label: m.filters.cardSetLong,
           options: setNames,
         },
       ],
@@ -119,46 +118,46 @@ export default async function CardsPage({
   ];
 
   const sortOptions: { value: string; label: string }[] = [
-    { value: "code", label: "编号 ↑" },
-    { value: "-code", label: "编号 ↓" },
-    { value: "name", label: "名称 ↑" },
-    { value: "-name", label: "名称 ↓" },
-    { value: "level", label: "等级 ↑" },
-    { value: "-level", label: "等级 ↓" },
-    { value: "play_cost", label: "费用 ↑" },
-    { value: "-play_cost", label: "费用 ↓" },
+    { value: "code", label: `${m.filters.code} ↑` },
+    { value: "-code", label: `${m.filters.code} ↓` },
+    { value: "name", label: `${m.filters.name} ↑` },
+    { value: "-name", label: `${m.filters.name} ↓` },
+    { value: "level", label: `${m.filters.level} ↑` },
+    { value: "-level", label: `${m.filters.level} ↓` },
+    { value: "play_cost", label: `${m.filters.cost} ↑` },
+    { value: "-play_cost", label: `${m.filters.cost} ↓` },
     { value: "dp", label: "DP ↑" },
     { value: "-dp", label: "DP ↓" },
   ];
 
   const chipSpecs: ChipSpec[] = [
-    { kind: "terms", key: "q", label: "关键词" },
-    { kind: "list", key: "color", label: "颜色", colorChips: true },
-    { kind: "list", key: "card_type", label: "类型" },
-    { kind: "list", key: "rarity", label: "稀有度" },
-    { kind: "range", minKey: "level_min", maxKey: "level_max", label: "等级" },
+    { kind: "terms", key: "q", label: m.filters.keyword },
+    { kind: "list", key: "color", label: m.filters.color, colorChips: true },
+    { kind: "list", key: "card_type", label: m.filters.type },
+    { kind: "list", key: "rarity", label: m.filters.rarity },
+    { kind: "range", minKey: "level_min", maxKey: "level_max", label: m.filters.level },
     {
       kind: "range",
       minKey: "play_cost_min",
       maxKey: "play_cost_max",
-      label: "费用",
+      label: m.filters.cost,
     },
     { kind: "range", minKey: "dp_min", maxKey: "dp_max", label: "DP" },
-    { kind: "bool", key: "has_inherited", label: "有继承效果" },
-    { kind: "bool", key: "has_security", label: "有安全区效果" },
-    { kind: "bool", key: "show_alt_arts", label: "异画单列" },
+    { kind: "bool", key: "has_inherited", label: m.filters.hasInherited },
+    { kind: "bool", key: "has_security", label: m.filters.hasSecurity },
+    { kind: "bool", key: "show_alt_arts", label: m.filters.altArtsChip },
     { kind: "list", key: "form", label: "Form" },
     { kind: "list", key: "stage", label: "Stage" },
-    { kind: "list", key: "attribute", label: "属性" },
-    { kind: "list", key: "set", label: "卡包" },
+    { kind: "list", key: "attribute", label: m.filters.attribute },
+    { kind: "list", key: "set", label: m.filters.cardSet },
     {
       kind: "sort",
       key: "sort",
       labelMap: {
-        code: "编号",
-        name: "名称",
-        level: "等级",
-        play_cost: "费用",
+        code: m.filters.code,
+        name: m.filters.name,
+        level: m.filters.level,
+        play_cost: m.filters.cost,
         dp: "DP",
       },
     },
@@ -247,13 +246,13 @@ export default async function CardsPage({
         <section className="min-w-0">
           <div className="flex items-baseline justify-between mb-3">
             <h1 className="text-lg font-semibold">
-              卡牌检索{" "}
+              {m.search.title}{" "}
               <span className="text-[var(--color-muted-fg)] font-normal text-sm">
-                {total.toLocaleString()} 张
+                {m.search.cards(total)}
               </span>
             </h1>
             <div className="text-xs text-[var(--color-muted-fg)]">
-              第 {page} / {totalPages} 页
+              {m.search.pageOf(page, totalPages)}
             </div>
           </div>
 
@@ -261,7 +260,7 @@ export default async function CardsPage({
 
           {rows.length === 0 ? (
             <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">
-              没有符合条件的卡牌
+              {m.search.noResults}
             </div>
           ) : (
             <div className="card-grid">

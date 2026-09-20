@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 export type Variant = {
   variant: string; // "" for base, "_P1" etc for parallels
@@ -10,8 +11,6 @@ export type Variant = {
   /** Language of the artwork itself, when known ("en" | "zh" | "ja"). */
   lang?: string;
 };
-
-const LANG_TAG: Record<string, string> = { en: "EN", zh: "中", ja: "日" };
 
 /**
  * Big card image with a thumbnail strip below for switching between variants.
@@ -32,6 +31,7 @@ export function CardImageGallery({
   /** Reader's card language — used to flag art that isn't in it. */
   cardLang?: string;
 }) {
+  const { m } = useI18n();
   const initial = defaultVariant
     ? Math.max(
         0,
@@ -55,7 +55,7 @@ export function CardImageGallery({
       <button
         type="button"
         onClick={() => setLightboxOpen(true)}
-        aria-label={`查看大图：${name}`}
+        aria-label={m.card.viewLarge(name)}
         /* w-full (not just `block`): a <button> sizes to fit-content by
            default, and on iOS Safari `display:block` doesn't override that.
            Without an explicit width the box collapses to ~0 until the image
@@ -69,14 +69,16 @@ export function CardImageGallery({
       {variants.length > 1 ? (
         <div>
           <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)] mb-1">
-            异画 ({variants.length} 个版本)
+            {m.card.altArts(variants.length)}
             {/* The CN/JP cardlists lag behind on alt arts, so we fall back to
                 the English scans. Say so rather than silently mixing them. */}
             {cardLang && variants.some((v) => v.lang && v.lang !== cardLang) ? (
               <span className="ml-1 normal-case opacity-80">
-                · 部分为{LANG_TAG[
-                  variants.find((v) => v.lang && v.lang !== cardLang)!.lang!
-                ] ?? "其他语言"}卡面
+                {m.card.partlyForeignArt(
+                  m.card.artLangTag[
+                    variants.find((v) => v.lang && v.lang !== cardLang)!.lang!
+                  ] ?? m.card.otherLanguage,
+                )}
               </span>
             ) : null}
           </div>
@@ -89,8 +91,8 @@ export function CardImageGallery({
               const isBase = !v.variant || v.variant.startsWith("lang-");
               const chip =
                 v.label ??
-                (isBase ? "原" : v.variant.replace("_", "")) +
-                  (foreign ? ` ${LANG_TAG[v.lang!] ?? v.lang}` : "");
+                (isBase ? m.card.baseShort : v.variant.replace("_", "")) +
+                  (foreign ? ` ${m.card.artLangTag[v.lang!] ?? v.lang}` : "");
               return (
                 <button
                   key={`${v.image_url}-${i}`}
@@ -101,7 +103,7 @@ export function CardImageGallery({
                       ? "border-[var(--color-accent)] ring-2 ring-[var(--color-accent)]/40"
                       : "border-[var(--color-border)] hover:border-[var(--color-fg)] opacity-70 hover:opacity-100"
                   }`}
-                  title={v.label ?? (v.variant ? `Parallel ${v.variant}` : "原版")}
+                  title={v.label ?? (v.variant ? `Parallel ${v.variant}` : m.card.baseVersion)}
                 >
                   <img
                     src={v.image_url}
@@ -151,6 +153,7 @@ function Lightbox({
   onChange: (next: number) => void;
   onClose: () => void;
 }) {
+  const { m } = useI18n();
   const cur = variants[activeIndex];
   const multi = variants.length > 1;
 
@@ -178,13 +181,13 @@ function Lightbox({
   }, [activeIndex, multi, variants.length, onChange, onClose]);
 
   const chip =
-    cur.label ?? (cur.variant ? cur.variant.replace("_", "") : "原版");
+    cur.label ?? (cur.variant ? cur.variant.replace("_", "") : m.card.baseVersion);
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`大图：${name}`}
+      aria-label={m.card.largeImage(name)}
       onClick={onClose}
       className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
     >
@@ -195,7 +198,7 @@ function Lightbox({
           e.stopPropagation();
           onClose();
         }}
-        aria-label="关闭"
+        aria-label={m.nav.close}
         className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl leading-none flex items-center justify-center cursor-pointer transition-colors"
       >
         ×
@@ -210,7 +213,7 @@ function Lightbox({
               e.stopPropagation();
               onChange((activeIndex - 1 + variants.length) % variants.length);
             }}
-            aria-label="上一个异画版本"
+            aria-label={m.card.prevArt}
             className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl leading-none flex items-center justify-center cursor-pointer transition-colors"
           >
             ‹
@@ -221,7 +224,7 @@ function Lightbox({
               e.stopPropagation();
               onChange((activeIndex + 1) % variants.length);
             }}
-            aria-label="下一个异画版本"
+            aria-label={m.card.nextArt}
             className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl leading-none flex items-center justify-center cursor-pointer transition-colors"
           >
             ›

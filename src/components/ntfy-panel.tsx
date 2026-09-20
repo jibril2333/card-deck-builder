@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 type View = {
   enabled: boolean;
@@ -24,6 +25,7 @@ type View = {
  * not "what you typed would have worked".
  */
 export function NtfyPanel() {
+  const { m } = useI18n();
   const [cfg, setCfg] = useState<View | null>(null);
   const [url, setUrl] = useState("");
   const [topic, setTopic] = useState("");
@@ -43,11 +45,13 @@ export function NtfyPanel() {
         if (!alive) return;
         apply(j.config);
       })
-      .catch(() => alive && setMsg({ ok: false, text: "读取配置失败" }));
+      .catch(() => alive && setMsg({ ok: false, text: m.admin.readConfigFailed }));
     return () => {
       alive = false;
     };
-  }, []);
+    // `m` is memoised per language by the provider — this re-reads only
+    // when the reader switches language.
+  }, [m]);
 
   function apply(v: View) {
     setCfg(v);
@@ -77,9 +81,9 @@ export function NtfyPanel() {
         body: JSON.stringify({ enabled, url, topic, token }),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) throw new Error(j.error ?? "保存失败");
+      if (!r.ok || !j.ok) throw new Error(j.error ?? m.admin.saveFailed);
       apply(j.config);
-      setMsg({ ok: true, text: "已保存" });
+      setMsg({ ok: true, text: m.admin.saved });
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -93,10 +97,10 @@ export function NtfyPanel() {
     try {
       const r = await fetch("/api/admin/ntfy/test", { method: "POST" });
       const j = await r.json();
-      if (!j.ok) throw new Error(j.error ?? "发送失败");
-      setMsg({ ok: true, text: "已发出 —— 手机上应该收到「测试通知」" });
+      if (!j.ok) throw new Error(j.error ?? m.admin.sendFailed);
+      setMsg({ ok: true, text: m.admin.testSent });
     } catch (e) {
-      setMsg({ ok: false, text: `发送失败:${(e as Error).message}` });
+      setMsg({ ok: false, text: m.admin.sendFailedWith((e as Error).message) });
     } finally {
       setBusy(false);
     }
@@ -109,15 +113,15 @@ export function NtfyPanel() {
 
   return (
     <section
-      aria-label="更新通知"
+      aria-label={m.admin.ntfyAria}
       className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3"
     >
       <div className="flex items-baseline gap-2 flex-wrap">
-        <h2 className="text-sm font-semibold">更新通知 (ntfy)</h2>
+        <h2 className="text-sm font-semibold">{m.admin.ntfyTitle}</h2>
       </div>
 
       {!cfg ? (
-        <div className="text-xs text-[var(--color-muted-fg)]">读取中…</div>
+        <div className="text-xs text-[var(--color-muted-fg)]">{m.admin.loading}</div>
       ) : (
         <>
           <label className="flex items-center gap-2 text-sm cursor-pointer w-fit">
@@ -126,13 +130,13 @@ export function NtfyPanel() {
               checked={enabled}
               onChange={(e) => edit(setEnabled)(e.target.checked)}
             />
-            启用
+            {m.admin.enable}
           </label>
 
           <div className="grid gap-2 sm:grid-cols-[1fr_10rem]">
             <label className="space-y-1">
               <div className="text-xs text-[var(--color-muted-fg)]">
-                服务器地址
+                {m.admin.serverUrl}
               </div>
               <input
                 className={field}
@@ -145,7 +149,7 @@ export function NtfyPanel() {
             </label>
             <label className="space-y-1">
               <div className="text-xs text-[var(--color-muted-fg)]">
-                订阅主题 (topic)
+                {m.admin.topic}
               </div>
               <input
                 className={field}
@@ -158,7 +162,7 @@ export function NtfyPanel() {
           </div>
 
           <div className="space-y-1">
-            <div className="text-xs text-[var(--color-muted-fg)]">令牌 (token)</div>
+            <div className="text-xs text-[var(--color-muted-fg)]">{m.admin.token}</div>
             {cfg.tokenSet && !editingToken ? (
               // A saved secret is SHOWN, masked, rather than replaced by an
               // empty box that silently means "keep the old one". An empty
@@ -180,7 +184,7 @@ export function NtfyPanel() {
                   }}
                   className={`${btn} shrink-0 border border-[var(--color-border)] hover:bg-[var(--color-muted)]`}
                 >
-                  更换
+                  {m.admin.replace}
                 </button>
               </div>
             ) : (
@@ -205,7 +209,7 @@ export function NtfyPanel() {
                     }}
                     className={`${btn} shrink-0 border border-[var(--color-border)] hover:bg-[var(--color-muted)]`}
                   >
-                    取消
+                    {m.admin.cancel}
                   </button>
                 ) : null}
               </div>
@@ -219,7 +223,7 @@ export function NtfyPanel() {
               disabled={busy}
               className={`${btn} bg-[var(--color-accent)] text-[var(--color-accent-fg)]`}
             >
-              保存
+              {m.admin.save}
             </button>
             <button
               type="button"
@@ -229,14 +233,14 @@ export function NtfyPanel() {
               disabled={busy || dirty || !cfg.ready}
               title={
                 dirty
-                  ? "先保存再测试"
+                  ? m.admin.testSaveFirst
                   : !cfg.ready
-                    ? "地址、主题、令牌都填好并启用后才能测试"
-                    : "发一条测试通知"
+                    ? m.admin.testNeedAll
+                    : m.admin.testSendHint
               }
               className={`${btn} border border-[var(--color-border)] hover:bg-[var(--color-muted)]`}
             >
-              发送测试通知
+              {m.admin.sendTest}
             </button>
             {msg ? (
               <span

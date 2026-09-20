@@ -1,6 +1,5 @@
-import { cookies } from "next/headers";
 import { isAdmin } from "@/lib/auth/admin";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { getLocale } from "@/lib/i18n/server";
 import { listRefreshChanges, listRefreshRuns } from "@/lib/db/digimon";
 
 /**
@@ -18,7 +17,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   if (!(await isAdmin())) return new Response("forbidden", { status: 403 });
   const params = new URL(req.url).searchParams;
-  const lang = parseCardLang((await cookies()).get(CARD_LANG_COOKIE)?.value);
+  const lang = await getLocale();
 
   const run = params.get("run");
   if (run) {

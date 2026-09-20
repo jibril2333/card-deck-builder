@@ -10,6 +10,8 @@ import {
   deckIsComplete,
   DECK_TARGET,
 } from "@/lib/deck-legality";
+import { useI18n } from "@/lib/i18n/client";
+import { INTL_LOCALE } from "@/lib/i18n/locale";
 
 /**
  * The deck-name status dots.
@@ -62,10 +64,10 @@ export type DeckCardInfo = {
   complete: boolean;
 };
 
-function formatDate(iso: string) {
+function formatDate(iso: string, lang: string) {
   try {
     const d = new Date(iso.replace(" ", "T") + "Z");
-    return d.toLocaleString("zh-CN", {
+    return d.toLocaleString(lang, {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -84,6 +86,7 @@ export function DecksGrid({
   game: string;
   decks: DeckCardInfo[];
 }) {
+  const { m, locale } = useI18n();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [order, setOrder] = useState<DeckCardInfo[]>(decks);
@@ -240,7 +243,7 @@ export function DecksGrid({
                 type="button"
                 onClick={() => togglePinned(d)}
                 aria-pressed={d.pinned}
-                title={d.pinned ? "取消主力" : "标记为主力卡组"}
+                title={d.pinned ? m.decks.unpin : m.decks.pin}
                 className={`absolute top-1.5 right-1.5 z-20 w-7 h-7 rounded-md flex items-center justify-center text-sm cursor-pointer transition-all ${
                   d.pinned
                     ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)] shadow"
@@ -379,7 +382,7 @@ export function DecksGrid({
                 {deckCountBadge(d.counts) ? (
                   <span
                     className="absolute top-1.5 left-1.5 px-2 py-0.5 text-xs rounded-md bg-black/75 text-white font-bold tabular-nums"
-                    title={`主卡组 ${d.counts.main} / ${DECK_TARGET.main} · 蛋卡 ${d.counts.egg} / ${DECK_TARGET.egg}`}
+                    title={m.decks.countsTitle({ main: d.counts.main, mainTarget: DECK_TARGET.main, egg: d.counts.egg, eggTarget: DECK_TARGET.egg })}
                   >
                     {deckCountBadge(d.counts)}
                   </span>
@@ -390,7 +393,7 @@ export function DecksGrid({
                 {!d.mine && d.owner_name ? (
                   <span
                     className="absolute top-1.5 right-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-black/65 text-white font-medium max-w-[80%] truncate"
-                    title={`所有者:${d.owner_name}`}
+                    title={m.decks.owner(d.owner_name)}
                   >
                     👁 {d.owner_name}
                   </span>
@@ -399,17 +402,17 @@ export function DecksGrid({
               <div className="px-2 py-1.5 pointer-events-none">
                 <div
                   className="card-code text-[10px] text-[var(--color-muted-fg)] font-mono truncate"
-                  title={formatDate(d.updated_at)}
+                  title={formatDate(d.updated_at, INTL_LOCALE[locale])}
                 >
-                  {formatDate(d.updated_at)}
+                  {formatDate(d.updated_at, INTL_LOCALE[locale])}
                 </div>
                 <div className="card-name flex items-center gap-1 text-xs font-medium group-hover:text-[var(--color-accent)] min-w-0">
                   <span className="truncate">{d.name}</span>
                   {d.locked ? (
                     <span
                       className="shrink-0 text-[10px]"
-                      title="已锁定 —— 改不了,直到在卡组页解锁"
-                      aria-label="已锁定"
+                      title={m.decks.lockedTitle}
+                      aria-label={m.decks.locked}
                     >
                       🔒
                     </span>
@@ -417,22 +420,22 @@ export function DecksGrid({
                   {d.issues > 0 ? (
                     <StatusDot
                       color="bg-red-500"
-                      label="不符合禁限表"
-                      title={`${d.issues} 张卡违反现行禁限表 —— 打开卡组查看,系统不会自动改`}
+                      label={m.decks.offBanlist}
+                      title={m.decks.offBanlistTitle(d.issues)}
                     />
                   ) : null}
                   {!deckIsComplete(d.counts) ? (
                     <StatusDot
                       color="bg-amber-400"
-                      label="缺卡"
-                      title={`还没配齐:主卡组 ${d.counts.main} / ${DECK_TARGET.main} · 蛋卡 ${d.counts.egg} / ${DECK_TARGET.egg}`}
+                      label={m.decks.short}
+                      title={m.decks.shortTitle({ main: d.counts.main, mainTarget: DECK_TARGET.main, egg: d.counts.egg, eggTarget: DECK_TARGET.egg })}
                     />
                   ) : null}
                   {d.mine && d.complete ? (
                     <span
                       className="shrink-0 text-green-600 dark:text-green-400 font-bold"
-                      title="所有卡牌都已收集齐"
-                      aria-label="已收齐"
+                      title={m.decks.completeTitle}
+                      aria-label={m.decks.complete}
                     >
                       ✓
                     </span>

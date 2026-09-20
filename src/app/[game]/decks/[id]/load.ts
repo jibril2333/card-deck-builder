@@ -17,9 +17,8 @@
  */
 
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { isGameId, colorHex } from "@/lib/games";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { getLocale, getMessages } from "@/lib/i18n/server";
 import { splitSetNames } from "@/lib/card-sets";
 import { type DeckCardData } from "@/components/deck-card";
 import { computeDeckSearchTargets, type SearchGroup } from "@/lib/deck-search";
@@ -43,6 +42,7 @@ import {
 } from "@/lib/deck-version";
 import type { VersionOption } from "@/components/deck-version-picker";
 import type { JogressView } from "@/components/jogress-badge";
+import type { Messages } from "@/lib/i18n/messages";
 
 type RawDeckCard = {
   card_type: string;
@@ -89,7 +89,10 @@ function tally(
   return bars;
 }
 
-function buildDigimonStats(cards: RawDeckCard[]): StatPanel[] {
+function buildDigimonStats(
+  cards: RawDeckCard[],
+  t: Messages,
+): StatPanel[] {
   // Traits: split digi_types by "/"
   const traitCards: RawDeckCard[] = [];
   for (const c of cards) {
@@ -101,21 +104,22 @@ function buildDigimonStats(cards: RawDeckCard[]): StatPanel[] {
   }
   return [
     {
-      title: "卡片类型",
+      title: t.deck.statCardTypes,
       bars: tally(cards, (c) => c.card_type, { sort: "count" }),
     },
     // Both of these keep a rule the generic `tally` can't express — empty
     // rungs, and a card counting for more than one bucket. See lib/deck-tally.
-    { title: "等级", bars: tallyLevels(cards) },
+    { title: t.deck.statLevel, bars: tallyLevels(cards) },
     {
-      title: "颜色",
+      title: t.deck.statColor,
       bars: tallyColors(cards).map((b) => ({
         ...b,
+        label: b.label === MULTI_COLOR ? t.deckCards.multiColor : b.label,
         color: b.label === MULTI_COLOR ? undefined : colorHexFn(b.label),
       })),
     },
     {
-      title: "登场费用",
+      title: t.deck.statPlayCost,
       bars: tally(
         cards,
         (c) => (c.play_cost != null ? `${c.play_cost} Cost` : null),
@@ -123,7 +127,7 @@ function buildDigimonStats(cards: RawDeckCard[]): StatPanel[] {
       ),
     },
     {
-      title: "特征 (Traits)",
+      title: t.deck.statTraits,
       bars: tally(traitCards, (c) => c.digi_types, {
         sort: "count",
         limit: 10,
@@ -213,9 +217,9 @@ export async function loadDeckView({ game, id, sp, me }: DeckViewParams) {
 
   // Read once for the whole page: the deck grid, the adjustment picker and the
   // build-mode picker all need to agree on what language cards read in.
-  const cardLangForPage = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
+  const cardLangForPage = await getLocale();
+  // `msgs`, not `m`: this function already has locals called m.
+  const msgs = await getMessages();
 
   const deck = digimon.getDeck(id);
   if (!deck) notFound();
@@ -254,6 +258,7 @@ export async function loadDeckView({ game, id, sp, me }: DeckViewParams) {
         jaEvoReq: ja?.evo_req,
       };
     }),
+    msgs.tile.words,
   );
   const displayCard = (cardId: string) => {
     const c = cards.find((x) => x.id === cardId)!;
@@ -365,6 +370,7 @@ export async function loadDeckView({ game, id, sp, me }: DeckViewParams) {
           inherited_effect: c.inherited_effect,
           security_effect: c.security_effect,
         })),
+        msgs.tile.or,
       );
       if (tMap.size === 0) return m;
       for (const groups of m.values()) {
@@ -401,6 +407,7 @@ export async function loadDeckView({ game, id, sp, me }: DeckViewParams) {
         digi_types: c.digi_types,
         quantity: c.quantity,
       })),
+      msgs,
     ),
     cover: coverCard
       ? (() => {

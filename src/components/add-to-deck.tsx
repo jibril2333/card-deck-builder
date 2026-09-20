@@ -10,6 +10,7 @@ import {
   createDeckQuietAction,
 } from "@/app/[game]/actions";
 import { collapseDecks } from "@/lib/collapse-decks";
+import { useI18n } from "@/lib/i18n/client";
 
 type DeckEntry = {
   id: string;
@@ -33,6 +34,7 @@ export function AddToDeck({
   cardId: string;
   decks: DeckEntry[];
 }) {
+  const { m } = useI18n();
   // Starts collapsed so the server HTML and the first client render agree;
   // the remembered choice arrives in an effect. Remembered at all because
   // deck-building means opening card after card, and re-expanding every time
@@ -64,14 +66,14 @@ export function AddToDeck({
   const { shown, hidden, collapsible } = collapseDecks(decks, expanded);
 
   return (
-    <section aria-label="添加到卡组" className="space-y-3">
+    <section aria-label={m.addToDeck.heading} className="space-y-3">
       <div className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]">
-        添加到卡组
+        {m.addToDeck.heading}
       </div>
 
       {decks.length === 0 ? (
         <div className="text-xs text-[var(--color-muted-fg)] py-2">
-          暂无卡组,可在下方新建。
+          {m.addToDeck.noDecks}
         </div>
       ) : (
         <div className="-mx-3 border-y border-[var(--color-border)]">
@@ -94,10 +96,10 @@ export function AddToDeck({
                 ⌃
               </span>
               {expanded
-                ? "收起"
+                ? m.addToDeck.collapse
                 : hidden === decks.length
-                  ? `展开全部 ${hidden} 个卡组`
-                  : `展开其余 ${hidden} 个卡组`}
+                  ? m.addToDeck.expandAll(hidden)
+                  : m.addToDeck.expandRest(hidden)}
             </button>
           ) : null}
         </div>
@@ -117,6 +119,7 @@ function DeckEntryRow({
   cardId: string;
   deck: DeckEntry;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -172,7 +175,7 @@ function DeckEntryRow({
         role="group"
         aria-label={deck.name}
         className="flex items-center gap-2 px-3 py-2 opacity-60"
-        title="这副卡组已锁定 —— 在卡组页解锁后才能改"
+        title={m.addToDeck.lockedTitle}
       >
         <span
           aria-hidden
@@ -182,12 +185,13 @@ function DeckEntryRow({
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium truncate">{deck.name}</div>
           <div className="text-[10px] text-[var(--color-muted-fg)] tabular-nums">
-            已有 <b className="text-[var(--color-fg)]">{qty}</b> 张 · 卡组共{" "}
-            {total} 张
+            {m.addToDeck.haveBefore}
+            <b className="text-[var(--color-fg)]">{qty}</b>
+            {m.addToDeck.haveAfter(total)}
           </div>
         </div>
         <span className="shrink-0 text-xs text-[var(--color-muted-fg)]">
-          🔒 已锁定
+          {m.addToDeck.locked}
         </span>
       </div>
     );
@@ -215,8 +219,9 @@ function DeckEntryRow({
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{deck.name}</div>
         <div className="text-[10px] text-[var(--color-muted-fg)] tabular-nums">
-          已有 <b className="text-[var(--color-fg)]">{qty}</b> 张 · 卡组共{" "}
-          {total} 张
+          {m.addToDeck.haveBefore}
+          <b className="text-[var(--color-fg)]">{qty}</b>
+          {m.addToDeck.haveAfter(total)}
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
@@ -258,6 +263,7 @@ function DeckEntryRow({
 }
 
 function NewDeckForm({ game }: { game: string }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -269,7 +275,7 @@ function NewDeckForm({ game }: { game: string }) {
         onClick={() => setOpen(true)}
         className="w-full h-9 rounded-md border border-dashed border-[var(--color-border)] text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:border-[var(--color-fg)] cursor-pointer"
       >
-        ＋ 新建卡组
+        {m.addToDeck.newDeck}
       </button>
     );
   }
@@ -290,13 +296,13 @@ function NewDeckForm({ game }: { game: string }) {
         name="name"
         required
         autoFocus
-        placeholder="卡组名…"
+        placeholder={m.addToDeck.deckNamePlaceholder}
         onKeyDown={(e) => {
           if (e.key === "Escape") setOpen(false);
         }}
       />
       <Button type="submit" size="sm" disabled={pending}>
-        {pending ? "创建中…" : "创建"}
+        {pending ? m.addToDeck.creating : m.addToDeck.create}
       </Button>
       <Button
         type="button"
@@ -304,7 +310,7 @@ function NewDeckForm({ game }: { game: string }) {
         variant="outline"
         onClick={() => setOpen(false)}
       >
-        取消
+        {m.addToDeck.cancel}
       </Button>
     </form>
   );

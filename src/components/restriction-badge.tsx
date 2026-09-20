@@ -1,3 +1,7 @@
+"use client";
+
+import { useI18n } from "@/lib/i18n/client";
+
 /**
  * Small red/orange chip rendered over a card thumbnail when the card has an
  * official-rule restriction. Display is purely cosmetic — actual enforcement
@@ -21,12 +25,15 @@ export function RestrictionBadge({
   restriction: Restriction | null | undefined;
   className?: string;
 }) {
+  const { m } = useI18n();
   if (!restriction) return null;
   const isBanned = restriction.status === "banned";
-  const label = isBanned ? "禁" : `限${restriction.max_count}`;
+  const label = isBanned
+    ? m.card.bannedShort
+    : m.card.limitedShort(restriction.max_count);
   const title = isBanned
-    ? "官方禁卡:不能放入卡组"
-    : `官方制限:卡组中最多 ${restriction.max_count} 张(含异画)`;
+    ? m.card.bannedTitle
+    : m.card.limitedTitle(restriction.max_count);
   return (
     <span
       className={`inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] rounded-md font-bold text-white shadow ${

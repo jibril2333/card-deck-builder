@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { REFRESH_STAGES, scriptLabel } from "@/lib/refresh-stages";
+import { REFRESH_STAGES } from "@/lib/refresh-stages";
+import { useI18n } from "@/lib/i18n/client";
+import { formatTimestamp } from "@/lib/i18n/format";
+import type { Messages } from "@/lib/i18n/messages";
 
 type Status = {
   state: "idle" | "running" | "ok" | "failed" | "paused";
@@ -38,6 +41,7 @@ const STAGE_LABELS = REFRESH_STAGES;
  * lib/refresh-progress.
  */
 function RunProgress({ status }: { status: Status | null }) {
+  const { m } = useI18n();
   if (!status) return null;
   const stages = (status.stages ?? "").split(" ").filter(Boolean);
   const current = stages.indexOf(status.message ?? "");
@@ -68,9 +72,9 @@ function RunProgress({ status }: { status: Status | null }) {
       <div className="flex items-baseline justify-between gap-2 text-xs text-[var(--color-muted-fg)]">
         <span>
           {stages.length > 0 && current >= 0
-            ? `第 ${current + 1} / ${stages.length} 项`
-            : "准备中"}
-          {stage ? ` · ${stage.label}` : ""}
+            ? m.admin.stepOf(current + 1, stages.length)
+            : m.admin.preparing}
+          {stage ? ` · ${m.admin.stageLabel[stage.id]}` : ""}
         </span>
         {/* One line per script: 中/日文 runs three in turn, 价格与读音 runs
             its two at the same time, and a single count could not say which
@@ -78,7 +82,7 @@ function RunProgress({ status }: { status: Status | null }) {
         <span className="flex flex-col items-end gap-0.5">
           {rows.map((p) => (
             <span key={p.script} className="tabular-nums">
-              {scriptLabel(p.script) ? `${scriptLabel(p.script)} · ` : ""}
+              {scriptName(m, p.script) ? `${scriptName(m, p.script)} · ` : ""}
               {p.done.toLocaleString()} / {p.total.toLocaleString()}
               {p.note ? ` · ${p.note}` : ""}
             </span>
@@ -89,11 +93,15 @@ function RunProgress({ status }: { status: Status | null }) {
   );
 }
 
-function fmt(iso?: string) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("zh-CN", { hour12: false });
+/**
+ * The label for a script as `refresh-progress` names it.
+ *
+ * The progress files leave the extension off ("scrape-pao-prices"), while
+ * the stage list carries it ("scrape-pao-prices.ts"). Both spellings reach
+ * this panel, so both are looked up — the helper this replaced did the same.
+ */
+function scriptName(m: Messages, script: string): string | undefined {
+  return m.admin.scriptLabel[script] ?? m.admin.scriptLabel[`${script}.ts`];
 }
 
 /**
@@ -106,6 +114,7 @@ function fmt(iso?: string) {
  * than awaiting a result.
  */
 export function RefreshCardsPanel() {
+  const { m, locale } = useI18n();
   const [status, setStatus] = useState<Status | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +157,7 @@ export function RefreshCardsPanel() {
         const body = (await r.json().catch(() => null)) as {
           error?: string;
         } | null;
-        setError(body?.error ?? `请求失败（${r.status}）`);
+        setError(body?.error ?? m.admin.requestFailed(r.status));
       } else {
         setStatus((s) => ({
           ...(s ?? { state: "running" }),
@@ -157,7 +166,7 @@ export function RefreshCardsPanel() {
         }));
       }
     } catch {
-      setError("网络错误");
+      setError(m.admin.networkError);
     } finally {
       setSubmitting(false);
     }
@@ -171,7 +180,7 @@ export function RefreshCardsPanel() {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-4">
       <div>
-        <h2 className="text-sm font-semibold">手动更新</h2>
+        <h2 className="text-sm font-semibold">{m.admin.manualUpdate}</h2>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -183,14 +192,14 @@ export function RefreshCardsPanel() {
               type="button"
               disabled={running}
               onClick={() => toggle(s.id)}
-              title={s.hint}
+              title={m.admin.stageHint[s.id]}
               className={`text-xs px-2.5 py-1 rounded-md border transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                 on
                   ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
                   : "border-[var(--color-border)] hover:border-[var(--color-fg)]"
               }`}
             >
-              {s.label}
+              {m.admin.stageLabel[s.id]}
             </button>
           );
         })}
@@ -203,7 +212,7 @@ export function RefreshCardsPanel() {
           disabled={running || submitting}
           className="text-sm px-3 py-1.5 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)] font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
         >
-          {running ? "更新中…" : submitting ? "提交中…" : "立即更新"}
+          {running ? m.admin.updating : submitting ? m.admin.submitting : m.admin.updateNow}
         </button>
         {status ? (
           <span className="text-xs text-[var(--color-muted-fg)]">
@@ -211,7 +220,7 @@ export function RefreshCardsPanel() {
             {/* The stage id would just repeat what the bar below already says
                 in words, so it is only shown when there is no bar. */}
             {status.message && !running ? ` ${status.message}` : ""}
-            {status.updatedAt ? ` · ${fmt(status.updatedAt)}` : ""}
+            {status.updatedAt ? ` · ${formatTimestamp(locale, status.updatedAt)}` : ""}
           </span>
         ) : null}
       </div>
@@ -220,7 +229,7 @@ export function RefreshCardsPanel() {
       <SourceHealth status={status} />
       {running ? (
         <p className="text-xs text-[var(--color-muted-fg)]">
-          更新期间站点会短暂重启
+          {m.admin.restartNote}
         </p>
       ) : null}
       {error ? <p className="text-xs text-red-500">{error}</p> : null}
@@ -236,12 +245,13 @@ export function RefreshCardsPanel() {
  * stop noticing when a row turns red.
  */
 function SourceHealth({ status }: { status: Status | null }) {
+  const { m } = useI18n();
   const bad = (status?.health ?? []).filter((h) => h.level !== "ok");
   if (bad.length === 0) return null;
   return (
     <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 space-y-1">
       <div className="text-xs font-medium text-amber-600 dark:text-amber-400">
-        抓取来源结果变少
+        {m.admin.sourceShrink}
       </div>
       {bad.map((h) => (
         <div
@@ -250,26 +260,27 @@ function SourceHealth({ status }: { status: Status | null }) {
         >
           <span>{h.source}</span>
           <span className="tabular-nums text-[var(--color-muted-fg)]">
-            {h.ok} / 过去 {h.baseline}
+            {m.admin.vsBaseline(h.ok, h.baseline)}
           </span>
         </div>
       ))}
       <p className="text-[11px] text-[var(--color-muted-fg)]">
-        抓取没有报错,是结果变少了 —— 多半是对方页面改版。
+        {m.admin.shrinkNote}
       </p>
     </div>
   );
 }
 
 function StateBadge({ state }: { state: Status["state"] }) {
+  const { m } = useI18n();
   const map: Record<Status["state"], { text: string; cls: string }> = {
-    idle: { text: "未运行", cls: "text-[var(--color-muted-fg)]" },
-    running: { text: "运行中", cls: "text-[var(--color-accent)]" },
-    ok: { text: "成功", cls: "text-emerald-500" },
-    failed: { text: "失败", cls: "text-red-500" },
+    idle: { text: m.admin.stateIdle, cls: "text-[var(--color-muted-fg)]" },
+    running: { text: m.admin.stateRunning, cls: "text-[var(--color-accent)]" },
+    ok: { text: m.admin.stateOk, cls: "text-emerald-500" },
+    failed: { text: m.admin.stateFailed, cls: "text-red-500" },
     // Stopped by a container replacement, not by an error. The remaining
     // stages run by themselves when the new container starts.
-    paused: { text: "已暂停,重启后继续", cls: "text-amber-500" },
+    paused: { text: m.admin.statePaused, cls: "text-amber-500" },
   };
   const s = map[state] ?? map.idle;
   return <span className={`font-medium ${s.cls}`}>{s.text}</span>;

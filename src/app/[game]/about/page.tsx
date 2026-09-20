@@ -3,6 +3,9 @@ import { isGameId, colorHex } from "@/lib/games";
 import { KEYWORDS } from "@/lib/keywords";
 import * as digimon from "@/lib/db/digimon";
 import { KEYWORD_CHIP, SPECIAL_CHIP } from "@/components/effect-text";
+import { getLocale } from "@/lib/i18n/server";
+import type { Locale } from "@/lib/i18n/locale";
+import { getMessages } from "@/lib/i18n/server";
 
 export default async function AboutPage({
   params,
@@ -14,7 +17,7 @@ export default async function AboutPage({
   return (
     <>
       <main className="w-full mx-auto max-w-3xl px-4 py-8 prose prose-sm">
-        <DigimonAbout keywords={keywordRows()} />
+        <DigimonAbout keywords={keywordRows(await getLocale())} />
       </main>
     </>
   );
@@ -39,6 +42,29 @@ function P({
     <p className={`text-sm leading-relaxed mb-3 ${className ?? ""}`}>
       {children}
     </p>
+  );
+}
+
+/**
+ * The dictionary's paragraphs, rendered.
+ *
+ * Rules prose is full of emphasis and line breaks, and splitting each
+ * paragraph into a key per bold run would leave the translator holding a bag
+ * of fragments. So a paragraph is ONE string carrying `**bold**` and
+ * newlines, and this turns it back into markup.
+ */
+function Rich({ text }: { text: string }) {
+  return (
+    <>
+      {text.split("\n").map((line, i) => (
+        <span key={i}>
+          {i > 0 ? <br /> : null}
+          {line.split(/\*\*(.+?)\*\*/g).map((part, j) =>
+            j % 2 === 1 ? <b key={j}>{part}</b> : part,
+          )}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -71,8 +97,8 @@ type KeywordRow = {
   zhName: string | null;
   /** How card text writes it, e.g. ＜Blocker＞. */
   display: string;
-  /** The Chinese explanation, where one has been written. */
-  zh: string | null;
+  /** The write-up, in the reader's language, where one has been written. */
+  explain: string | null;
 };
 
 /**
@@ -85,7 +111,7 @@ type KeywordRow = {
  * the first scrape there is nothing to read from, so the hand-written list is
  * the whole table.
  */
-function keywordRows(): KeywordRow[] {
+function keywordRows(locale: Locale): KeywordRow[] {
   const byName = new Map<string, (typeof KEYWORDS)[number]>();
   for (const k of KEYWORDS) {
     byName.set(k.official, k);
@@ -97,7 +123,7 @@ function keywordRows(): KeywordRow[] {
     ja: k.ja,
     zhName: k.zhName,
     display: k.display,
-    zh: k.zh,
+    explain: k.explain[locale],
   });
 
   const official = digimon.listKeywordGlossary();
@@ -120,7 +146,7 @@ function keywordRows(): KeywordRow[] {
       ja: k?.ja ?? ja,
       zhName: k?.zhName ?? zh,
       display: k?.display ?? (name ? `＜${name}＞` : `≪${ja}≫`),
-      zh: k?.zh ?? null,
+      explain: k ? k.explain[locale] : null,
     });
   }
 
@@ -186,9 +212,9 @@ function KeywordList({ items }: { items: KeywordRow[] }) {
               </span>
             ))}
           </dt>
-          {k.zh ? (
+          {k.explain ? (
             <dd className="text-[var(--color-fg)] leading-relaxed mt-0.5">
-              {k.zh}
+              {k.explain}
             </dd>
           ) : null}
         </div>
@@ -197,135 +223,83 @@ function KeywordList({ items }: { items: KeywordRow[] }) {
   );
 }
 
-function DigimonAbout({ keywords }: { keywords: KeywordRow[] }) {
+async function DigimonAbout({ keywords }: { keywords: KeywordRow[] }) {
+  const m = await getMessages();
   return (
     <>
       <h1 className="text-2xl font-bold">Digimon Card Game</h1>
+      <P>{m.about.intro}</P>
+
+      <H>{m.about.colors}</H>
+      <ColorList
+        colors={["Red", "Blue", "Yellow", "Green", "Black", "Purple", "White"]}
+      />
+      <P className="mt-3">{m.about.colorsText}</P>
+
+      <H>{m.about.cardTypes}</H>
       <P>
-        Bandai 于 2020 年推出的集换式卡牌游戏，世界范围内同步发行英文版与日文版。核心系统围绕「记忆值」(Memory) 与「安全区」(Security
-        Stack) 展开 —— 记忆值是双方共享的回合资源条，安全区则是攻击落地前的最后一道防线。
+        <Rich text={m.about.cardTypesText} />
       </P>
 
-      <H>颜色</H>
-      <ColorList colors={["Red", "Blue", "Yellow", "Green", "Black", "Purple", "White"]} />
-      <P className="mt-3">
-        7 种颜色各有性格：红色擅长进攻、删除对方的数码兽；蓝色返手 / 防守；黄色靠安全区上的牌制造价值；绿色铺场速攻；黑色压记忆 / 阻断；紫色弃牌堆复用；白色补血与混色支援。
-      </P>
-
-      <H>卡片类型</H>
+      <H>{m.about.terms}</H>
       <P>
-        <b>Digimon</b>：主力战斗单位，按 Lv.2–Lv.7 的等级链通过「进化」叠成。
-        <br />
-        <b>Digi-Egg</b>：进化的最底层（Lv.2），从单独的「蛋区」起手。
-        <br />
-        <b>Tamer</b>：训练师，提供持续效果，不会战斗。
-        <br />
-        <b>Option</b>：一次性效果牌，类似法术。
-        <br />
-        <b>Dual</b>：少见，同时具备多张卡的特性。
+        <Rich text={m.about.termsText} />
       </P>
 
-      <H>关键术语</H>
+      <H>{m.about.winning}</H>
+      <P>{m.about.winningText}</P>
+
+      <H>{m.about.turn}</H>
       <P>
-        <b>Memory</b>：记忆条从 −10 到 +10，结束自己回合时把记忆推到对方一侧。
-        <br />
-        <b>Security Stack</b>：游戏开始时盖 5 张作为安全区，对方攻击穿透时翻一张结算。
-        <br />
-        <b>Inherited Effect</b>：继承效果，被进化覆盖后仍持续生效。
-        <br />
-        <b>DP</b>：战斗力，攻防比对值。
+        <Rich text={m.about.turnText} />
       </P>
 
-      <H>胜负条件</H>
+      <H>{m.about.breeding}</H>
       <P>
-        当对手安全区已空（0 张），你的数码兽再对其发动一次成功的直接攻击，即获胜。
-        另外：牌库抽空（需要抽牌却抽不出）的一方判负。
+        <Rich text={m.about.breedingText} />
       </P>
 
-      <H>回合流程</H>
+      <H>{m.about.zones}</H>
       <P>
-        每回合按顺序进行 6 个阶段：
-        <br />
-        <b>1. Unsuspend（解除休眠）</b>：竖正自己所有横置的卡。
-        <br />
-        <b>2. Draw（抽牌）</b>：抽 1 张（先手第一回合跳过）。
-        <br />
-        <b>3. Breeding（育成）</b>：从育成区孵蛋 / 进化，或把成长的数码兽移到战场。
-        <br />
-        <b>4. Main（主要）</b>：花记忆值打出数码兽 / 训练师 / 选项卡、进化、发动效果。
-        <br />
-        <b>5. 攻击</b>：横置数码兽攻击对手数码兽或安全区。
-        <br />
-        <b>6. End（结束）</b>：把记忆推给对手，换手。
+        <Rich text={m.about.zonesText} />
       </P>
 
-      <H>育成区与进化</H>
+      <H>{m.about.attackFlow}</H>
       <P>
-        <b>育成区</b>是独立于战场的小区域，每次只能有 1 只。用蛋卡（Lv.2）起手，在育成阶段进化成 Lv.3，再&ldquo;孵出&rdquo;到战场参战。
-        <br />
-        <b>进化</b>：把高一阶的数码兽叠在低阶上、支付进化消费（记忆），下层卡成为「进化源」并提供继承效果。每次进化还能抽 1 张。
+        <Rich text={m.about.attackFlowText} />
       </P>
 
-      <H>游戏区域</H>
+      <H>{m.about.blocking}</H>
       <P>
-        区域有:<b>牌库</b>、<b>蛋卡组</b>、<b>战场</b>、<b>手牌</b>、<b>废弃区</b>、<b>安全区</b>。
-        <br />
-        其中<b>公开区域</b>(如废弃区)双方随时可查看内容和顺序;<b>非公开区域</b>(手牌、牌库、安全区)则不可查看。
-        安全区尤其要注意:它是非公开的,双方都不能偷看,只在检查时逐张翻开。
+        <Rich text={m.about.blockingText} />
       </P>
 
-      <H>攻击流程</H>
+      <H>{m.about.securityCheck}</H>
       <P>
-        只有回合玩家能攻击。一次攻击按固定顺序经过 5 个时机:
-        <br />
-        <b>宣言攻击 → 反击时机 → 阻挡时机 → 确认攻击是否成功 → 攻击结束</b>
-        <br />
-        当前时机的处理 <b>全部结算完</b> 才会进入下一个时机 —— 这是判断效果发动先后的依据。
+        <Rich text={m.about.securityCheckText} />
       </P>
 
-      <H>阻挡</H>
+      <H>{m.about.ruleCheck}</H>
+      <P>{m.about.ruleCheckText}</P>
+
+      <H>{m.about.battle}</H>
       <P>
-        阻挡是把攻击目标换成场上一只带 ＜Blocker＞ 的数码兽。规则要点:
-        <br />
-        · 每次攻击<b>只能阻挡 1 次</b>,不能多只同时阻挡
-        <br />
-        · 阻挡进行中不能再次宣言阻挡
-        <br />
-        · 无法横置的数码兽不能阻挡
-        <br />
-        · <b>被指定为攻击目标的那只数码兽不能自己阻挡</b>
+        <Rich text={m.about.battleText} />
       </P>
 
-      <H>安全检查</H>
-      <P>
-        安全检查是查看对手安全区的规则。<b>一次攻击只做 1 次安全检查</b>,但攻击者身上若有 ＜Security A. +N＞ 之类的效果,这一次检查会按修正后的张数进行。检查<b>逐张</b>进行。
-      </P>
-
-      <H>规则检查</H>
-      <P>
-        在允许的时机,游戏会自动执行一些「该发生就发生」的处理 —— 比如 DP 归零的数码兽被删除、不符合条件的卡离场。它不需要玩家宣言,但在规则处理进行当中不会执行,要等当前处理结束。
-      </P>
-
-      <H>战斗</H>
-      <P>
-        攻击时双方比 <b>DP</b>：DP 高的存活、低的被删除（destroy），相等则两败俱伤。攻击安全区时翻开顶部 1 张安全卡结算其效果，再和攻击者比 DP。
-      </P>
-
-      <H>关键字（Keywords）</H>
-      <P className="!mt-0 text-xs">
-        共 {keywords.length} 个,取自官方卡表的关键字表,按名称排序,随卡表更新。每条给出英/中/日三种卡面写法。数值或指定卡不同的写法(＜Draw 1＞ 与 ＜Draw 2＞)按规则 16-2 视为同一个关键字,合并成一条。
-      </P>
+      <H>{m.about.keywords}</H>
+      <P className="!mt-0 text-xs">{m.about.keywordsNote(keywords.length)}</P>
       <KeywordList items={keywords} />
 
-      <H>构筑规则</H>
+      <H>{m.about.deckbuilding}</H>
       <P>
-        主卡组恰好 <b>50</b> 张；蛋卡组 <b>0–5</b> 张（独立洗牌、独立堆叠）；同名卡（按卡名计）每副卡组最多 <b>4</b> 张。本工具不强制这些规则，超出会在卡组页给出红字提示。
+        <Rich text={m.about.deckbuildingText} />
       </P>
 
-      <H>资源</H>
+      <H>{m.about.resources}</H>
       <ul className="text-sm space-y-1 list-disc pl-5">
         <li>
-          官方卡表：
+          {m.about.officialCardList}
           <a
             href="https://world.digimoncard.com/cardlist/"
             target="_blank"
@@ -336,7 +310,7 @@ function DigimonAbout({ keywords }: { keywords: KeywordRow[] }) {
           </a>
         </li>
         <li>
-          综合规则：
+          {m.about.comprehensiveRules}
           <a
             href="https://world.digimoncard.com/rule/"
             target="_blank"
@@ -346,9 +320,7 @@ function DigimonAbout({ keywords }: { keywords: KeywordRow[] }) {
             world.digimoncard.com/rule ↗
           </a>
         </li>
-        <li>
-          卡牌图片来源：world.digimoncard.com（已写入数据库 image_url）
-        </li>
+        <li>{m.about.imageSource}</li>
       </ul>
     </>
   );

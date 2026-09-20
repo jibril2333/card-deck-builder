@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * "导出图片" button: renders the deck as a single shareable PNG on a canvas
@@ -72,6 +73,7 @@ export function DeckImageExport({
     run: () => void;
   }) => React.ReactNode;
 }) {
+  const { m } = useI18n();
   const [busy, setBusy] = useState(false);
 
   async function exportPng() {
@@ -182,7 +184,7 @@ export function DeckImageExport({
       className="px-3 h-8 rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
       title="PNG"
     >
-      🖼️ {busy ? "生成中…" : "导出图片"}
+      🖼️ {busy ? m.deck.generating : m.deck.exportImage}
     </button>
   );
 }

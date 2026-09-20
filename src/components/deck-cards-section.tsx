@@ -11,8 +11,9 @@ import { CardPreviewProvider } from "@/components/card-preview";
 import { DeckCard, type DeckCardData } from "@/components/deck-card";
 import type { SearchGroup } from "@/lib/deck-search";
 import type { JogressView } from "@/components/jogress-badge";
+import { getMessages } from "@/lib/i18n/server";
 
-export function DeckCardsSection({
+export async function DeckCardsSection({
   game,
   deckId,
   cards,
@@ -36,18 +37,19 @@ export function DeckCardsSection({
   searchTargets: Map<string, SearchGroup[]>;
   jogress: Map<string, JogressView[]>;
 }) {
+  const m = await getMessages();
   const visibleCards = missingOnly
     ? cards.filter((c) => c.purchased < c.quantity)
     : cards;
   if (cards.length === 0) {
     return (
       <div className="mt-6 p-12 text-sm text-center text-[var(--color-muted-fg)] border border-dashed border-[var(--color-border)] rounded-lg">
-        暂无卡片。
+        {m.deckCards.noCards}
         <Link
           href={`/${game}`}
           className="underline ml-1 hover:text-[var(--color-fg)]"
         >
-          去检索卡牌 →
+          {m.deckCards.goSearch}
         </Link>
       </div>
     );
@@ -55,14 +57,14 @@ export function DeckCardsSection({
   if (visibleCards.length === 0) {
     return (
       <div className="mt-6 p-12 text-sm text-center text-[var(--color-muted-fg)] border border-dashed border-[var(--color-border)] rounded-lg">
-        已全部备齐
+        {m.deckCards.allSet}
         <Link
           href={`/${game}/decks/${deckId}?mode=purchase&missing=0`}
           replace
           className="underline ml-1 hover:text-[var(--color-fg)]"
           scroll={false}
         >
-          显示全部 →
+          {m.deckCards.showAll}
         </Link>
       </div>
     );

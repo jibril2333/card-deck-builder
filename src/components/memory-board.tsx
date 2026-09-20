@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { hasInAppHistory } from "@/lib/nav-depth";
 import { MEMORY_MAX, clampMemory } from "@/lib/memory-gauge";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * The memory gauge as a honeycomb, after the reference app: one flat-top
@@ -110,8 +111,8 @@ function hexPoints(x: number, y: number, scale = 0.97): string {
     .join(" ");
 }
 
-const cellName = (v: number) =>
-  v === 0 ? "0" : `${v > 0 ? "橙方" : "蓝方"} ${Math.abs(v)}`;
+const cellName = (v: number, orange: string, blue: string) =>
+  v === 0 ? "0" : `${v > 0 ? orange : blue} ${Math.abs(v)}`;
 
 function load(): number {
   if (typeof window === "undefined") return 0;
@@ -126,6 +127,7 @@ function load(): number {
 }
 
 export function MemoryBoard({ home }: { home: string }) {
+  const { m } = useI18n();
   // Starts at 0 rather than from storage so the server HTML and the first
   // client render agree; the saved game arrives in an effect.
   const [value, setValue] = useState(0);
@@ -192,7 +194,7 @@ export function MemoryBoard({ home }: { home: string }) {
           preserveAspectRatio="xMidYMid meet"
           className="w-full h-full"
           role="group"
-          aria-label="内存条"
+          aria-label={m.nav.memory}
         >
           {CELLS.map((c) => {
             const here = c.value === value;
@@ -200,7 +202,11 @@ export function MemoryBoard({ home }: { home: string }) {
               <g
                 key={c.value}
                 role="button"
-                aria-label={cellName(c.value)}
+                aria-label={cellName(
+                  c.value,
+                  m.playtest.orangeSide,
+                  m.playtest.blueSide,
+                )}
                 aria-current={here ? "true" : undefined}
                 onClick={() => setValue(c.value)}
                 style={{ cursor: "pointer" }}
@@ -235,7 +241,7 @@ export function MemoryBoard({ home }: { home: string }) {
           className="absolute left-2 bottom-2 h-9 px-4 rounded-lg text-white text-sm cursor-pointer"
           style={{ background: BTN }}
         >
-          返回
+          {m.playtest.back}
         </button>
         <FullscreenButton />
       </div>
@@ -251,6 +257,7 @@ export function MemoryBoard({ home }: { home: string }) {
  * this page's `appleWebApp` metadata turns into a chrome-less standalone launch.
  */
 function FullscreenButton() {
+  const { m } = useI18n();
   const [supported, setSupported] = useState(false);
   const [on, setOn] = useState(false);
 
@@ -282,7 +289,7 @@ function FullscreenButton() {
       className="absolute right-2 bottom-2 w-9 h-9 rounded-lg text-white text-[15px] cursor-pointer"
       style={{ background: BTN }}
       aria-pressed={on}
-      aria-label={on ? "退出全屏" : "全屏"}
+      aria-label={on ? m.playtest.exitFullscreen : m.playtest.fullscreen}
     >
       {on ? "⤡" : "⤢"}
     </button>

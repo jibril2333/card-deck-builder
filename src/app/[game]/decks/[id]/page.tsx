@@ -20,6 +20,7 @@ import { DeckCardsSection } from "@/components/deck-cards-section";
 import { DeckPurchaseSummary } from "@/components/deck-purchase-summary";
 import { formatPrice } from "@/lib/price-format";
 import { loadDeckView } from "./load";
+import { getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function DeckEditPage({
   params: Promise<{ game: string; id: string }>;
   searchParams: Promise<{ mode?: string; missing?: string; compare?: string }>;
 }) {
+  const m = await getMessages();
   const me = await getCurrentUser();
   const { game, id } = await params;
   const sp = await searchParams;
@@ -86,7 +88,7 @@ export default async function DeckEditPage({
             href={`/${game}/decks`}
             className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
           >
-            ← 全部卡组
+            {m.deck.allDecks}
           </RestoreScrollLink>
           <DeckHeader
             game={game}
@@ -109,7 +111,7 @@ export default async function DeckEditPage({
                     : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
                 }`}
               >
-                👁 浏览
+                {m.deck.modeBrowse}
               </Link>
               {canEdit ? (
                 <>
@@ -123,7 +125,7 @@ export default async function DeckEditPage({
                         : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
                     }`}
                   >
-                    🛠 组建
+                    {m.deck.modeBuild}
                   </Link>
                   <Link
                     href={`/${game}/decks/${loaded.deck.id}?mode=purchase`}
@@ -135,7 +137,7 @@ export default async function DeckEditPage({
                         : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
                     }`}
                   >
-                    🛒 购买
+                    {m.deck.modePurchase}
                   </Link>
                 </>
               ) : null}
@@ -144,9 +146,9 @@ export default async function DeckEditPage({
             <Link
               href={`/${game}/decks/${loaded.deck.id}/playtest`}
               className="px-3 h-8 rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] flex items-center gap-1.5"
-              title="起手模拟 + 抽到概率计算"
+              title={m.deck.playtestTitle}
             >
-              🎲 试玩
+              {m.deck.playtest}
             </Link>
             {/* Next to 试玩: both are ways of looking at the deck you have,
               not edits to it. */}
@@ -177,8 +179,8 @@ export default async function DeckEditPage({
               gameLabel={GAMES[game as GameId].label}
               subtitle={
                 loaded.isDigimon
-                  ? `主卡组 ${main} 张 · 蛋卡 ${eggs} 张`
-                  : `共 ${main} 张`
+                  ? m.deck.imageSubtitle(main, eggs)
+                  : m.deck.imageSubtitleTotal(main)
               }
               cards={loaded.cards.map((c) => ({
                 code: c.code,
@@ -226,14 +228,14 @@ export default async function DeckEditPage({
                       here ("主卡组数量不达标") repeated it in words. The info
                       bar above 卡组分布 carries the same fact for anyone
                       scanning the sidebar. */}
-                  主卡组{" "}
+                  {m.deck.mainDeck}{" "}
                   <span className={mainOk ? "" : "text-red-500 font-medium"}>
                     {main}
                   </span>{" "}
                   / {target.main}
                   {loaded.isDigimon ? (
                     <>
-                      {" · 蛋卡 "}
+                      {m.deck.eggsSep}
                       <span className={eggOk ? "" : "text-red-500 font-medium"}>
                         {eggs}
                       </span>
@@ -242,7 +244,7 @@ export default async function DeckEditPage({
                   ) : null}
                   {totalPrice > 0 ? (
                     <span className="ml-2">
-                      · 预期总价{" "}
+                      {m.deck.expectedTotal}{" "}
                       <b className="text-[var(--color-accent2)]">
                         {formatPrice(totalPrice)}
                       </b>
@@ -274,7 +276,7 @@ export default async function DeckEditPage({
                         className="chip"
                         title={
                           b.label === MULTI_COLOR
-                            ? "同时带两种颜色的卡,已分别计入各自颜色"
+                            ? m.deck.multiColorTitle
                             : undefined
                         }
                       >
@@ -284,7 +286,7 @@ export default async function DeckEditPage({
                             style={{ background: colorHex(b.label) }}
                           />
                         )}
-                        {b.label} · {b.value}
+                        {b.label === MULTI_COLOR ? m.deckCards.multiColor : b.label} · {b.value}
                       </span>
                     ))}
                   </div>
@@ -368,7 +370,7 @@ export default async function DeckEditPage({
               in the banner, so this panel would otherwise repeat them. */}
           {!mine ? (
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 text-xs text-[var(--color-muted-fg)]">
-              这是别人的卡组,你只能浏览。
+              {m.deck.othersDeck}
             </div>
           ) : null}
 

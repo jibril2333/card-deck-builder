@@ -6,6 +6,10 @@ import {
   parseJogress,
   type JogressCard,
 } from "@/lib/jogress";
+import { MESSAGES } from "@/lib/i18n/messages";
+
+/** The Chinese wording the assertions below were written against. */
+const W = MESSAGES.zh.tile.words;
 
 /**
  * Every requirement string here is copied verbatim out of the live database
@@ -108,7 +112,7 @@ describe("parseJogress", () => {
     const [c] = parseJogress("〔ジョグレス〕なにか新しい書き方:コスト0");
     expect(c.sides[0].parsed).toBe(false);
     // The reader still sees the requirement, in the card's own words.
-    expect(describeCondition(c)).toContain("なにか新しい書き方");
+    expect(describeCondition(c, W)).toContain("なにか新しい書き方");
   });
 
   it("finds nothing on a card with no condition", () => {
@@ -189,7 +193,7 @@ describe("computeDeckJogress", () => {
   ];
 
   it("finds the pair the deck can actually assemble", () => {
-    const m = computeDeckJogress(deck());
+    const m = computeDeckJogress(deck(), W);
     const [opt] = m.get("chaos")!;
     expect(opt.pairs).toEqual([["y6", "b6"]]);
     expect(opt.label).toBe("黄 Lv.6 ＋ 黑 Lv.6");
@@ -197,7 +201,7 @@ describe("computeDeckJogress", () => {
   });
 
   it("says nothing about cards that have no condition", () => {
-    const m = computeDeckJogress(deck());
+    const m = computeDeckJogress(deck(), W);
     expect(m.has("y6")).toBe(false);
   });
 
@@ -205,7 +209,7 @@ describe("computeDeckJogress", () => {
     // The half that would pair with the yellow Lv.6 isn't in the deck — the
     // case the feature exists to surface.
     const cards = deck().filter((c) => c.id !== "b6");
-    const [opt] = computeDeckJogress(cards).get("chaos")!;
+    const [opt] = computeDeckJogress(cards, W).get("chaos")!;
     expect(opt.pairs).toEqual([]);
     expect(opt.parsed).toBe(true);
   });
@@ -219,9 +223,9 @@ describe("computeDeckJogress", () => {
       }),
       card({ id: "solo", color: "Yellow", level: 6, quantity: 1 }),
     ];
-    expect(computeDeckJogress(two).get("t")![0].pairs).toEqual([]);
+    expect(computeDeckJogress(two, W).get("t")![0].pairs).toEqual([]);
     two[1] = card({ id: "solo", color: "Yellow", level: 6, quantity: 2 });
-    expect(computeDeckJogress(two).get("t")![0].pairs).toEqual([["solo", "solo"]]);
+    expect(computeDeckJogress(two, W).get("t")![0].pairs).toEqual([["solo", "solo"]]);
   });
 
   it("never offers the card itself as its own material", () => {
@@ -236,14 +240,14 @@ describe("computeDeckJogress", () => {
         jaEvoReq: "〔ジョグレス〕黄Lv.6+黄Lv.6:コスト0",
       }),
     ];
-    expect(computeDeckJogress(self).get("self")![0].pairs).toEqual([]);
+    expect(computeDeckJogress(self, W).get("self")![0].pairs).toEqual([]);
   });
 
   it("matches either half against either card", () => {
     // The deck order must not decide whether a pair is found.
     const cards = deck();
     const reversed = [cards[0], cards[2], cards[1], cards[3], cards[4]];
-    expect(computeDeckJogress(reversed).get("chaos")![0].pairs).toEqual([["b6", "y6"]]);
+    expect(computeDeckJogress(reversed, W).get("chaos")![0].pairs).toEqual([["b6", "y6"]]);
   });
 
   it("keeps a card's two conditions apart", () => {
@@ -259,7 +263,7 @@ describe("computeDeckJogress", () => {
       card({ id: "piemon", jaName: "ピエモン" }),
       card({ id: "vamdemon", jaName: "ヴァンデモン" }),
     ];
-    const opts = computeDeckJogress(cards).get("bolt")!;
+    const opts = computeDeckJogress(cards, W).get("bolt")!;
     expect(opts).toHaveLength(2);
     expect(opts[0].pairs).toEqual([["p6", "g6"]]);
     expect(opts[1].pairs).toEqual([["piemon", "vamdemon"]]);
@@ -270,7 +274,7 @@ describe("computeDeckJogress", () => {
       card({ id: "weird", jaEvoReq: "〔ジョグレス〕まったく新しい条件:コスト0" }),
       card({ id: "y6", color: "Yellow", level: 6 }),
     ];
-    const [opt] = computeDeckJogress(cards).get("weird")!;
+    const [opt] = computeDeckJogress(cards, W).get("weird")!;
     expect(opt.parsed).toBe(false);
     expect(opt.pairs).toEqual([]);
   });

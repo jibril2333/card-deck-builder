@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDeckVersionAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 export type VersionOption = {
   code: string;
@@ -41,6 +42,7 @@ export function DeckVersionPicker({
   newer: number;
   editable: boolean;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [value, setValue] = useState(version ?? "");
@@ -77,33 +79,30 @@ export function DeckVersionPicker({
     return (
       <span
         className="chip"
-        title="这份卡表是按这个卡包的环境组的"
+        title={m.deck.versionTitle}
       >
-        版本 {version}
+        {m.deck.versionChip(version)}
       </span>
     );
   }
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="text-xs text-[var(--color-muted-fg)]">版本</span>
+      <span className="text-xs text-[var(--color-muted-fg)]">{m.deck.version}</span>
       <select
-        aria-label="卡组版本"
+        aria-label={m.deck.deckVersion}
         value={value}
         disabled={pending}
         onChange={(e) => save(e.target.value)}
-        title={
-          `这份卡表是按哪个卡包的环境组的。列表是官方全部卡包,最新的是 ${newest ?? "—"}` +
-          (auto ? `;「跟随卡表」= ${auto},按这副卡组里最新的那张卡算出来的` : "")
-        }
+        title={m.deck.versionSelectTitle(newest ?? "—", auto)}
         className="h-6 max-w-[14rem] rounded-full border border-[var(--color-border)] bg-[var(--color-card)] px-2 text-xs cursor-pointer disabled:opacity-60 hover:bg-[var(--color-muted)]"
       >
-        <option value="">未设置</option>
+        <option value="">{m.deck.notSet}</option>
         {/* Not "the newest pack" — the newest pack THIS DECK needs. Spelled
             out because the old wording ("按最新的卡") read as a claim about
             the game rather than about the deck in front of you. */}
         {auto && auto !== value ? (
-          <option value={auto}>跟随卡表 → {auto}</option>
+          <option value={auto}>{m.deck.followList(auto)}</option>
         ) : null}
         {options.map((o) => (
           <option key={o.code} value={o.code}>
@@ -114,9 +113,9 @@ export function DeckVersionPicker({
       {newer > 0 ? (
         <span
           className="text-[11px] text-amber-600 dark:text-amber-400"
-          title={`有 ${newer} 张卡来自比 ${value} 更新的卡包`}
+          title={m.deck.newerTitle(newer, value)}
         >
-          +{newer} 张更新的卡
+          {m.deck.newerCards(newer)}
         </span>
       ) : null}
     </span>

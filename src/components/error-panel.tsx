@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { isStaleBuildError } from "@/lib/stale-build";
+import { useI18n } from "@/lib/i18n/client";
+import type { Messages } from "@/lib/i18n/messages";
 
 const STALE_RELOAD_KEY = "cdb:stale-build-reload";
 const STALE_RELOAD_COOLDOWN_MS = 30_000;
@@ -36,6 +38,7 @@ export function ErrorPanel({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { m } = useI18n();
   const params = useParams<{ game: string }>();
   const game = params?.game;
   const [showDetail, setShowDetail] = useState(false);
@@ -92,13 +95,13 @@ export function ErrorPanel({
     return (
       <main className="w-full mx-auto max-w-3xl px-4 py-12">
         <p className="text-sm text-[var(--color-muted-fg)] text-center">
-          正在加载新版本…
+          {m.common.reloadingNewVersion}
         </p>
       </main>
     );
   }
 
-  const hint = diagnoseError(error);
+  const hint = diagnoseError(error, m);
 
   const detail = [
     error.name ? `name: ${error.name}` : "",
@@ -125,17 +128,17 @@ export function ErrorPanel({
             ⚠️
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-semibold">这一页出错了</h1>
+            <h1 className="text-lg font-semibold">{m.common.errorTitle}</h1>
             <p className="text-sm text-[var(--color-muted-fg)] mt-1">
-              页面在服务器渲染时抛了异常。可以试试重试,或者回上一页。
+              {m.common.errorBody}
             </p>
             <p className="mt-2 text-xs font-mono text-red-600 dark:text-red-300 break-words">
-              {error.message || error.name || "未知错误"}
+              {error.message || error.name || m.common.unknownError}
             </p>
 
             {hint ? (
               <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-                <div className="font-medium mb-1">💡 可能的修复方法</div>
+                <div className="font-medium mb-1">{m.common.possibleFix}</div>
                 <div className="text-[var(--color-muted-fg)] whitespace-pre-line">
                   {hint.message}
                 </div>
@@ -149,18 +152,18 @@ export function ErrorPanel({
 
             <div className="mt-4 flex items-center gap-2 flex-wrap">
               <Button size="sm" onClick={reset}>
-                重试
+                {m.common.retry}
               </Button>
               {game ? (
                 <Link href={`/${game}`}>
                   <Button size="sm" variant="outline">
-                    回卡牌检索
+                    {m.common.backToSearch}
                   </Button>
                 </Link>
               ) : null}
               <Link href="/">
                 <Button size="sm" variant="outline">
-                  回首页
+                  {m.common.backHome}
                 </Button>
               </Link>
               <button
@@ -168,7 +171,7 @@ export function ErrorPanel({
                 onClick={() => setShowDetail((s) => !s)}
                 className="ml-auto text-xs text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] cursor-pointer"
               >
-                {showDetail ? "收起详情" : "查看详情"}
+                {showDetail ? m.common.hideDetail : m.common.showDetail}
               </button>
             </div>
 
@@ -176,14 +179,14 @@ export function ErrorPanel({
               <div className="mt-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-                    错误详情
+                    {m.common.errorDetail}
                   </span>
                   <button
                     type="button"
                     onClick={copyDetail}
                     className="text-[11px] text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] cursor-pointer"
                   >
-                    {copied ? "✓ 已复制" : "复制"}
+                    {copied ? m.common.copied : m.common.copy}
                   </button>
                 </div>
                 <pre className="text-[10px] font-mono whitespace-pre-wrap break-words text-[var(--color-muted-fg)] leading-snug max-h-64 overflow-auto">
@@ -213,7 +216,7 @@ type ErrorHint = {
   command?: string;
 };
 
-function diagnoseError(err: Error): ErrorHint | null {
+function diagnoseError(err: Error, t: Messages): ErrorHint | null {
   const m = err.message || "";
 
   // Node was upgraded since the last npm install; better-sqlite3's native
@@ -227,8 +230,7 @@ function diagnoseError(err: Error): ErrorHint | null {
   ) {
     return {
       message:
-        "better-sqlite3 的 native 绑定与当前 Node 版本不兼容\n" +
-        "(通常发生在通过 nvm/brew 升级 Node 之后)。重建一下就好。",
+        t.common.hintNativeBinding,
       command: "npm rebuild better-sqlite3",
     };
   }
@@ -238,8 +240,7 @@ function diagnoseError(err: Error): ErrorHint | null {
   if (/数据库文件不存在|database file does not exist/i.test(m)) {
     return {
       message:
-        "数据库文件路径错误。检查 .env.local 里的 CDB_DIGIMON_DB / CDB_UA_DB " +
-        "环境变量,或确认默认路径下的 .db 文件存在。",
+        t.common.hintDbPath,
     };
   }
 
@@ -247,10 +248,7 @@ function diagnoseError(err: Error): ErrorHint | null {
   if (/SQLITE_CANTOPEN|unable to open database file/i.test(m)) {
     return {
       message:
-        "SQLite 打不开数据库文件。可能原因:\n" +
-        "  · 文件路径不对\n" +
-        "  · 进程没有读权限\n" +
-        "  · 同目录里残留了过期的 .db-shm / .db-wal 锁文件",
+        t.common.hintCantOpen,
     };
   }
 
@@ -259,8 +257,7 @@ function diagnoseError(err: Error): ErrorHint | null {
   if (/no such table|no such column/i.test(m)) {
     return {
       message:
-        "数据库结构不匹配。可能是迁移没跑完,或者环境变量指到了一个旧版本的 .db。\n" +
-        "重启 dev 服务器让 runMigrations 跑一遍,或者检查 CDB_*_DB 指向的文件。",
+        t.common.hintSchema,
     };
   }
 

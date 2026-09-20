@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useI18n } from "@/lib/i18n/client";
 
 type JogressPairCard = {
   id: string;
@@ -42,6 +43,7 @@ export function JogressBadge({
   game: string;
   options: JogressView[];
 }) {
+  const { m } = useI18n();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
@@ -90,13 +92,11 @@ export function JogressBadge({
         ref={btnRef}
         type="button"
         onClick={toggle}
-        aria-label="联展进化"
+        aria-label={m.tile.jogress}
         title={
           none
-            ? `联展进化:${options
-                .map((o) => o.label)
-                .join(" / ")} —— 本卡组里没有能凑出来的组合`
-            : `联展进化:本卡组里有 ${total} 种组合`
+            ? m.tile.jogressNone(options.map((o) => o.label).join(" / "))
+            : m.tile.jogressSome(total)
         }
         className={`h-6 px-1.5 rounded-md text-[11px] font-bold flex items-center gap-0.5 cursor-pointer shadow transition-colors ${
           open
@@ -106,7 +106,7 @@ export function JogressBadge({
               : "bg-black/70 text-white hover:bg-black/85"
         }`}
       >
-        联展 {total}
+        {m.tile.jogressShort(total)}
       </button>
 
       {open && pos && typeof document !== "undefined" ? (
@@ -120,7 +120,7 @@ export function JogressBadge({
         <div
           ref={popRef}
           role="dialog"
-          aria-label="联展组合"
+          aria-label={m.tile.jogressPairs}
           style={{ position: "fixed", top: pos.top, left: pos.left, width: 268 }}
           className="z-[60] max-h-80 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl p-2"
           onClick={(e) => e.preventDefault()}
@@ -135,15 +135,15 @@ export function JogressBadge({
                 ) : null}
                 <span className="text-[11px] text-[var(--color-muted-fg)] break-words">
                   {o.label}
-                  {o.cost !== null ? ` · 费用${o.cost}` : ""}
+                  {o.cost !== null ? m.tile.cost(o.cost) : ""}
                 </span>
               </div>
 
               {o.pairs.length === 0 ? (
                 <div className="px-1 py-1 text-[11px] text-amber-600 dark:text-amber-400">
                   {o.parsed
-                    ? "这副卡组里没有能凑出这个条件的两张卡"
-                    : "这个条件的写法还没支持,请看卡面"}
+                    ? m.tile.noPair
+                    : m.tile.unsupported}
                 </div>
               ) : (
                 <div className="flex flex-col gap-1">

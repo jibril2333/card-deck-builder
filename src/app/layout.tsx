@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { NavTracker } from "@/components/nav-tracker";
+import { HTML_LANG } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/server";
+import { I18nProvider } from "@/lib/i18n/client";
 
 export const metadata: Metadata = {
   title: "DCG Deck Builder",
@@ -30,20 +33,24 @@ export const viewport: Viewport = {
   themeColor: "#02142e",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read here, once, for the whole tree: `lang` has to be right on the very
+  // first byte (see HTML_LANG), and every client component below reads the
+  // locale from the provider rather than from a cookie of its own.
+  const locale = await getLocale();
   return (
-    <html lang="zh" className="h-full antialiased">
+    <html lang={HTML_LANG[locale]} className="h-full antialiased">
       {/* `relative z-10`: the backdrop in globals.css is a fixed ::before /
           ::after on the body, so the app has to sit above it. */}
       <body className="min-h-full flex flex-col relative z-10">
         {/* Counts client-side navigations so BackLink knows whether the entry
             behind us is ours. Renders nothing. */}
         <NavTracker />
-        {children}
+        <I18nProvider locale={locale}>{children}</I18nProvider>
       </body>
     </html>
   );

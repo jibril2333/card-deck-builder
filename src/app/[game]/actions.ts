@@ -15,6 +15,7 @@ import { isSearchableQuery } from "@/lib/search-terms";
 import { isEmptyReport, type ImportReport } from "@/lib/import-report";
 import { requireUser } from "@/lib/auth/session";
 import { field, formAction, z } from "./action-kit";
+import { getMessages } from "@/lib/i18n/server";
 
 // ---------- Cache invalidation helpers ----------
 //
@@ -61,7 +62,7 @@ export const createDeckAction = formAction(
     // useful when someone clicks it without filling in the input.
     const id = digimon.createDeck({
       user_id: me.id,
-      name: input.name || "新卡组",
+      name: input.name || (await getMessages()).deck.newDeckName,
       notes: input.notes || undefined,
       accent_color: input.accent_color || undefined,
     });
@@ -192,7 +193,10 @@ function syncPoolForCard(
 export const createGroupAction = formAction(
   { name: field.trimmed, deck_id: field.list },
   async ({ me, game, input }) => {
-    const id = digimon.createGroup(me.id, input.name || "新卡池");
+    const id = digimon.createGroup(
+      me.id,
+      input.name || (await getMessages()).deck.newPoolName,
+    );
     // A new group is empty; seed it with any decks ticked on the create form.
     if (input.deck_id.length) {
       digimon.setGroupDecks(me.id, id, input.deck_id);
@@ -298,11 +302,12 @@ export async function buildCartScriptAction(
   | { ok: true; script: string; kinds: number; cards: number; yen: number }
   | { ok: false; error: string }
 > {
+  const m = await getMessages();
   const me = await requireUser();
   if (!isGameId(game)) return { ok: false, error: "invalid game" };
   const deck = digimon.getDeck(deckId);
   if (!deck || deck.user_id !== me.id) {
-    return { ok: false, error: "不是你的卡组" };
+    return { ok: false, error: m.deck.notYourDeck };
   }
 
   const cards = digimon.getDeckCards(deckId);
@@ -353,11 +358,11 @@ export async function buildCartScriptAction(
     });
   }
   if (items.length === 0) {
-    return { ok: false, error: "PAO 目前没有这副卡组缺的卡" };
+    return { ok: false, error: m.deck.paoNothingMissing };
   }
   return {
     ok: true,
-    script: paoCartScript(items),
+    script: paoCartScript(items, m.deck.cartDone, m.deck.cartHeader),
     kinds: items.length,
     cards: items.reduce((n, i) => n + i.quantity, 0),
     yen: items.reduce((n, i) => n + i.priceYen * i.quantity, 0),
@@ -596,19 +601,22 @@ export async function importDeckAction(formData: FormData): Promise<{
   missing?: string[];
   error?: string;
 }> {
+  const m = await getMessages();
   const me = await requireUser();
   const game = String(formData.get("game"));
   const rawName = String(formData.get("name") ?? "").trim();
   const text = String(formData.get("text") ?? "");
   if (!isGameId(game)) return { ok: false, error: "invalid game" };
-  if (!text.trim()) return { ok: false, error: "请粘贴卡组文本" };
+  if (!text.trim()) return { ok: false, error: m.deck.pasteDeckText };
   backupBeforeWrite(game);
 
-  const { lines, errors } = parseDeckText(text);
+  const { lines, errors } = parseDeckText(text, m.deck.unparsedLine);
   if (lines.length === 0) {
     return {
       ok: false,
-      error: `没有解析到任何卡（${errors.length ? errors.slice(0, 3).join("; ") : "格式不识别"}）`,
+      error: m.deck.nothingParsed(
+        errors.length ? errors.slice(0, 3).join("; ") : m.deck.formatUnknown,
+      ),
     };
   }
 

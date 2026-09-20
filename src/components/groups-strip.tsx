@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createGroupAction } from "@/app/[game]/actions";
+import { getMessages } from "@/lib/i18n/server";
 
 type GroupLite = {
   id: string;
@@ -12,17 +13,18 @@ type GroupLite = {
  * that share one physical card set) plus a button to create a new one. Each
  * chip links to that group's pooled buy-list view.
  */
-export function GroupsStrip({
+export async function GroupsStrip({
   game,
   groups,
 }: {
   game: string;
   groups: GroupLite[];
 }) {
+  const m = await getMessages();
   return (
     <div className="mb-5 flex items-center gap-2 flex-wrap">
       <span className="text-xs text-[var(--color-muted-fg)] inline-flex items-center gap-1">
-        🎴 共享卡池
+        {m.decks.sharedPools}
       </span>
       {groups.map((g) => (
         <Link
@@ -55,7 +57,7 @@ export function GroupsStrip({
           type="submit"
           className="px-2.5 h-8 rounded-full border border-dashed border-[var(--color-border)] text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:border-[var(--color-fg)] cursor-pointer transition-colors"
         >
-          ＋ 新建卡池
+          {m.decks.newPool}
         </button>
       </form>
     </div>

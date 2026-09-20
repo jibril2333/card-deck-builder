@@ -3,6 +3,7 @@ import path from "node:path";
 import { isAdmin } from "@/lib/auth/admin";
 import { parseSchedule, type RefreshSchedule } from "@/lib/refresh-schedule";
 import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * The automatic refresh's schedule.
@@ -46,6 +47,7 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const m = await getMessages();
   if (!(await isAdmin())) return new Response("forbidden", { status: 403 });
 
   let schedule: RefreshSchedule;
@@ -55,7 +57,7 @@ export async function PUT(req: Request) {
     // that hour 99 doesn't exist.
     schedule = parseSchedule(await req.json(), REFRESH_STAGE_IDS);
   } catch {
-    return Response.json({ ok: false, error: "请求格式不对" }, { status: 400 });
+    return Response.json({ ok: false, error: m.admin.badRequest }, { status: 400 });
   }
 
   try {
@@ -68,7 +70,7 @@ export async function PUT(req: Request) {
   } catch (err) {
     console.error("[admin/schedule] write failed:", err);
     return Response.json(
-      { ok: false, error: "无法写入排程文件" },
+      { ok: false, error: m.admin.cannotWriteSchedule },
       { status: 500 },
     );
   }

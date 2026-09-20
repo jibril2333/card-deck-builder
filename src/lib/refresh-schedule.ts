@@ -39,18 +39,21 @@ export type RefreshSchedule = {
  */
 export const DEFAULT_TIMEZONE = "Asia/Tokyo";
 
-/** The zones the panel offers, in the order it offers them. */
-export const TIMEZONE_CHOICES: { id: string; label: string }[] = [
-  { id: "Asia/Tokyo", label: "日本" },
-  { id: "Asia/Shanghai", label: "中国" },
-  { id: "Asia/Taipei", label: "台北" },
-  { id: "Asia/Seoul", label: "首尔" },
-  { id: "Asia/Singapore", label: "新加坡" },
-  { id: "Europe/London", label: "伦敦" },
-  { id: "Europe/Paris", label: "巴黎" },
-  { id: "America/New_York", label: "纽约" },
-  { id: "America/Los_Angeles", label: "洛杉矶" },
-  { id: "UTC", label: "UTC" },
+/**
+ * The zones the panel offers, in the order it offers them. Named by the
+ * dictionary (`m.admin.timezones`) — a list of places, not of IANA ids.
+ */
+export const TIMEZONE_CHOICES: string[] = [
+  "Asia/Tokyo",
+  "Asia/Shanghai",
+  "Asia/Taipei",
+  "Asia/Seoul",
+  "Asia/Singapore",
+  "Europe/London",
+  "Europe/Paris",
+  "America/New_York",
+  "America/Los_Angeles",
+  "UTC",
 ];
 
 /** What the pipeline did before it was configurable: Mondays at 04:30, everything. */

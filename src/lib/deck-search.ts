@@ -232,8 +232,8 @@ function criteriaLabel(c: Criteria): string {
   return parts.join(" · ");
 }
 
-function slotLabel(slot: Slot): string {
-  return slot.alts.map(criteriaLabel).filter(Boolean).join(" 或 ");
+function slotLabel(slot: Slot, or: string): string {
+  return slot.alts.map(criteriaLabel).filter(Boolean).join(or);
 }
 
 /**
@@ -243,6 +243,8 @@ function slotLabel(slot: Slot): string {
  */
 export function computeDeckSearchTargets(
   cards: SearchableCard[],
+  /** Joins a slot's alternatives for display — the dictionary's `tile.or`. */
+  or: string,
 ): Map<string, SearchGroup[]> {
   const meta = cards.map((c) => ({
     card: c,
@@ -327,7 +329,7 @@ export function computeDeckSearchTargets(
         .join(",");
       if (groupSig.has(sig)) continue; // same slot twice / overlapping wording
       groupSig.add(sig);
-      groups.push({ label: slotLabel(slot), targets });
+      groups.push({ label: slotLabel(slot, or), targets });
     }
 
     if (groups.length > 0) out.set(self.card.id, groups);

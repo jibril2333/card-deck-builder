@@ -6,13 +6,14 @@
  * language of the digimon `cards` table; 'zh'/'ja' overlay from
  * `card_translations` with per-field fallback to EN.
  */
-export const CARD_LANG_COOKIE = "cardLang";
+export { LOCALE_COOKIE as CARD_LANG_COOKIE } from "@/lib/i18n/locale";
 
-export type CardLang = "en" | "zh" | "ja";
-
-export function parseCardLang(v: string | undefined | null): CardLang {
-  return v === "zh" || v === "ja" ? v : "en";
-}
+/**
+ * The card-text language is the site's language — one switch sets both, and
+ * which one a reader gets without a cookie is decided in `lib/i18n/locale`.
+ */
+export type { Locale as CardLang } from "@/lib/i18n/locale";
+import type { Locale as CardLang } from "@/lib/i18n/locale";
 
 export const CARD_LANG_LABELS: Record<CardLang, string> = {
   en: "EN",

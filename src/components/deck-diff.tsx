@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getMessages } from "@/lib/i18n/server";
 
 export type DiffCard = {
   code: string;
@@ -56,7 +57,7 @@ export function computeDeckDiff(
  * Server component: the whole thing is a function of `?compare=<deckId>`,
  * so picking a deck is a navigation and the result arrives rendered.
  */
-export function DeckDiffPanel({
+export async function DeckDiffPanel({
   game,
   a,
   b,
@@ -72,18 +73,19 @@ export function DeckDiffPanel({
   };
   closeHref: string;
 }) {
+  const m = await getMessages();
   const { onlyA, onlyB, diffQty, sameKinds } = computeDeckDiff(a.cards, b.cards);
   const identical =
     onlyA.length === 0 && onlyB.length === 0 && diffQty.length === 0;
 
   return (
     <section
-      aria-label="卡组对比"
+      aria-label={m.deckCards.diff}
       className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3"
     >
       <div className="flex items-center gap-2">
         <h3 className="text-sm font-semibold flex items-center gap-1.5 min-w-0">
-          🔀 对比
+          {m.deckCards.diffButton}
           <span className="text-[var(--color-muted-fg)] font-normal truncate">
             {b.name}
             {b.ownerName ? ` · ${b.ownerName}` : ""}
@@ -93,7 +95,7 @@ export function DeckDiffPanel({
           href={closeHref}
           replace
           scroll={false}
-          aria-label="结束对比"
+          aria-label={m.deckCards.endDiff}
           className="ml-auto shrink-0 text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] text-sm px-1"
         >
           ×
@@ -102,30 +104,30 @@ export function DeckDiffPanel({
 
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-[var(--color-border)] pt-2.5 text-xs text-[var(--color-muted-fg)]">
         <div>
-          本卡组独有{" "}
+          {m.deckCards.onlyHere}{" "}
           <b className="text-[var(--color-fg)] tabular-nums">{onlyA.length}</b>{" "}
-          · 数量不同{" "}
+          {m.deckCards.qtyDiffersSep}{" "}
           <b className="text-[var(--color-fg)] tabular-nums">
             {diffQty.length}
           </b>{" "}
-          · 对比卡组独有{" "}
+          {m.deckCards.onlyThereSep}{" "}
           <b className="text-[var(--color-fg)] tabular-nums">{onlyB.length}</b>
         </div>
         <div>
-          相同 <b className="text-[var(--color-fg)] tabular-nums">{sameKinds}</b>{" "}
-          种
+          {m.deckCards.sameBefore} <b className="text-[var(--color-fg)] tabular-nums">{sameKinds}</b>{" "}
+          {m.deckCards.sameAfter(sameKinds)}
         </div>
       </div>
 
       {identical ? (
         <div className="text-xs text-[var(--color-muted-fg)] py-3 text-center">
-          两副卡组内容相同
+          {m.deckCards.identical}
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-3">
           <DiffColumn
             game={game}
-            title="本卡组独有"
+            title={m.deckCards.onlyHere}
             subtitle={a.name}
             accent={a.accent}
             cards={onlyA.map((c) => ({
@@ -138,8 +140,8 @@ export function DeckDiffPanel({
           />
           <DiffColumn
             game={game}
-            title="数量不同"
-            subtitle="本卡组 → 对比卡组"
+            title={m.deckCards.qtyDiffers}
+            subtitle={m.deckCards.diffSubtitle}
             accent={null}
             cards={diffQty.map((c) => ({
               code: c.code,
@@ -154,7 +156,7 @@ export function DeckDiffPanel({
           />
           <DiffColumn
             game={game}
-            title="对比卡组独有"
+            title={m.deckCards.onlyThere}
             subtitle={b.name}
             accent={b.accent}
             cards={onlyB.map((c) => ({
@@ -172,7 +174,7 @@ export function DeckDiffPanel({
 }
 
 /** One of the three diff columns. */
-function DiffColumn({
+async function DiffColumn({
   game,
   title,
   subtitle,
@@ -191,6 +193,7 @@ function DiffColumn({
   }[];
   accent: string | null;
 }) {
+  const m = await getMessages();
   return (
     <section
       aria-label={title}
@@ -213,7 +216,7 @@ function DiffColumn({
       </div>
       {cards.length === 0 ? (
         <div className="text-[11px] text-[var(--color-muted-fg)] p-3 text-center">
-          0 张
+          {m.deckCards.zeroCards}
         </div>
       ) : (
         <div className="p-1.5 flex flex-col gap-1">

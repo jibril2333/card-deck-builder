@@ -6,6 +6,7 @@ import { Input, Select } from "@/components/ui/input";
 import { colorHex } from "@/lib/games";
 import { useComposition } from "@/lib/use-composition";
 import { useDebouncedField } from "@/lib/use-debounced-field";
+import { useI18n } from "@/lib/i18n/client";
 
 export type FilterField =
   | {
@@ -77,6 +78,7 @@ type Props = {
 };
 
 export function FilterForm({ basePath, fields, sortOptions }: Props) {
+  const { m } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -172,7 +174,7 @@ export function FilterForm({ basePath, fields, sortOptions }: Props) {
             className="h-8 text-xs w-full"
             aria-label={f.label}
           >
-            <option value="">{f.placeholder ?? "全部"}</option>
+            <option value="">{f.placeholder ?? m.filters.all}</option>
             {f.options.map((o) => {
               const { value, label } =
                 typeof o === "string" ? { value: o, label: o } : o;
@@ -242,9 +244,9 @@ export function FilterForm({ basePath, fields, sortOptions }: Props) {
             value={searchParams.get("sort") ?? ""}
             onChange={(e) => nav({ sort: e.target.value || undefined })}
             className="h-8 text-xs flex-1"
-            aria-label="排序"
+            aria-label={m.filters.sort}
           >
-            <option value="">默认排序</option>
+            <option value="">{m.filters.defaultSort}</option>
             {sortOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -257,9 +259,9 @@ export function FilterForm({ basePath, fields, sortOptions }: Props) {
             type="button"
             onClick={clearAll}
             className="px-2 h-8 text-xs rounded-md border border-[var(--color-border)] hover:bg-[var(--color-muted)] cursor-pointer text-[var(--color-muted-fg)]"
-            title="清空全部筛选"
+            title={m.filters.clearAll}
           >
-            清空
+            {m.filters.clear}
           </button>
         ) : null}
       </div>
@@ -368,6 +370,7 @@ function SearchField({
   value: string;
   onCommit: (v: string) => void;
 }) {
+  const { m } = useI18n();
   // Don't navigate on the romaji an IME emits while composing — see
   // `useComposition`. The composed word is scheduled from onCompositionEnd
   // below, where the flag has already been cleared.
@@ -420,7 +423,7 @@ function SearchField({
             type="button"
             onClick={() => q.flush({ q: "" })}
             className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-fg)] text-xs cursor-pointer flex items-center justify-center"
-            aria-label="清空"
+            aria-label={m.filters.clear}
           >
             ×
           </button>
@@ -435,7 +438,7 @@ function SearchField({
             onChange={(e) => onWide(e.target.checked)}
             className="accent-[var(--color-accent)]"
           />
-          {field.wideLabel ?? "同时搜索效果文本"}
+          {field.wideLabel ?? m.filters.searchEffectText}
         </label>
       ) : null}
     </div>
@@ -451,13 +454,14 @@ function MultiField({
   selected: string[];
   onToggle: (v: string) => void;
 }) {
+  const { m } = useI18n();
   return (
     <div>
       <FieldLabel>
         {field.label}
         {field.maxSelect != null ? (
           <span className="ml-1 normal-case text-[var(--color-muted-fg)]">
-            (最多 {field.maxSelect}·交集)
+            {m.filters.maxIntersect(field.maxSelect)}
           </span>
         ) : null}
       </FieldLabel>
@@ -499,6 +503,7 @@ function MultiScrollField({
   selected: string[];
   onToggle: (v: string) => void;
 }) {
+  const { m } = useI18n();
   const [query, setQuery] = useState("");
   const filtered = query
     ? field.options.filter((o) =>
@@ -517,7 +522,7 @@ function MultiScrollField({
         ) : null}
       </FieldLabel>
       <Input
-        placeholder={`在 ${field.options.length} 项中搜…`}
+        placeholder={m.filters.searchWithin(field.options.length)}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="h-7 text-xs mb-1"
@@ -529,7 +534,7 @@ function MultiScrollField({
       <div className="border border-[var(--color-border)] rounded-md bg-[var(--color-card)] max-h-36 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="p-2 text-[11px] text-[var(--color-muted-fg)] text-center">
-            无匹配
+            {m.filters.noMatch}
           </div>
         ) : (
           filtered.map((o) => (
@@ -594,6 +599,7 @@ function RangeSelect({
   maxValue: string;
   onCommit: (min: string, max: string) => void;
 }) {
+  const { m } = useI18n();
   // Normalize options into {value, label}[]
   const opts: { value: number; label: string }[] = (field.options ?? []).map(
     (o) =>
@@ -614,7 +620,7 @@ function RangeSelect({
           value={minValue}
           onChange={(e) => onCommit(e.target.value, maxValue)}
           className="h-7 text-xs px-1.5 flex-1 min-w-0"
-          aria-label={`${field.label} 最小值`}
+          aria-label={m.filters.min(field.label)}
         >
           <option value="">—</option>
           {minOpts.map((o) => (
@@ -628,7 +634,7 @@ function RangeSelect({
           value={maxValue}
           onChange={(e) => onCommit(minValue, e.target.value)}
           className="h-7 text-xs px-1.5 flex-1 min-w-0"
-          aria-label={`${field.label} 最大值`}
+          aria-label={m.filters.max(field.label)}
         >
           <option value="">—</option>
           {maxOpts.map((o) => (

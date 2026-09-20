@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { deleteDeckAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Delete the deck. Lives at the bottom of the sidebar, under the stats —
@@ -17,10 +18,11 @@ export function DeckDeleteButton({
   deckId: string;
   deckName: string;
 }) {
+  const { m } = useI18n();
   const [pending, startTransition] = useTransition();
 
   function onDelete() {
-    if (!confirm(`确认删除卡组「${deckName}」？这会同时移除其中所有卡。`)) return;
+    if (!confirm(m.deck.confirmDelete(deckName))) return;
     const fd = new FormData();
     fd.set("game", game);
     fd.set("id", deckId);
@@ -36,7 +38,7 @@ export function DeckDeleteButton({
       disabled={pending}
       className="w-full px-3 h-9 rounded-md text-sm border border-red-500/40 text-red-500 hover:bg-red-500/10 disabled:opacity-50 cursor-pointer transition-colors"
     >
-      {pending ? "删除中…" : "删除卡组"}
+      {pending ? m.deck.deleting : m.deck.deleteDeck}
     </button>
   );
 }

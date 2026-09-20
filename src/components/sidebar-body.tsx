@@ -7,7 +7,7 @@ import { GAMES, type GameId } from "@/lib/games";
 import { cn } from "@/lib/utils";
 import { UserMenu } from "@/components/user-menu";
 import { CardLangSwitcher } from "@/components/card-lang-switcher";
-import type { CardLang } from "@/lib/card-lang";
+import { useI18n } from "@/lib/i18n/client";
 import { BuildStamp } from "@/components/build-stamp";
 import type { BuildInfo } from "@/lib/build-info";
 
@@ -20,23 +20,19 @@ type NavId =
   | "about"
   | "settings";
 
-const NAV: { id: NavId; label: string; icon: string; sub: string }[] = [
-  { id: "search", label: "卡牌检索", icon: "🔍", sub: "Cards" },
-  { id: "decks", label: "我的卡组", icon: "🗂️", sub: "Decks" },
-  { id: "collection", label: "已收集", icon: "📦", sub: "Collection" },
-  { id: "restrictions", label: "禁制限卡", icon: "🚫", sub: "Banlist" },
-  { id: "memory", label: "内存条", icon: "🎚️", sub: "Memory" },
-  { id: "about", label: "游戏知识", icon: "📖", sub: "About" },
+/** Order is the sidebar's; the words come from the dictionary. */
+const NAV: { id: NavId; icon: string }[] = [
+  { id: "search", icon: "🔍" },
+  { id: "decks", icon: "🗂️" },
+  { id: "collection", icon: "📦" },
+  { id: "restrictions", icon: "🚫" },
+  { id: "memory", icon: "🎚️" },
+  { id: "about", icon: "📖" },
 ];
 
 // Everyone signed in has settings (passkeys, their own data); admins see the
 // card-data panels on the same page. The gate is inside the page, not here.
-const SETTINGS_NAV = {
-  id: "settings" as const,
-  label: "设置",
-  icon: "⚙️",
-  sub: "Settings",
-};
+const SETTINGS_NAV = { id: "settings" as const, icon: "⚙️" };
 
 function hrefFor(id: NavId, game: string): string {
   return id === "search" ? `/${game}` : `/${game}/${id}`;
@@ -74,16 +70,15 @@ function activeFor(pathname: string, game: string): NavId {
 export function SidebarBody({
   game,
   loggedIn,
-  cardLang,
   user,
   build,
 }: {
   game: GameId;
   loggedIn: boolean;
-  cardLang: CardLang;
   user: React.ComponentProps<typeof UserMenu>["user"] | null;
   build: BuildInfo;
 }) {
+  const { m } = useI18n();
   const pathname = usePathname() ?? `/${game}`;
   const active = activeFor(pathname, game);
   const [open, setOpen] = useState(false);
@@ -139,7 +134,7 @@ export function SidebarBody({
           rail && "hidden lg:block",
         )}
       >
-        选单
+        {m.nav.menu}
       </div>
       {items.map((n) => {
         const isActive = n.id === active;
@@ -151,7 +146,7 @@ export function SidebarBody({
             aria-current={isActive ? "page" : undefined}
             // Only useful in the rail, and that branch always has a pointer —
             // a tooltip is a thing that can actually be reached there.
-            title={rail ? n.label : undefined}
+            title={rail ? m.nav[n.id] : undefined}
             className={cn(
               "flex items-center gap-2.5 h-10 rounded-lg text-sm transition-colors",
               rail
@@ -168,7 +163,7 @@ export function SidebarBody({
             >
               {n.icon}
             </span>
-            <span className={rail ? "hidden lg:inline" : ""}>{n.label}</span>
+            <span className={rail ? "hidden lg:inline" : ""}>{m.nav[n.id]}</span>
           </Link>
         );
       })}
@@ -178,7 +173,7 @@ export function SidebarBody({
   /** The drawer's footer: always the full-width version. */
   const footer = (
     <div className="flex flex-col gap-2">
-      <CardLangSwitcher current={cardLang} />
+      <CardLangSwitcher />
       {user ? (
         <UserMenu user={user} />
       ) : (
@@ -187,7 +182,7 @@ export function SidebarBody({
           onClick={() => setOpen(false)}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] border border-[var(--color-border)] rounded-lg px-3 h-9 flex items-center gap-2"
         >
-          <span aria-hidden>👤</span> 登录
+          <span aria-hidden>👤</span> {m.nav.login}
         </Link>
       )}
       <BuildStamp info={build} />
@@ -202,20 +197,17 @@ export function SidebarBody({
    */
   const railFooter = (
     <div className="flex flex-col gap-2">
-      <CardLangSwitcher
-        current={cardLang}
-        className="flex-col lg:flex-row items-stretch lg:items-center"
-      />
+      <CardLangSwitcher className="flex-col lg:flex-row items-stretch lg:items-center" />
       {user ? (
         <UserMenu user={user} compact />
       ) : (
         <Link
           href="/login"
-          title="登录"
+          title={m.nav.login}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] border border-[var(--color-border)] rounded-lg h-9 flex items-center justify-center lg:justify-start gap-2 lg:px-3"
         >
           <span aria-hidden>👤</span>
-          <span className="hidden lg:inline">登录</span>
+          <span className="hidden lg:inline">{m.nav.login}</span>
         </Link>
       )}
       <div className="hidden lg:block">
@@ -248,14 +240,14 @@ export function SidebarBody({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            aria-label="打开菜单"
+            aria-label={m.nav.openMenu}
             className="w-9 h-9 rounded-md border border-[var(--color-border)] flex items-center justify-center text-lg cursor-pointer"
           >
             ☰
           </button>
           {brand}
           <div className="ml-auto flex items-center gap-2">
-            <CardLangSwitcher current={cardLang} />
+            <CardLangSwitcher />
           </div>
         </div>
       </div>
@@ -277,7 +269,7 @@ export function SidebarBody({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="关闭"
+                aria-label={m.nav.close}
                 className="w-8 h-8 rounded-md hover:bg-[var(--color-muted)] cursor-pointer text-lg"
               >
                 ×

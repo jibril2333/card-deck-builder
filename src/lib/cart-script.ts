@@ -29,7 +29,24 @@ export type CartItem = {
  * reader pastes is exactly what is written here, which matters for something
  * they are being asked to run.
  */
-export function paoCartScript(items: CartItem[]): string {
+export function paoCartScript(
+  items: CartItem[],
+  /**
+   * What the script says when it finishes, with `{ok}`, `{total}` and
+   * `{yen}` filled in.
+   *
+   * A template rather than a function, unlike every other message on the
+   * site: this text has to survive being serialised into the snippet the
+   * reader pastes into the shop's own console, and a closure does not.
+   */
+  doneMessage: string,
+  /**
+   * The two comment lines at the top of the snippet. The reader looks at
+   * this text in their own console before running it, so it is theirs to
+   * read — and, like `doneMessage`, it has to survive serialisation.
+   */
+  header: string,
+): string {
   const list = items.map((i) => ({
     code: i.code,
     id: i.itemCode,
@@ -37,8 +54,7 @@ export function paoCartScript(items: CartItem[]): string {
     name: i.name,
     price: i.priceYen,
   }));
-  return `// 在 pao-onlineshop.com 的页面上运行:F12 → Console → 粘贴回车
-// 只加入购物车,不结算、不付款。
+  return `${header}
 (async () => {
   const items = ${JSON.stringify(list, null, 2)};
   let ok = 0, yen = 0;
@@ -61,7 +77,10 @@ export function paoCartScript(items: CartItem[]): string {
     console.log(r.result ? "OK  " : "FAIL", it.code, "x" + it.n, it.name);
     await new Promise((done) => setTimeout(done, 400));
   }
-  alert("加入购物车:" + ok + "/" + items.length + " 种,合计约 ¥" + yen);
+  alert(${JSON.stringify(doneMessage)}
+    .replace("{ok}", ok)
+    .replace("{total}", items.length)
+    .replace("{yen}", yen));
 })();
 `;
 }

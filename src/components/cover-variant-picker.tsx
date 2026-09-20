@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDeckCoverVariantAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 export type CoverArt = {
   /** `card_images.variant` — "" for the base print, "_P1" etc for alt arts. */
@@ -32,6 +33,7 @@ export function CoverVariantPicker({
   /** Currently-selected variant key. */
   current: string;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -50,7 +52,7 @@ export function CoverVariantPicker({
   return (
     <div>
       <div className="text-xs text-[var(--color-muted-fg)] mb-1.5">
-        封面异画（{arts.length} 种）
+        {m.deck.coverArts(arts.length)}
       </div>
       <div className={`art-strip ${pending ? "opacity-60" : ""}`}>
         {arts.map((a) => {
@@ -61,7 +63,7 @@ export function CoverVariantPicker({
               type="button"
               onClick={() => pick(a.variant)}
               disabled={pending}
-              title={a.variant ? `异画 ${a.variant.replace("_", "")}` : "原版"}
+              title={a.variant ? m.deck.parallel(a.variant.replace("_", "")) : m.deck.base}
               aria-pressed={active}
               className={`aspect-[5/7] rounded overflow-hidden border-2 transition-all cursor-pointer relative disabled:cursor-wait ${
                 active
@@ -71,13 +73,13 @@ export function CoverVariantPicker({
             >
               <img
                 src={a.image_url}
-                alt={a.variant || "原版"}
+                alt={a.variant || m.deck.base}
                 loading="lazy"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
               />
               <span className="absolute bottom-0 left-0 right-0 text-[8px] font-bold text-white bg-black/65 text-center leading-tight py-0.5">
-                {a.variant ? a.variant.replace("_", "") : "原"}
+                {a.variant ? a.variant.replace("_", "") : m.deck.baseShort}
               </span>
             </button>
           );

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTransition } from "react";
 import { logoutAction } from "@/lib/auth/actions";
 import type { User } from "@/lib/auth/types";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Top-nav user avatar + dropdown. Shows the display name; clicking opens a
@@ -21,6 +22,7 @@ export function UserMenu({
   user: User;
   compact?: boolean;
 }) {
+  const { m } = useI18n();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -51,7 +53,7 @@ export function UserMenu({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="账号菜单"
+        aria-label={m.nav.accountMenu}
         aria-expanded={open}
         className="h-8 px-2 rounded-md hover:bg-[var(--color-muted)] flex items-center gap-2 text-sm cursor-pointer"
       >
@@ -97,7 +99,7 @@ export function UserMenu({
               disabled={pending}
               className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--color-muted)] cursor-pointer disabled:cursor-wait"
             >
-              {pending ? "登出中…" : "登出"}
+              {pending ? m.nav.loggingOut : m.nav.logout}
             </button>
           </form>
         </div>

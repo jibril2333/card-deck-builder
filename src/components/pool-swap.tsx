@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n/client";
 
 type SwapCard = {
   card_id: string;
@@ -39,6 +40,7 @@ export function PoolSwap({
   decks: DeckLite[];
   cards: SwapCard[];
 }) {
+  const { m } = useI18n();
   const [open, setOpen] = useState(false);
   const [aId, setAId] = useState(decks[0]?.id ?? "");
   const [bId, setBId] = useState(decks[1]?.id ?? decks[0]?.id ?? "");
@@ -142,9 +144,9 @@ export function PoolSwap({
           {short && short > 0 ? (
             <span
               className="text-[10px] text-amber-500 shrink-0"
-              title={`你只持有 ${c.owned} 张，组这套还差 ${short} 张`}
+              title={m.pool.shortTitle(c.owned, short)}
             >
-              ⚠缺{short}
+              {m.pool.shortBadge(short)}
             </span>
           ) : null}
         </Link>
@@ -160,9 +162,9 @@ export function PoolSwap({
         className="w-full flex items-center gap-2 px-3 py-2.5 cursor-pointer text-left"
         aria-expanded={open}
       >
-        <span className="text-sm font-semibold">🔄 换组装（A → B）</span>
+        <span className="text-sm font-semibold">{m.pool.swapTitle}</span>
         <span className="text-xs text-[var(--color-muted-fg)]">
-          换着玩时拆/装哪些卡
+          {m.pool.swapHint}
         </span>
         <span
           className={`ml-auto text-[var(--color-muted-fg)] transition-transform ${
@@ -177,7 +179,7 @@ export function PoolSwap({
         <div className="px-3 pb-3 border-t border-[var(--color-border)] pt-3">
           {/* A → B picker */}
           <div className="flex items-center gap-2 flex-wrap text-sm">
-            <span className="text-[var(--color-muted-fg)]">从</span>
+            <span className="text-[var(--color-muted-fg)]">{m.pool.from}</span>
             <DeckSelect
               decks={decks}
               value={aId}
@@ -195,12 +197,12 @@ export function PoolSwap({
                 setModeChoice("auto");
               }}
               className="w-7 h-7 rounded-md border border-[var(--color-border)] hover:bg-[var(--color-muted)] cursor-pointer"
-              title="对调 A / B"
-              aria-label="对调"
+              title={m.pool.swapAB}
+              aria-label={m.pool.swap}
             >
               ⇄
             </button>
-            <span className="text-[var(--color-muted-fg)]">变成</span>
+            <span className="text-[var(--color-muted-fg)]">{m.pool.to}</span>
             <DeckSelect
               decks={decks}
               value={bId}
@@ -214,7 +216,7 @@ export function PoolSwap({
 
           {sameDeck ? (
             <p className="text-sm text-[var(--color-muted-fg)] mt-3">
-              选两个不同的卡组。
+              {m.pool.pickTwo}
             </p>
           ) : (
             <>
@@ -229,9 +231,9 @@ export function PoolSwap({
                       ? "bg-[var(--color-muted)] font-medium"
                       : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
                   }`}
-                  title="保持 A 不拆，抽掉差异、补上差异——共用卡多时更省事"
+                  title={m.pool.editTitle}
                 >
-                  🔧 拆改（动 {outTotal + inTotal} 张）
+                  {m.pool.editButton(outTotal + inTotal)}
                 </button>
                 <button
                   type="button"
@@ -241,16 +243,17 @@ export function PoolSwap({
                       ? "bg-[var(--color-muted)] font-medium"
                       : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
                   }`}
-                  title="把 A 整副拆散放回，只挑出 B 也要用的，再加上其余——共用卡少时更省事"
+                  title={m.pool.rebuildTitle}
                 >
-                  ♻️ 重挑（动 {keepTotal + inTotal} 张）
+                  {m.pool.rebuildButton(keepTotal + inTotal)}
                 </button>
               </div>
 
               {mode === "rebuild" ? (
                 <p className="text-xs text-[var(--color-muted-fg)] mt-2">
-                  把「{aName}」整副拆散放回收纳，从里面<b>只挑出</b>下面左列这
-                  {keepTotal} 张（B 也要用），其余整堆收走，再把右列加上。
+                  {m.pool.rebuildBefore(aName)}
+                  <b>{m.pool.rebuildBold}</b>
+                  {m.pool.rebuildAfter(keepTotal)}
                 </p>
               ) : null}
 
@@ -258,11 +261,11 @@ export function PoolSwap({
                 <div>
                   {mode === "edit" ? (
                     <div className="text-xs font-semibold text-red-500 mb-1 pb-1 border-b border-[var(--color-border)]">
-                      ➖ 去掉 {outTotal} 张
+                      {m.pool.removeN(outTotal)}
                     </div>
                   ) : (
                     <div className="text-xs font-semibold text-sky-500 mb-1 pb-1 border-b border-[var(--color-border)]">
-                      🔍 挑出保留 {keepTotal} 张
+                      {m.pool.keepN(keepTotal)}
                     </div>
                   )}
                   {(mode === "edit" ? takeOut : keep).length ? (
@@ -273,13 +276,13 @@ export function PoolSwap({
                     </ul>
                   ) : (
                     <p className="text-xs text-[var(--color-muted-fg)] py-1">
-                      无
+                      {m.pool.none}
                     </p>
                   )}
                 </div>
                 <div>
                   <div className="text-xs font-semibold text-green-600 mb-1 pb-1 border-b border-[var(--color-border)]">
-                    ➕ 加上 {inTotal} 张
+                    {m.pool.addN(inTotal)}
                   </div>
                   {putIn.length ? (
                     <ul className="divide-y divide-[var(--color-border)]/40">
@@ -289,7 +292,7 @@ export function PoolSwap({
                     </ul>
                   ) : (
                     <p className="text-xs text-[var(--color-muted-fg)] py-1">
-                      无
+                      {m.pool.none}
                     </p>
                   )}
                 </div>

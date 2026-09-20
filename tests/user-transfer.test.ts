@@ -5,7 +5,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { seedDigimonDb, seedUserDb } from "./e2e/fixtures/seed";
-import { describeExport, isUserExport, type UserExport } from "@/lib/user-data";
+import { exportCounts, isUserExport, type UserExport } from "@/lib/user-data";
+import { MESSAGES } from "@/lib/i18n/messages";
 
 /**
  * Moving one account's work from one install to another.
@@ -89,7 +90,7 @@ describe("user data transfer", () => {
 
     const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as UserExport;
     expect(isUserExport(parsed)).toBe(true);
-    expect(describeExport(parsed)).toContain("1 副卡组");
+    expect(MESSAGES.zh.account.counts(exportCounts(parsed))).toContain("1 副卡组");
 
     // Install B: a different person id entirely.
     const landed = await run(

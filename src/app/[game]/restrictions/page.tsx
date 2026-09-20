@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { isGameId, colorHex } from "@/lib/games";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { getLocale } from "@/lib/i18n/server";
 import { RestrictionBadge } from "@/components/restriction-badge";
 import * as digimon from "@/lib/db/digimon";
+import { getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,7 @@ export default async function RestrictionsPage({
 }: {
   params: Promise<{ game: string }>;
 }) {
+  const m = await getMessages();
   const { game } = await params;
   if (!isGameId(game)) notFound();
 
@@ -40,9 +41,7 @@ export default async function RestrictionsPage({
   // localized scan (or the reverse), and `?? ` per field keeps the half that
   // exists instead of dropping both.
   {
-    const cardLang = parseCardLang(
-      (await cookies()).get(CARD_LANG_COOKIE)?.value,
-    );
+    const cardLang = await getLocale();
     const codes = [
       ...rows.map((r) => r.card_code).filter((c): c is string => !!c),
       ...pairEdges.flatMap((e) => [e.trigger_code, e.banned_code]),
@@ -120,18 +119,18 @@ export default async function RestrictionsPage({
         <header className="mb-5">
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <span aria-hidden>🚫</span>
-            禁卡 / 制限卡
+            {m.restrictions.title}
             <span className="text-[var(--color-muted-fg)] font-normal text-sm tabular-nums">
               ({rows.length}
-              {pairGroups.length > 0 ? ` · ${pairGroups.length} 组合` : ""})
+              {pairGroups.length > 0 ? m.restrictions.pairCount(pairGroups.length) : ""})
             </span>
           </h1>
           <p className="text-xs text-[var(--color-muted-fg)] mt-1">
-            按身份计算:本体 + 异画合计
+            {m.restrictions.byIdentity}
             {lastSync ? (
               <>
                 {" "}
-                最后同步:{" "}
+                {m.restrictions.lastSync}{" "}
                 <span className="tabular-nums">{lastSync.slice(0, 10)}</span>
               </>
             ) : null}
@@ -140,28 +139,28 @@ export default async function RestrictionsPage({
 
         {rows.length === 0 && pairGroups.length === 0 ? (
           <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">
-            暂无禁制限卡数据,将在下次同步后显示。
+            {m.restrictions.empty}
           </div>
         ) : (
           <div className="space-y-8">
             <Section
               kind="banned"
-              title="禁卡"
-              caption="不能放入卡组"
+              title={m.restrictions.banned}
+              caption={m.restrictions.bannedCaption}
               rows={banned}
               game={game}
             />
             <Section
               kind="limited_1"
-              title="制限 1"
-              caption="卡组中最多 1 张(含异画)"
+              title={m.restrictions.limited1}
+              caption={m.restrictions.limited1Caption}
               rows={limited1}
               game={game}
             />
             <Section
               kind="limited_2"
-              title="制限 2"
-              caption="卡组中最多 2 张(含异画)"
+              title={m.restrictions.limited2}
+              caption={m.restrictions.limited2Caption}
               rows={limited2}
               game={game}
             />
@@ -188,7 +187,7 @@ type Row = {
   card_type: string | null;
 };
 
-function Section({
+async function Section({
   kind,
   title,
   caption,
@@ -201,6 +200,7 @@ function Section({
   rows: Row[];
   game: string;
 }) {
+  const m = await getMessages();
   if (rows.length === 0) return null;
   const accentClass =
     kind === "banned" ? "border-red-500/40" : "border-amber-500/40";
@@ -220,7 +220,7 @@ function Section({
         <span className="text-xs text-[var(--color-muted-fg)]">·</span>
         <span className="text-xs text-[var(--color-muted-fg)]">{caption}</span>
         <span className="ml-auto text-xs text-[var(--color-muted-fg)] tabular-nums">
-          {rows.length} 种
+          {m.restrictions.kinds(rows.length)}
         </span>
       </header>
       {/* Four to a row on a phone, like every other card grid in the app — a
@@ -237,7 +237,8 @@ function Section({
   );
 }
 
-function RestrictionCard({ row, game }: { row: Row; game: string }) {
+async function RestrictionCard({ row, game }: { row: Row; game: string }) {
+  const m = await getMessages();
   const href = row.card_code
     ? `/${game}/card/${row.card_code
         .split("/")
@@ -257,15 +258,15 @@ function RestrictionCard({ row, game }: { row: Row; game: string }) {
           />
         ) : (
           <div className="absolute inset-0 grid place-items-center text-[10px] text-[var(--color-muted-fg)] p-2 text-center">
-            缺图
+            {m.restrictions.noImage}
           </div>
         )}
         {row.includes_parallel === 0 ? (
           <span
             className="absolute top-0.5 left-0.5 sm:top-1.5 sm:left-1.5 px-1 sm:px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-medium bg-black/70 text-white"
-            title="本条限制不包括异画卡 — 异画各自按标准 4 张上限"
+            title={m.restrictions.excludesParallelTitle}
           >
-            不含异画
+            {m.restrictions.excludesParallel}
           </span>
         ) : null}
       </div>
@@ -285,7 +286,7 @@ function RestrictionCard({ row, game }: { row: Row; game: string }) {
         </div>
         <div className="text-[10.5px] leading-tight sm:text-xs sm:leading-normal font-medium truncate group-hover:text-[var(--color-accent)]">
           {row.card_name ?? (
-            <span className="text-[var(--color-muted-fg)]">未在卡库中</span>
+            <span className="text-[var(--color-muted-fg)]">{m.restrictions.notInLibrary}</span>
           )}
         </div>
       </div>
@@ -326,21 +327,22 @@ type PairGroup = {
  * the trigger card alone; you CAN play the banned cards alone; the rule is
  * about co-occurrence.
  */
-function PairsSection({ groups, game }: { groups: PairGroup[]; game: string }) {
+async function PairsSection({ groups, game }: { groups: PairGroup[]; game: string }) {
+  const m = await getMessages();
   if (groups.length === 0) return null;
   return (
     <section className="rounded-lg border border-purple-500/40 bg-[var(--color-card)]">
       <header className="flex items-baseline gap-2 px-4 py-3 border-b border-[var(--color-border)]">
         <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] rounded-md font-bold text-white bg-purple-600 shadow">
-          组合
+          {m.restrictions.pairTag}
         </span>
-        <h2 className="text-sm font-semibold">禁卡组合</h2>
+        <h2 className="text-sm font-semibold">{m.restrictions.pairsTitle}</h2>
         <span className="text-xs text-[var(--color-muted-fg)]">·</span>
         <span className="text-xs text-[var(--color-muted-fg)]">
-          A 出现在卡组里 ⇒ B 不能与 A 同卡组
+          {m.restrictions.pairsCaption}
         </span>
         <span className="ml-auto text-xs text-[var(--color-muted-fg)] tabular-nums">
-          {groups.length} 组
+          {m.restrictions.pairGroups(groups.length)}
         </span>
       </header>
       <div className="divide-y divide-[var(--color-border)]">
@@ -352,7 +354,8 @@ function PairsSection({ groups, game }: { groups: PairGroup[]; game: string }) {
   );
 }
 
-function PairRow({ group, game }: { group: PairGroup; game: string }) {
+async function PairRow({ group, game }: { group: PairGroup; game: string }) {
+  const m = await getMessages();
   return (
     // ONE grid, with the same column ladder as the sections above (4 / 5 / 6 /
     // 8 across). Every card on this page is then exactly the same width at
@@ -378,7 +381,7 @@ function PairRow({ group, game }: { group: PairGroup; game: string }) {
           />
         </div>
         <span
-          title={`卡组里有这张卡时,右边 ${group.banned.length} 张都不能同组`}
+          title={m.restrictions.pairRowTitle(group.banned.length)}
           className="absolute right-1 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center shadow"
         >
           ⇒
@@ -399,7 +402,7 @@ function PairRow({ group, game }: { group: PairGroup; game: string }) {
   );
 }
 
-function PairCard({
+async function PairCard({
   identity,
   code,
   name,
@@ -414,6 +417,7 @@ function PairCard({
   color: string | null;
   game: string;
 }) {
+  const m = await getMessages();
   const href = code
     ? `/${game}/card/${code.split("/").map(encodeURIComponent).join("/")}`
     : null;
@@ -430,7 +434,7 @@ function PairCard({
           />
         ) : (
           <div className="absolute inset-0 grid place-items-center text-[10px] text-[var(--color-muted-fg)] p-2 text-center">
-            缺图
+            {m.restrictions.noImage}
           </div>
         )}
       </div>
@@ -448,7 +452,7 @@ function PairCard({
         </div>
         <div className="text-xs font-medium truncate group-hover:text-[var(--color-accent)]">
           {name ?? (
-            <span className="text-[var(--color-muted-fg)]">未在卡库中</span>
+            <span className="text-[var(--color-muted-fg)]">{m.restrictions.notInLibrary}</span>
           )}
         </div>
       </div>

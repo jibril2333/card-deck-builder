@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { SearchGroup } from "@/lib/deck-search";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * "🔍 N" badge on a deck card with a search/tutor effect. N is how many
@@ -23,6 +24,7 @@ export function SearchTargets({
   game: string;
   groups: SearchGroup[];
 }) {
+  const { m } = useI18n();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
@@ -76,9 +78,7 @@ export function SearchTargets({
         ref={btnRef}
         type="button"
         onClick={toggle}
-        title={`检索:${
-          multi ? `${groups.length} 个槽,` : ""
-        }共可拿本卡组 ${distinctCount} 张`}
+        title={m.tile.searchTitle(multi ? groups.length : null, distinctCount)}
         className={`h-6 px-1.5 rounded-md text-[11px] font-bold flex items-center gap-0.5 cursor-pointer shadow transition-colors ${
           open
             ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
@@ -87,7 +87,7 @@ export function SearchTargets({
       >
         🔍 {distinctCount}
         {multi ? (
-          <span className="opacity-80 font-normal">·{groups.length}槽</span>
+          <span className="opacity-80 font-normal">{m.tile.slots(groups.length)}</span>
         ) : null}
       </button>
 
@@ -110,7 +110,7 @@ export function SearchTargets({
                   </span>
                 ) : null}
                 <span className="text-[11px] text-[var(--color-muted-fg)] truncate">
-                  {g.label || "可检索"} · {g.targets.length}
+                  {g.label || m.tile.searchable} · {g.targets.length}
                 </span>
               </div>
               <div className="flex flex-col gap-1">

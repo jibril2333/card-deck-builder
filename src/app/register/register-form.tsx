@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { registerAction } from "@/lib/auth/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 export function RegisterForm({ initialInvite }: { initialInvite: string }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -28,13 +30,13 @@ export function RegisterForm({ initialInvite }: { initialInvite: string }) {
     <form action={onSubmit} className="space-y-3">
       <label className="block">
         <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]">
-          邀请码
+          {m.auth.inviteCodeLabel}
         </span>
         <Input
           name="invite"
           required
           defaultValue={initialInvite}
-          placeholder="一串字母数字"
+          placeholder={m.auth.invitePlaceholder}
           autoComplete="off"
           spellCheck={false}
           className="mt-1 font-mono"
@@ -43,20 +45,20 @@ export function RegisterForm({ initialInvite }: { initialInvite: string }) {
 
       <label className="block">
         <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]">
-          昵称
+          {m.auth.nickname}
         </span>
         <Input
           name="display_name"
           required
           maxLength={40}
-          placeholder="给自己起个名字"
+          placeholder={m.auth.nicknamePlaceholder}
           className="mt-1"
         />
       </label>
 
       <label className="block">
         <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]">
-          邮箱
+          {m.auth.email}
         </span>
         <Input
           name="email"
@@ -72,7 +74,7 @@ export function RegisterForm({ initialInvite }: { initialInvite: string }) {
 
       <label className="block">
         <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]">
-          密码
+          {m.auth.password}
         </span>
         <Input
           name="password"
@@ -80,7 +82,7 @@ export function RegisterForm({ initialInvite }: { initialInvite: string }) {
           required
           minLength={8}
           autoComplete="new-password"
-          placeholder="至少 8 位"
+          placeholder={m.auth.passwordPlaceholder}
           className="mt-1"
         />
       </label>
@@ -92,7 +94,7 @@ export function RegisterForm({ initialInvite }: { initialInvite: string }) {
       ) : null}
 
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "注册中…" : "注册"}
+        {pending ? m.auth.registering : m.auth.register}
       </Button>
     </form>
   );

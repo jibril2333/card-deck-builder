@@ -16,6 +16,7 @@ import { useCardPreview } from "@/components/card-preview";
 import { SearchTargets } from "@/components/search-targets";
 import { JogressBadge, type JogressView } from "@/components/jogress-badge";
 import type { SearchGroup } from "@/lib/deck-search";
+import { useI18n } from "@/lib/i18n/client";
 
 export type DeckCardData = {
   id: string;
@@ -255,6 +256,7 @@ export function DeckCard({
  */
 /** The code line (colour dot, code, reprint count) and the card's name. */
 function TileCaption({ card }: { card: DeckCardData }) {
+  const { m } = useI18n();
   return (
     <div className="px-2 py-1.5">
       {/* card-code / card-name / card-price are styling hooks, not
@@ -272,9 +274,9 @@ function TileCaption({ card }: { card: DeckCardData }) {
         {card.sets && card.sets.length > 1 ? (
           <span
             className="shrink-0 px-1 rounded bg-[var(--color-muted)] text-[9px] font-sans"
-            title={`收录于 ${card.sets.length} 个产品：\n${card.sets.join("\n")}`}
+            title={m.deckCards.setsTitle(card.sets.length, card.sets.join("\n"))}
           >
-            {card.sets.length}包
+            {m.deckCards.packs(card.sets.length)}
           </span>
         ) : null}
       </div>
@@ -302,6 +304,7 @@ function TilePrice({
   card: DeckCardData;
   mode: DeckMode;
 }) {
+  const { m } = useI18n();
   if (mode !== "browse") {
     return (
       <div className="px-2 pb-1.5">
@@ -326,8 +329,8 @@ function TilePrice({
       }`}
       title={
         typed
-          ? "预期价格"
-          : `${card.market?.source === "pao" ? "PAO" : "Cardrush"} 市场价`
+          ? m.deckCards.priceTyped
+          : m.deckCards.marketPrice(card.market?.source === "pao" ? "PAO" : "Cardrush")
       }
     >
       ¥{card.price}
@@ -415,10 +418,11 @@ function CollectedBadge({
   want: number;
   withWant: boolean;
 }) {
+  const { m } = useI18n();
   const short = withWant && held < want;
   return (
     <span
-      title={`已收集 ${held} 张 · 这套需要 ${want} 张`}
+      title={m.deckCards.collectedTitle(held, want)}
       className={`absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md text-[10px] font-medium tabular-nums shadow ${
         short ? "bg-amber-500/90 text-white" : "bg-black/65 text-white"
       }`}
@@ -476,11 +480,12 @@ function WantQtyBadge({
   want: number;
   violation?: boolean;
 }) {
+  const { m } = useI18n();
   return (
     <span
       // Red when the current banlist disagrees with this count. The count is
       // left exactly as it is — the notice above the grid explains it.
-      title={violation ? "违反现行禁限表" : undefined}
+      title={violation ? m.deckCards.violationTitle : undefined}
       className={`absolute top-1.5 left-1.5 px-2 py-0.5 text-xs rounded-md font-bold tabular-nums ${
         violation ? "bg-red-600 text-white" : "bg-black/75 text-white"
       }`}
@@ -530,12 +535,13 @@ function CoverToggleButton({
   pending: boolean;
   onToggle: (e: React.MouseEvent) => void;
 }) {
+  const { m } = useI18n();
   return (
     <button
       type="button"
       onClick={onToggle}
       disabled={pending}
-      title={isCover ? "已是封面（点击取消）" : "设为封面"}
+      title={isCover ? m.deckCards.isCover : m.deckCards.setCover}
       // The ★ state stays visible — it tells you WHICH card is the cover. The
       // empty ☆ is an affordance, not information, so `hover-reveal` keeps it
       // off the art until you point at the tile (see globals.css: it also
@@ -553,10 +559,11 @@ function CoverToggleButton({
 }
 
 function DoneCheckBadge() {
+  const { m } = useI18n();
   return (
     <span
       className="absolute top-1.5 right-1.5 w-7 h-7 rounded-md flex items-center justify-center bg-green-500 text-white text-sm font-bold shadow"
-      title="已备齐"
+      title={m.deckCards.doneTitle}
     >
       ✓
     </span>
@@ -596,6 +603,7 @@ function BuildControlsBar({
   pending: boolean;
   dispatch: Dispatch;
 }) {
+  const { m } = useI18n();
   return (
     <div className="flex items-stretch border-t border-[var(--color-border)] divide-x divide-[var(--color-border)]">
       <button
@@ -651,7 +659,7 @@ function BuildControlsBar({
         }
         disabled={pending}
         className="w-8 h-8 hover:bg-red-500/10 text-red-500 text-sm cursor-pointer disabled:cursor-wait"
-        title="移除"
+        title={m.deckCards.remove}
       >
         ×
       </button>
@@ -672,6 +680,7 @@ function PurchaseControlsBar({
   pending: boolean;
   dispatch: Dispatch;
 }) {
+  const { m } = useI18n();
   return (
     <div className="flex items-stretch border-t border-[var(--color-border)] divide-x divide-[var(--color-border)]">
       <button
@@ -685,7 +694,7 @@ function PurchaseControlsBar({
         }
         disabled={pending || owned === 0}
         className="flex-1 h-8 hover:bg-[var(--color-muted)] text-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-        title="少买 1 张"
+        title={m.deckCards.buyLess}
       >
         −
       </button>
@@ -716,7 +725,7 @@ function PurchaseControlsBar({
         }
         disabled={pending}
         className="flex-1 h-8 hover:bg-[var(--color-muted)] text-sm cursor-pointer disabled:cursor-wait"
-        title="多买 1 张"
+        title={m.deckCards.buyMore}
       >
         ＋
       </button>
@@ -731,7 +740,7 @@ function PurchaseControlsBar({
         }
         disabled={pending || done}
         className="w-10 h-8 hover:bg-green-500/10 text-green-600 text-xs cursor-pointer disabled:opacity-40"
-        title="备齐（设为所需张数）"
+        title={m.deckCards.fillUp}
       >
         ✓
       </button>

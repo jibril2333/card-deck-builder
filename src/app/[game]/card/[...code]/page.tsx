@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { isGameId, type GameId, colorHex } from "@/lib/games";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { getLocale } from "@/lib/i18n/server";
 import { splitSetNames } from "@/lib/card-sets";
 import { Badge } from "@/components/ui/badge";
 import { AddToDeck } from "@/components/add-to-deck";
@@ -22,6 +21,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import { SHOPS, shopSearchUrl, type ShopId } from "@/lib/shops";
+import { getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -45,9 +45,7 @@ export default async function CardPage({
 
   const card = digimon.getCardByCode(decoded);
   if (!card) notFound();
-  const cardLang = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
+  const cardLang = await getLocale();
   // Which field comes from which language is declared once, in
   // FIELD_SOURCE — see src/lib/cards/digimon-fields.ts. Hand-writing the
   // fallbacks here is how BT9-104 ended up showing its Japanese trait beside
@@ -128,44 +126,46 @@ export default async function CardPage({
  * came for, and "2 张,其中 P1 一张" on the face of it is noise on every card
  * anybody owns twice.
  */
-function OwnedRow({
+async function OwnedRow({
   code,
   owned,
 }: {
   code: string;
   owned: { total: number; byVariant: { variant: string; quantity: number }[] };
 }) {
+  const m = await getMessages();
   const split =
     owned.byVariant.length > 1
       ? owned.byVariant
           .map(
-            (v) => `${v.variant ? v.variant.replace(/^_/, "") : "原版"} ×${v.quantity}`,
+            (v) => `${v.variant ? v.variant.replace(/^_/, "") : m.card.baseVersion} ×${v.quantity}`,
           )
           .join(" · ")
       : undefined;
   return (
     <div className="flex items-center justify-between gap-2 text-xs">
       <span className="font-medium text-[var(--color-muted-fg)] shrink-0">
-        已收集
+        {m.card.owned}
       </span>
       <Link
         href={`/digimon/collection?q=${encodeURIComponent(code)}`}
         title={split}
         className="tabular-nums hover:text-[var(--color-accent)] transition-colors"
       >
-        {`📦 ${owned.total} 张`}
+        {m.card.ownedCopies(owned.total)}
       </Link>
     </div>
   );
 }
 
-function DetailShell({
+async function DetailShell({
   game,
   children,
 }: {
   game: GameId;
   children: React.ReactNode;
 }) {
+  const m = await getMessages();
   return (
     <>
       <main className="w-full mx-auto max-w-6xl px-4 sm:px-6 py-6">
@@ -173,7 +173,7 @@ function DetailShell({
           fallback={`/${game}`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-4"
         >
-          ← 返回
+          {m.card.back}
         </BackLink>
         {children}
       </main>
@@ -219,21 +219,17 @@ function EffectBlock({
   );
 }
 
-/** Effect blocks, in print order, with the label the page shows for each. */
-const TEXT_BLOCKS: [FieldKey, string][] = [
-  ["main_effect", "主要效果"],
-  ["security_effect", "安全区效果"],
-  ["inherited_effect", "进化继承效果"],
-  ["source_effect", "源池效果"],
-  ["special_rule", "特别规则"],
+/** Effect blocks, in print order. Their names are the dictionary's. */
+const TEXT_BLOCKS: FieldKey[] = [
+  "main_effect",
+  "security_effect",
+  "inherited_effect",
+  "source_effect",
+  "special_rule",
 ];
 
-const STAT_LABELS: Partial<Record<FieldKey, string>> = {
-  level: "Lv",
-  play_cost: "Play Cost",
-  dp: "DP",
-  dual_cost: "使用费用",
-};
+/** The numeric stats, shown as a row rather than as labelled blocks. */
+const STAT_FIELDS: FieldKey[] = ["level", "play_cost", "dp", "dual_cost"];
 
 /**
  * The numeric stats this card actually has.
@@ -242,15 +238,16 @@ const STAT_LABELS: Partial<Record<FieldKey, string>> = {
  * cost, and reserving two empty columns for the level and DP it will never
  * have was the layout equivalent of the data bugs above.
  */
-function StatRow({ card, fields }: { card: CardView; fields: FieldKey[] }) {
-  const stats = fields.filter((f) => f in STAT_LABELS);
+async function StatRow({ card, fields }: { card: CardView; fields: FieldKey[] }) {
+  const m = await getMessages();
+  const stats = fields.filter((f) => STAT_FIELDS.includes(f));
   if (stats.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-x-10 gap-y-3 p-3 rounded-lg bg-[var(--color-muted)] border border-[var(--color-border)]">
       {stats.map((f) => (
         <Stat
           key={f}
-          label={STAT_LABELS[f]!}
+          label={m.card.fields[f]}
           value={card[FIELD_SOURCE[f].base] as string | number | null}
         />
       ))}
@@ -259,7 +256,8 @@ function StatRow({ card, fields }: { card: CardView; fields: FieldKey[] }) {
 }
 
 /** 形态 / 属性 / 特征 — the fields that say what KIND of card this is. */
-function IdentityBlock({ card, fields }: { card: CardView; fields: FieldKey[] }) {
+async function IdentityBlock({ card, fields }: { card: CardView; fields: FieldKey[] }) {
+  const m = await getMessages();
   const has = (f: FieldKey) => fields.includes(f);
   if (!has("form") && !has("attribute") && !has("digi_types")) return null;
   return (
@@ -269,7 +267,7 @@ function IdentityBlock({ card, fields }: { card: CardView; fields: FieldKey[] })
           {has("form") ? (
             <div>
               <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-                形态
+                {m.card.fields.form}
               </div>
               <div className="text-sm font-medium">{card.form}</div>
             </div>
@@ -277,7 +275,7 @@ function IdentityBlock({ card, fields }: { card: CardView; fields: FieldKey[] })
           {has("attribute") ? (
             <div>
               <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-                属性
+                {m.card.fields.attribute}
               </div>
               <div className="text-sm font-medium">{card.attribute}</div>
             </div>
@@ -287,7 +285,7 @@ function IdentityBlock({ card, fields }: { card: CardView; fields: FieldKey[] })
       {has("digi_types") ? (
         <div>
           <div className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-            特征
+            {m.card.fields.digi_types}
           </div>
           <div className="flex flex-wrap gap-1.5 mt-1">
             {card
@@ -310,13 +308,14 @@ function IdentityBlock({ card, fields }: { card: CardView; fields: FieldKey[] })
 }
 
 /** How this card gets onto the field, when it isn't simply played. */
-function DigivolveBlock({
+async function DigivolveBlock({
   card,
   fields,
 }: {
   card: CardView;
   fields: FieldKey[];
 }) {
+  const m = await getMessages();
   const has = (f: FieldKey) => fields.includes(f);
   if (!has("evolution_cost") && !has("evolution_requirements")) return null;
   return (
@@ -324,7 +323,7 @@ function DigivolveBlock({
       {has("evolution_cost") ? (
         <div className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-            进化消费
+            {m.card.fields.evolution_cost}
           </span>
           <EvolutionCost value={card.evolution_cost!} />
         </div>
@@ -332,7 +331,7 @@ function DigivolveBlock({
       {has("evolution_requirements") ? (
         <div className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
-            进化条件
+            {m.card.fields.evolution_requirements}
           </span>
           {/* DigiXros / special-digivolve lines carry the same bracket tokens
               as effect text, so chip them the same way. */}
@@ -355,11 +354,12 @@ function DigivolveBlock({
  * sources used to mangle it: English filed it under 进化元效果, Japanese threw
  * it away, Chinese kept it but labelled it wrong.
  */
-function DualFace({
+async function DualFace({
   card,
 }: {
   card: CardView;
 }) {
+  const m = await getMessages();
   if (!card.dual_effect && !card.dual_name) return null;
   const colors = card.dual_color
     ? (parseEvolutionCost(card.dual_color)?.colors ?? [])
@@ -368,7 +368,7 @@ function DualFace({
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--color-muted)] text-[var(--color-muted-fg)]">
-          选项面
+          {m.card.optionFace}
         </span>
         {card.dual_name ? (
           <span className="text-sm font-semibold">{card.dual_name}</span>
@@ -387,11 +387,11 @@ function DualFace({
           </span>
         ))}
         {card.dual_cost !== null && card.dual_cost !== undefined ? (
-          <Badge>使用费用 {card.dual_cost}</Badge>
+          <Badge>{m.card.fields.dual_cost} {card.dual_cost}</Badge>
         ) : null}
       </div>
-      <EffectBlock label="选项效果" text={card.dual_effect} />
-      <EffectBlock label="双力规则" text={card.dual_rule} />
+      <EffectBlock label={m.card.fields.dual_effect} text={card.dual_effect} />
+      <EffectBlock label={m.card.fields.dual_rule} text={card.dual_rule} />
     </div>
   );
 }
@@ -405,30 +405,31 @@ function DualFace({
  * exactly the distinction every source lost: the JP scrape dropped all three
  * blocks, and both English sources folded them into 进化元效果.
  */
-function LinkFace({
+async function LinkFace({
   card,
 }: {
   card: CardView;
 }) {
+  const m = await getMessages();
   if (!card.link_requirement && !card.link_effect && card.link_dp === null)
     return null;
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--color-muted)] text-[var(--color-muted-fg)]">
-          链接
+          {m.card.link}
         </span>
         {card.link_dp !== null && card.link_dp !== undefined ? (
           <Badge>DP +{card.link_dp}</Badge>
         ) : null}
       </div>
       <EffectBlock
-        label="链接条件"
+        label={m.card.fields.link_requirement}
         text={card.link_requirement}
        
       />
       <EffectBlock
-        label="链接中效果"
+        label={m.card.fields.link_effect}
         text={card.link_effect}
        
       />
@@ -436,7 +437,7 @@ function LinkFace({
   );
 }
 
-function DigimonDetail({
+async function DigimonDetail({
   card,
   subName,
   decks,
@@ -480,6 +481,7 @@ function DigimonDetail({
   /** Anon viewer: hide the editable price input + the AddToDeck widget. */
   readonly: boolean;
 }) {
+  const m = await getMessages();
   const shown = visibleFields(card);
   return (
     <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
@@ -505,7 +507,7 @@ function DigimonDetail({
             price != null ? (
               <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="font-medium text-[var(--color-muted-fg)]">
-                  预期价格
+                  {m.card.expectedPrice}
                 </span>
                 <span className="font-mono tabular-nums">¥{price}</span>
               </div>
@@ -515,7 +517,7 @@ function DigimonDetail({
               {owned ? <OwnedRow code={card.code} owned={owned} /> : null}
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-[var(--color-muted-fg)] shrink-0">
-                  预期价格
+                  {m.card.expectedPrice}
                 </span>
                 <CardPriceInput
                   game="digimon"
@@ -573,10 +575,10 @@ function DigimonDetail({
         <IdentityBlock card={card} fields={shown} />
         <DigivolveBlock card={card} fields={shown} />
 
-        {TEXT_BLOCKS.filter(([f]) => shown.includes(f)).map(([f, label]) => (
+        {TEXT_BLOCKS.filter((f) => shown.includes(f)).map((f) => (
           <EffectBlock
             key={f}
-            label={label}
+            label={m.card.fields[f]}
             text={card[FIELD_SOURCE[f].base] as string | null}
             />
         ))}
@@ -590,17 +592,17 @@ function DigimonDetail({
         <CardRulings rulings={rulings} />
 
         <div className="grid grid-cols-2 gap-3 text-xs text-[var(--color-muted-fg)] pt-3 border-t border-[var(--color-border)]">
-          <Stat label="画师" value={card.artist} />
+          <Stat label={m.card.artist} value={card.artist} />
           {card.source_url ? (
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] uppercase tracking-wide">源</span>
+              <span className="text-[10px] uppercase tracking-wide">{m.card.source}</span>
               <a
                 href={card.source_url}
                 target="_blank"
                 rel="noreferrer"
                 className="text-sm underline truncate"
               >
-                查看页面 ↗
+                {m.card.viewPage}
               </a>
             </div>
           ) : null}
@@ -634,7 +636,7 @@ function DigimonDetail({
  * quote you cannot check is a rumour, and shop prices move faster than a
  * daily scrape.
  */
-function ShopHeading({
+async function ShopHeading({
   shop,
   code,
   title,
@@ -643,6 +645,7 @@ function ShopHeading({
   code: string;
   title: string;
 }) {
+  const m = await getMessages();
   return (
     <a
       href={shopSearchUrl(shop, code)}
@@ -651,7 +654,7 @@ function ShopHeading({
       title={title}
       className="text-xs font-medium text-[var(--color-muted-fg)] hover:text-[var(--color-accent)] transition-colors inline-flex items-center gap-1"
     >
-      {SHOPS[shop].label} 市场价
+      {m.card.marketPrice(SHOPS[shop].label)}
       <span aria-hidden className="text-[10px] opacity-70">
         ↗
       </span>
@@ -659,7 +662,7 @@ function ShopHeading({
   );
 }
 
-function PaoPriceBlock({
+async function PaoPriceBlock({
   pao,
   code,
 }: {
@@ -669,27 +672,28 @@ function PaoPriceBlock({
   };
   code: string;
 }) {
-  const rows: [string, digimon.ExternalPrice][] = [];
-  if (pao.base) rows.push(["原画", pao.base]);
-  if (pao.parallel) rows.push(["异画", pao.parallel]);
+  const m = await getMessages();
+  const rows: ["base" | "parallel", digimon.ExternalPrice][] = [];
+  if (pao.base) rows.push(["base", pao.base]);
+  if (pao.parallel) rows.push(["parallel", pao.parallel]);
   if (rows.length === 0) return null;
   return (
     <div className="space-y-1">
-      <ShopHeading shop="pao" code={code} title="PAO 最低价(品相由好到差取第一档)" />
+      <ShopHeading shop="pao" code={code} title={m.card.paoTitle} />
       <div className="space-y-0.5">
-        {rows.map(([label, p]) => (
+        {rows.map(([kind, p]) => (
           <div
-            key={label}
+            key={kind}
             className="flex items-center justify-between gap-2 text-xs"
           >
             <span
               className={`shrink-0 px-1 py-px text-[9px] rounded font-bold uppercase ${
-                label === "原画"
+                kind === "base"
                   ? "bg-[var(--color-muted)] text-[var(--color-muted-fg)]"
                   : "bg-purple-600/15 text-purple-600 dark:text-purple-300"
               }`}
             >
-              {label}
+              {kind === "base" ? m.card.baseArt : m.card.parallelArt}
             </span>
             <span
               className={`font-mono tabular-nums shrink-0 ${
@@ -697,7 +701,7 @@ function PaoPriceBlock({
                   ? "text-[var(--color-fg)]"
                   : "text-[var(--color-muted-fg)] line-through opacity-70"
               }`}
-              title={p.in_stock ? "在售" : "已售罄(最后记录价)"}
+              title={p.in_stock ? m.card.inStock : m.card.soldOut}
             >
               ¥{p.price_yen.toLocaleString()}
             </span>
@@ -708,7 +712,7 @@ function PaoPriceBlock({
   );
 }
 
-function MarketListingsBlock({
+async function MarketListingsBlock({
   listings,
   code,
 }: {
@@ -720,13 +724,14 @@ function MarketListingsBlock({
   }[];
   code: string;
 }) {
+  const m = await getMessages();
   if (listings.length === 0) return null;
   return (
     <div className="space-y-1">
       <ShopHeading
         shop="cardrush"
         code={code}
-        title="Cardrush 最低价(品相 A- 以上)"
+        title={m.card.cardrushTitle}
       />
       <div className="space-y-0.5">
         {listings.map((l, i) => (
@@ -742,7 +747,7 @@ function MarketListingsBlock({
                     : "bg-purple-600/15 text-purple-600 dark:text-purple-300"
                 }`}
               >
-                {l.variant_type === "base" ? "原画" : "异画"}
+                {l.variant_type === "base" ? m.card.baseArt : m.card.parallelArt}
               </span>
               <span className="truncate text-[var(--color-muted-fg)]">
                 {l.illustrator}
@@ -754,7 +759,7 @@ function MarketListingsBlock({
                   ? "text-[var(--color-fg)]"
                   : "text-[var(--color-muted-fg)] line-through opacity-70"
               }`}
-              title={l.in_stock ? "在售" : "已售罄(最后记录价)"}
+              title={l.in_stock ? m.card.inStock : m.card.soldOut}
             >
               ¥{l.price_yen.toLocaleString()}
             </span>
@@ -770,12 +775,13 @@ function MarketListingsBlock({
  * semicolon-joined string: promos run to seven entries and read as a wall of
  * text otherwise.
  */
-function SetList({ sets }: { sets: string[] }) {
+async function SetList({ sets }: { sets: string[] }) {
+  const m = await getMessages();
   if (sets.length === 0) return null;
   return (
     <div>
       <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted-fg)] mb-1">
-        收录信息{sets.length > 1 ? `（${sets.length} 个产品）` : ""}
+        {m.card.setInfo(sets.length)}
       </div>
       <ul className="text-sm bg-[var(--color-muted)] rounded-md p-3 border border-[var(--color-border)] space-y-1">
         {sets.map((s) => (

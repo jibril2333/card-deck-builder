@@ -6,6 +6,7 @@ import { updateDeckMetaAction } from "@/app/[game]/actions";
 import { CoverVariantPicker } from "@/components/cover-variant-picker";
 import { DeckAccentPicker } from "@/components/deck-accent-picker";
 import { InlineText, type SaveStatus } from "@/components/inline-text";
+import { useI18n } from "@/lib/i18n/client";
 
 type DeckLite = {
   id: string;
@@ -60,6 +61,7 @@ export function DeckHeader({
    *  say it belongs to somebody else. */
   editable: boolean;
 }) {
+  const { m } = useI18n();
   const [arts, setArts] = useState(false);
 
   const wash = deck.accent_color2
@@ -105,7 +107,7 @@ export function DeckHeader({
               <button
                 type="button"
                 onClick={() => setArts((v) => !v)}
-                title={`换一张异画（${cover.arts.length} 个版本）`}
+                title={m.deck.changeCoverArt(cover.arts.length)}
                 className="shrink-0 rounded-md overflow-hidden border-2 border-white/80 shadow-lg hover:border-[var(--color-accent)] transition-colors cursor-pointer"
               >
                 <img
@@ -120,7 +122,7 @@ export function DeckHeader({
                 src={cover.image_url}
                 alt={cover.name}
                 referrerPolicy="no-referrer"
-                title={editable ? "封面来自卡组里点了 ★ 的那张卡" : undefined}
+                title={editable ? m.deck.coverFromStar : undefined}
                 className="h-20 sm:h-28 aspect-[5/7] object-cover rounded-md shadow-lg border-2 border-white/80 shrink-0"
               />
             )
@@ -132,17 +134,17 @@ export function DeckHeader({
               {mine && !editable ? (
                 <span
                   className="px-2 py-0.5 text-xs rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
-                  title="这副卡组已锁定 —— 在下方解锁后才能改"
+                  title={m.deck.lockedHeaderTitle}
                 >
-                  🔒 已锁定
+                  {m.deck.lockedBadge}
                 </span>
               ) : null}
               {!mine ? (
                 <span
                   className="px-2 py-0.5 text-xs rounded-full bg-[var(--color-muted)] text-[var(--color-muted-fg)] border border-[var(--color-border)]"
-                  title="这是别人的卡组,你只能浏览"
+                  title={m.deck.othersTitle}
                 >
-                  👁 只读
+                  {m.deck.readOnly}
                 </span>
               ) : null}
             </div>
@@ -229,6 +231,7 @@ function useFieldSave(game: string, deckId: string) {
 
 /** "保存中… / 已保存 / 保存失败", so an autosave isn't entirely silent. */
 function SaveMark({ status }: { status: SaveStatus }) {
+  const { m } = useI18n();
   if (status === "idle") return null;
   return (
     <span
@@ -236,7 +239,7 @@ function SaveMark({ status }: { status: SaveStatus }) {
         status === "error" ? "text-red-500" : "text-[var(--color-muted-fg)]"
       }`}
     >
-      {status === "saving" ? "保存中…" : status === "saved" ? "已保存" : "保存失败"}
+      {status === "saving" ? m.deck.saving : status === "saved" ? m.deck.saved : m.deck.saveFailed}
     </span>
   );
 }
@@ -250,16 +253,17 @@ function DeckName({
   deck: DeckLite;
   editable: boolean;
 }) {
+  const { m } = useI18n();
   const { save, status } = useFieldSave(game, deck.id);
   return (
     <span className="flex items-baseline gap-2 min-w-0">
       <InlineText
         as="h1"
         initial={deck.name}
-        placeholder="未命名卡组"
+        placeholder={m.deck.untitled}
         editable={editable}
-        ariaLabel="卡组名"
-        title={editable ? "点击改名" : undefined}
+        ariaLabel={m.deck.deckName}
+        title={editable ? m.deck.rename : undefined}
         onChange={(v) => {
           // An empty name would leave a blank banner, and the action ignores
           // it anyway — don't send one.
@@ -281,6 +285,7 @@ function DeckNotes({
   deck: DeckLite;
   editable: boolean;
 }) {
+  const { m } = useI18n();
   const { save, status } = useFieldSave(game, deck.id);
   if (!editable && !deck.notes) return null;
   return (
@@ -288,10 +293,10 @@ function DeckNotes({
       <InlineText
         as="div"
         initial={deck.notes ?? ""}
-        placeholder="添加备注…"
+        placeholder={m.deck.notesPlaceholder}
         editable={editable}
-        ariaLabel="备注"
-        title={editable ? "点击编辑备注" : undefined}
+        ariaLabel={m.deck.notes}
+        title={editable ? m.deck.editNotes : undefined}
         onChange={(v) => save("notes", v)}
         className="text-sm text-[var(--color-muted-fg)] whitespace-pre-wrap min-w-0 flex-1"
       />

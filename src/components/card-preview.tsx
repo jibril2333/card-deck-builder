@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 /** Viewport rect of the hovered tile, used to place the panel beside it. */
 type Anchor = { top: number; bottom: number; left: number; right: number };
@@ -68,6 +69,7 @@ export function CardPreviewProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { m } = useI18n();
   const [preview, setPreview] = useState<Preview>(null);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -135,7 +137,7 @@ export function CardPreviewProvider({
                 reprinted across many products. */}
             {preview.sets && preview.sets.length > 0 ? (
               <div className="mt-1.5 text-[11px] text-[var(--color-muted-fg)] leading-snug">
-                <span className="opacity-70">收录：</span>
+                <span className="opacity-70">{m.search.includedIn}</span>
                 {preview.sets.join(" · ")}
               </div>
             ) : null}

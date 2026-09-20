@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { colorHex } from "@/lib/games";
 import { RestrictionBadge, type Restriction } from "@/components/restriction-badge";
+import { getMessages } from "@/lib/i18n/server";
 
 export type CardLite = {
   id: string;
@@ -23,7 +24,7 @@ export type CardLite = {
   restriction?: Restriction | null;
 };
 
-export function CardThumb({
+export async function CardThumb({
   game,
   card,
   className,
@@ -32,6 +33,7 @@ export function CardThumb({
   card: CardLite;
   className?: string;
 }) {
+  const m = await getMessages();
   const href =
     card.href ??
     `/${game}/card/${card.code.split("/").map(encodeURIComponent).join("/")}`;
@@ -64,7 +66,7 @@ export function CardThumb({
         {card.variant_count && card.variant_count > 1 ? (
           <span
             className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-purple-600/85 text-white font-medium"
-            title={`${card.variant_count} 个版本`}
+            title={m.search.versions(card.variant_count)}
           >
             +{card.variant_count - 1}
           </span>
@@ -102,8 +104,8 @@ export function CardThumb({
               }`}
               title={
                 card.market_in_stock
-                  ? "Cardrush 最便宜在售价"
-                  : "Cardrush 最后记录价(已售罄)"
+                  ? m.search.cardrushCheapest
+                  : m.search.cardrushLastSold
               }
             >
               ¥{card.market_price.toLocaleString()}

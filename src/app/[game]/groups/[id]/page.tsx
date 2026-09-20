@@ -1,14 +1,14 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { isGameId } from "@/lib/games";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { getLocale } from "@/lib/i18n/server";
 import { GroupEditor } from "@/components/group-editor";
 import { PoolTable } from "@/components/pool-table";
 import { PoolSwap } from "@/components/pool-swap";
 import { requireUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
+import { getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,7 @@ export default async function GroupPage({
 }: {
   params: Promise<{ game: string; id: string }>;
 }) {
+  const m = await getMessages();
   const me = await requireUser();
   const { game, id } = await params;
   if (!isGameId(game)) notFound();
@@ -48,9 +49,7 @@ export default async function GroupPage({
     }));
 
   // Localize names per the language cookie.
-  const cardLang = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
+  const cardLang = await getLocale();
   const tMap = digimon.getDisplayTranslations(
     pool.map((c) => c.code),
     cardLang,
@@ -92,7 +91,7 @@ export default async function GroupPage({
           href={`/${game}/decks`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
         >
-          ← 全部卡组
+          {m.deck.allDecks}
         </Link>
 
         <GroupEditor
@@ -105,24 +104,33 @@ export default async function GroupPage({
 
         {memberDecks.length === 0 ? (
           <p className="mt-6 text-sm text-[var(--color-muted-fg)]">
-            暂无成员卡组,可在「管理成员」中选择。
+            {m.pool.noMembers}
           </p>
         ) : (
           <>
             {/* Summary metrics */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-              <Metric label="需购张数" value={needTotal} hint="按最多那套算" />
               <Metric
-                label="各买一份"
+                label={m.pool.needTotal}
+                value={needTotal}
+                hint={m.pool.needTotalHint}
+              />
+              <Metric
+                label={m.pool.separate}
                 value={separateTotal}
-                hint="不共享的话"
+                hint={m.pool.separateHint}
                 muted
               />
-              <Metric label="省下" value={saved} hint="少买这么多张" accent />
               <Metric
-                label="还缺"
+                label={m.pool.saved}
+                value={saved}
+                hint={m.pool.savedHint}
+                accent
+              />
+              <Metric
+                label={m.pool.missing}
                 value={missingTotal}
-                hint="需备 − 持有"
+                hint={m.pool.missingHint}
                 danger={missingTotal > 0}
               />
             </div>

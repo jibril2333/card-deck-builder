@@ -7,6 +7,7 @@ import {
   setGroupDecksAction,
   deleteGroupAction,
 } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 type DeckLite = {
   id: string;
@@ -39,6 +40,7 @@ export function GroupEditor({
   allDecks: DeckLite[];
   memberIds: string[];
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editingName, setEditingName] = useState(false);
@@ -93,7 +95,7 @@ export function GroupEditor({
   }
 
   function del() {
-    if (!confirm("删除这个卡池？卡组本身不受影响")) return;
+    if (!confirm(m.pool.confirmDelete)) return;
     const fd = new FormData();
     fd.set("game", game);
     fd.set("id", groupId);
@@ -122,20 +124,20 @@ export function GroupEditor({
           <h1
             className="text-2xl font-bold cursor-text"
             onClick={() => setEditingName(true)}
-            title="点击重命名"
+            title={m.pool.rename}
           >
             {name}
           </h1>
         )}
         <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-muted)] text-[var(--color-muted-fg)]">
-          🎴 共享卡池
+          {m.pool.sharedPool}
         </span>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="ml-auto px-3 h-8 rounded-md text-sm border border-[var(--color-border)] hover:bg-[var(--color-muted)] cursor-pointer"
         >
-          {open ? "收起" : "管理成员"}
+          {open ? m.pool.collapse : m.pool.manageMembers}
         </button>
       </div>
 
@@ -221,7 +223,7 @@ export function GroupEditor({
               onClick={del}
               className="px-3 h-8 rounded-md text-sm border border-red-500/40 text-red-500 hover:bg-red-500/10 cursor-pointer ml-auto"
             >
-              删除卡池
+              {m.pool.deletePool}
             </button>
           </div>
         </div>

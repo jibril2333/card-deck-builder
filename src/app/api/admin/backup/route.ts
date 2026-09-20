@@ -10,6 +10,7 @@ import {
   readBackupStatus,
   writeBackupConfig,
 } from "@/lib/backup-store";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * Backup settings: the off-site replica's bucket and key pair.
@@ -50,13 +51,14 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const m = await getMessages();
   if (!(await isAdmin())) return new Response("forbidden", { status: 403 });
 
   let incoming: BackupConfig;
   try {
     incoming = parseBackupConfig(await req.json());
   } catch {
-    return Response.json({ ok: false, error: "请求格式不对" }, { status: 400 });
+    return Response.json({ ok: false, error: m.admin.badRequest }, { status: 400 });
   }
 
   // An empty secret field means "leave the saved one alone": the form can't
@@ -76,7 +78,7 @@ export async function PUT(req: Request) {
   } catch (err) {
     console.error("[admin/backup] write failed:", err);
     return Response.json(
-      { ok: false, error: "无法写入配置文件" },
+      { ok: false, error: m.admin.cannotWriteConfig },
       { status: 500 },
     );
   }

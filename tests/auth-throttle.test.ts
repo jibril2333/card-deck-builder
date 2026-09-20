@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_FAILURES,
   WINDOW_MS,
-  describeWait,
+  waitMinutes,
   fail,
   judge,
   succeed,
@@ -81,11 +81,11 @@ describe("succeed", () => {
   });
 });
 
-describe("describeWait", () => {
+describe("waitMinutes", () => {
   it("rounds up to whole minutes", () => {
-    expect(describeWait(1)).toBe("1 分钟");
-    expect(describeWait(60_000)).toBe("1 分钟");
-    expect(describeWait(61_000)).toBe("2 分钟");
-    expect(describeWait(WINDOW_MS)).toBe("15 分钟");
+    expect(waitMinutes(1)).toBe(1);
+    expect(waitMinutes(60_000)).toBe(1);
+    expect(waitMinutes(61_000)).toBe(2);
+    expect(waitMinutes(WINDOW_MS)).toBe(15);
   });
 });

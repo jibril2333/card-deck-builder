@@ -92,32 +92,17 @@ export function isUserExport(v: unknown): v is UserExport {
   );
 }
 
-/** A human-readable summary for the confirm step, before anything is written. */
-export function describeExport(x: UserExport): string {
-  return describeCounts({
+/**
+ * What an export holds, counted — for the confirm step, before anything is
+ * written. The sentence is the dictionary's (`m.account.counts`).
+ */
+export function exportCounts(x: UserExport) {
+  return {
     decks: x.decks.length,
     cards: x.decks.reduce((n, d) => n + d.cards.length, 0),
     groups: x.groups.length,
     collection: x.collection.length,
     prices: x.prices.length,
-  });
+  };
 }
 
-/** The same sentence from raw counts — what the export tile shows. */
-export function describeCounts(c: {
-  decks: number;
-  cards: number;
-  groups: number;
-  collection: number;
-  prices: number;
-}): string {
-  return [
-    `${c.decks} 副卡组`,
-    `${c.cards} 条卡片记录`,
-    c.groups ? `${c.groups} 个卡池` : "",
-    c.collection ? `${c.collection} 条收藏` : "",
-    c.prices ? `${c.prices} 条价格` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
