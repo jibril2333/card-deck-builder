@@ -7,6 +7,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { readJsonFile } from "./json-file";
 import {
   EMPTY_BACKUP,
   parseBackupConfig,
@@ -19,22 +20,13 @@ const BACKUP_CONFIG_FILE = path.join(DATA_DIR, "backup.json");
 const BACKUP_STATUS_FILE = path.join(DATA_DIR, "backup-status.json");
 
 export function readBackupConfig(): BackupConfig {
-  try {
-    return parseBackupConfig(
-      JSON.parse(fs.readFileSync(BACKUP_CONFIG_FILE, "utf8")),
-    );
-  } catch {
-    return EMPTY_BACKUP;
-  }
+  const raw = readJsonFile(BACKUP_CONFIG_FILE);
+  return raw === undefined ? EMPTY_BACKUP : parseBackupConfig(raw);
 }
 
 /** Whatever the daemon last said about itself. Absent until it has run once. */
 export function readBackupStatus(): unknown {
-  try {
-    return JSON.parse(fs.readFileSync(BACKUP_STATUS_FILE, "utf8"));
-  } catch {
-    return null;
-  }
+  return readJsonFile(BACKUP_STATUS_FILE) ?? null;
 }
 
 /** Atomic, 0600 — the file holds the R2 secret. */

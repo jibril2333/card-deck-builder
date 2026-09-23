@@ -14,7 +14,13 @@
  *
  * See https://nextjs.org/docs/messages/failed-to-find-server-action
  */
-export function isStaleBuildError(err: { message?: string } | null): boolean {
+export function isStaleBuildError(
+  err: { name?: string; message?: string } | null,
+): boolean {
+  // Next names the error it throws on the client. The message patterns stay
+  // as the fallback: an error that has crossed a boundary can arrive with its
+  // text but not its class, and older Next versions only had the text.
+  if (err?.name === "UnrecognizedActionError") return true;
   const m = err?.message ?? "";
   return (
     /Server Action .* was not found on the server/i.test(m) ||

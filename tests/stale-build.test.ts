@@ -16,6 +16,12 @@ describe("isStaleBuildError", () => {
     }
   });
 
+  it("recognises Next's own error class by name, whatever its wording", () => {
+    expect(
+      isStaleBuildError({ name: "UnrecognizedActionError", message: "reworded" }),
+    ).toBe(true);
+  });
+
   it("leaves every other failure to the error panel", () => {
     for (const m of [
       "数据库文件不存在",

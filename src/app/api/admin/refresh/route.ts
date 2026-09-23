@@ -5,6 +5,7 @@ import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
 import { clearProgress, readProgress } from "@/lib/refresh-progress";
 import { healthReport } from "@/lib/scrape-health";
 import { getMessages } from "@/lib/i18n/server";
+import { readJsonFile } from "@/lib/json-file";
 
 /**
  * Admin endpoint behind the "更新卡牌数据" button.
@@ -50,12 +51,7 @@ type Status = {
 };
 
 function readStatus(): Status {
-  try {
-    const raw = fs.readFileSync(STATUS_FILE, "utf8");
-    return JSON.parse(raw) as Status;
-  } catch {
-    return { state: "idle" };
-  }
+  return (readJsonFile(STATUS_FILE) as Status | undefined) ?? { state: "idle" };
 }
 
 export async function GET() {

@@ -36,6 +36,7 @@ import {
 } from "../src/lib/backup-config";
 import { parseNtfyConfig, EMPTY_NTFY } from "../src/lib/ntfy-config";
 import { sendNtfy } from "../src/lib/refresh-notify";
+import { readJsonFile } from "../src/lib/json-file";
 
 const DATA_DIR = process.env.CDB_DATA_DIR ?? "/app/data.nosync";
 /**
@@ -109,11 +110,8 @@ function writeJsonAtomic(file: string, value: unknown) {
 }
 
 function readConfig(): BackupConfig {
-  try {
-    return parseBackupConfig(JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")));
-  } catch {
-    return EMPTY_BACKUP;
-  }
+  const raw = readJsonFile(CONFIG_FILE);
+  return raw === undefined ? EMPTY_BACKUP : parseBackupConfig(raw);
 }
 
 /**
@@ -209,9 +207,8 @@ function haveBinary(): boolean {
 
 async function notify(title: string, body: string) {
   try {
-    const cfg = parseNtfyConfig(
-      JSON.parse(fs.readFileSync(path.join(DATA_DIR, "ntfy.json"), "utf8")),
-    );
+    const raw = readJsonFile(path.join(DATA_DIR, "ntfy.json"));
+    const cfg = raw === undefined ? EMPTY_NTFY : parseNtfyConfig(raw);
     await sendNtfy(cfg, {
       title,
       body,
@@ -220,8 +217,7 @@ async function notify(title: string, body: string) {
       click: process.env.CDB_PUBLIC_URL ?? "",
     });
   } catch {
-    /* not configured, or unreachable — never a reason to stop replicating */
-    void EMPTY_NTFY;
+    /* unreachable — never a reason to stop replicating */
   }
 }
 

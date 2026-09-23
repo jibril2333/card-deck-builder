@@ -22,8 +22,8 @@
  * Monday at 04:30.
  */
 
-import fs from "node:fs";
 import path from "node:path";
+import { readJsonFile } from "../src/lib/json-file";
 import {
   buildFailureNotification,
   buildRefreshNotification,
@@ -61,13 +61,8 @@ function loadConfig(): NtfyConfig {
       token: process.env.CDB_NTFY_TOKEN,
     });
   }
-  try {
-    return parseNtfyConfig(
-      JSON.parse(fs.readFileSync(path.join(DATA_DIR, "ntfy.json"), "utf8")),
-    );
-  } catch {
-    return EMPTY_NTFY;
-  }
+  const raw = readJsonFile(path.join(DATA_DIR, "ntfy.json"));
+  return raw === undefined ? EMPTY_NTFY : parseNtfyConfig(raw);
 }
 
 async function send(note: Notification): Promise<void> {

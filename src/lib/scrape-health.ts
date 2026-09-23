@@ -25,6 +25,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { readJsonFile } from "./json-file";
 
 export type Level = "ok" | "warn" | "dead";
 
@@ -76,13 +77,9 @@ export function judge(ok: number, baseline: number): Level {
 }
 
 function readStates(): Record<string, SourceState> {
-  try {
-    const raw = JSON.parse(fs.readFileSync(file(), "utf8")) as unknown;
-    if (!raw || typeof raw !== "object") return {};
-    return raw as Record<string, SourceState>;
-  } catch {
-    return {};
-  }
+  const raw = readJsonFile(file());
+  if (!raw || typeof raw !== "object") return {};
+  return raw as Record<string, SourceState>;
 }
 
 function writeStates(states: Record<string, SourceState>): void {

@@ -9,6 +9,7 @@ import {
   type NtfyConfig,
 } from "@/lib/ntfy-config";
 import { getMessages } from "@/lib/i18n/server";
+import { readJsonFile } from "@/lib/json-file";
 
 /**
  * Push-notification settings.
@@ -29,11 +30,8 @@ const DATA_DIR =
 const FILE = path.join(DATA_DIR, "ntfy.json");
 
 export function readNtfyConfig(): NtfyConfig {
-  try {
-    return parseNtfyConfig(JSON.parse(fs.readFileSync(FILE, "utf8")));
-  } catch {
-    return EMPTY_NTFY;
-  }
+  const raw = readJsonFile(FILE);
+  return raw === undefined ? EMPTY_NTFY : parseNtfyConfig(raw);
 }
 
 function publicView(c: NtfyConfig) {
