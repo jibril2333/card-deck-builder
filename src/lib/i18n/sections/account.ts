@@ -26,7 +26,6 @@ export default section({
     delete: "删除",
     confirmDeletePasskey: "确认删除这个 Passkey?之后必须用其它方式登录。",
     passkeyRegisterFailed: "Passkey 注册失败",
-    cancelled: "已取消",
     /** Stored with the credential, so written in the language of the moment. */
     thisDevice: "本设备",
     dataHeading: "数据搬运",
@@ -84,7 +83,6 @@ export default section({
     confirmDeletePasskey:
       "このパスキーを削除しますか?以後は別の方法でログインする必要があります。",
     passkeyRegisterFailed: "パスキーの登録に失敗しました",
-    cancelled: "キャンセルしました",
     thisDevice: "このデバイス",
     dataHeading: "データの移行",
     export: "エクスポート",
@@ -141,7 +139,6 @@ export default section({
     confirmDeletePasskey:
       "Delete this passkey? You will have to log in another way afterwards.",
     passkeyRegisterFailed: "Passkey registration failed",
-    cancelled: "Cancelled",
     thisDevice: "This device",
     dataHeading: "Move your data",
     export: "Export",

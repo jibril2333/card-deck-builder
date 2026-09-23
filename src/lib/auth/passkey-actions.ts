@@ -37,6 +37,27 @@ async function rpFromRequest(): Promise<{ rpID: string; origin: string }> {
   return { rpID, origin };
 }
 
+/**
+ * A ceremony the server refused, in the container log.
+ *
+ * The reason also goes back to the browser, but only the person at that
+ * browser sees it. "User verification required, but user could not be
+ * verified" (2026-09) took a round trip through the user to diagnose,
+ * because the server had said nothing. Logged: which ceremony, the reason,
+ * the origin, the browser. Not logged: the credential, the challenge, or
+ * anything else a replay could use.
+ */
+async function logRefusal(
+  ceremony: "register" | "login",
+  reason: string,
+  origin: string,
+): Promise<void> {
+  const ua = (await headers()).get("user-agent") ?? "-";
+  console.error(
+    `[passkey] ${ceremony} refused: ${reason} · origin=${origin} · ua=${ua}`,
+  );
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // Registration (binds a new passkey to the currently-logged-in user)
 // ────────────────────────────────────────────────────────────────────────
@@ -65,7 +86,10 @@ export async function finishRegisterPasskeyAction(input: {
     label: input.label,
     singleDeviceLabel: (await getMessages()).account.thisDevice,
   });
-  if (!r.ok) return { ok: false, error: r.error };
+  if (!r.ok) {
+    await logRefusal("register", r.error, origin);
+    return { ok: false, error: r.error };
+  }
   return { ok: true };
 }
 
@@ -94,7 +118,10 @@ export async function finishLoginWithPasskeyAction(input: {
     expectedOrigin: origin,
     expectedRPID: rpID,
   });
-  if (!r.ok) return { ok: false, error: r.error };
+  if (!r.ok) {
+    await logRefusal("login", r.error, origin);
+    return { ok: false, error: r.error };
+  }
   await setSessionCookie(r.user_id);
   return { ok: true };
 }

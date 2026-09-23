@@ -1,5 +1,6 @@
 /** 登录、注册,以及它们的报错。 */
 import { section } from "../define";
+import type { PasskeyFailure } from "@/lib/auth/passkey-error";
 
 export default section({
   zh: {
@@ -16,7 +17,13 @@ export default section({
     inviteAlreadyUsed: "这个邀请码已经被使用过了,请向管理员要一个新的。",
     passkeyLogin: "🔑 使用 Passkey 登录",
     passkeyFailed: "Passkey 登录失败",
-    cancelled: "已取消",
+    // 登录和添加 Passkey 共用。键名见 lib/auth/passkey-error.ts。
+    passkeyError: {
+      cancelled: "已取消",
+      timedOut: "已超时",
+      alreadyRegistered: "这台设备上已有此账号的 Passkey",
+      wrongAddress: "当前网址不支持 Passkey",
+    } as Record<PasskeyFailure, string>,
     working: "处理中…",
     orEmail: "或邮箱密码",
     email: "邮箱",
@@ -54,7 +61,12 @@ export default section({
       "この招待コードは使用済みです。管理者に新しいコードを依頼してください。",
     passkeyLogin: "🔑 パスキーでログイン",
     passkeyFailed: "パスキーでのログインに失敗しました",
-    cancelled: "キャンセルしました",
+    passkeyError: {
+      cancelled: "キャンセルしました",
+      timedOut: "タイムアウトしました",
+      alreadyRegistered: "このデバイスにはこのアカウントのパスキーが登録済みです",
+      wrongAddress: "このアドレスではパスキーを使用できません",
+    },
     working: "処理中…",
     orEmail: "またはメールアドレスとパスワード",
     email: "メールアドレス",
@@ -93,7 +105,12 @@ export default section({
       "This invite code has already been used. Ask the administrator for a new one.",
     passkeyLogin: "🔑 Log in with a passkey",
     passkeyFailed: "Passkey login failed",
-    cancelled: "Cancelled",
+    passkeyError: {
+      cancelled: "Cancelled",
+      timedOut: "Timed out",
+      alreadyRegistered: "This device already has a passkey for this account",
+      wrongAddress: "Passkeys are not available at this address",
+    },
     working: "Working…",
     orEmail: "or email and password",
     email: "Email",

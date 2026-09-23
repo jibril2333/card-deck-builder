@@ -10,6 +10,7 @@ import {
   beginLoginWithPasskeyAction,
   finishLoginWithPasskeyAction,
 } from "@/lib/auth/passkey-actions";
+import { classifyPasskeyError } from "@/lib/auth/passkey-error";
 import { useI18n } from "@/lib/i18n/client";
 
 export function LoginForm({ next }: { next?: string }) {
@@ -35,8 +36,12 @@ export function LoginForm({ next }: { next?: string }) {
 
   async function onPasskey() {
     setError(null);
+    let startedAt = Date.now();
+    let timeout: number | undefined;
     try {
       const { challengeId, options } = await beginLoginWithPasskeyAction();
+      startedAt = Date.now();
+      timeout = options.timeout;
       // `useBrowserAutofill: false` because the autofill flow needs an
       // <input autocomplete="webauthn"> + conditional UI; the explicit
       // button flow is simpler and more reliable across browsers.
@@ -54,12 +59,12 @@ export function LoginForm({ next }: { next?: string }) {
         router.refresh();
       });
     } catch (e) {
-      const msg = (e as Error).message ?? m.auth.passkeyFailed;
-      if (msg.includes("NotAllowedError") || msg.includes("aborted")) {
-        setError(m.auth.cancelled);
-      } else {
-        setError(msg);
-      }
+      const why = classifyPasskeyError(e, Date.now() - startedAt, timeout);
+      setError(
+        why
+          ? m.auth.passkeyError[why]
+          : (e as Error).message || m.auth.passkeyFailed,
+      );
     }
   }
 

@@ -9,6 +9,7 @@ import {
   deletePasskeyAction,
   finishRegisterPasskeyAction,
 } from "@/lib/auth/passkey-actions";
+import { classifyPasskeyError } from "@/lib/auth/passkey-error";
 import { useI18n } from "@/lib/i18n/client";
 
 type PasskeyRow = {
@@ -43,8 +44,12 @@ export function PasskeySection({
 
   async function enroll() {
     setError(null);
+    let startedAt = Date.now();
+    let timeout: number | undefined;
     try {
       const { challengeId, options } = await beginRegisterPasskeyAction();
+      startedAt = Date.now();
+      timeout = options.timeout;
       const response = await startRegistration({ optionsJSON: options });
       startTransition(async () => {
         const r = await finishRegisterPasskeyAction({
@@ -60,14 +65,12 @@ export function PasskeySection({
         router.refresh();
       });
     } catch (e) {
-      const msg = (e as Error).message ?? m.account.passkeyRegisterFailed;
-      // Browsers throw "NotAllowedError" when the user cancels — don't
-      // make that look like a real error.
-      if (msg.includes("NotAllowedError") || msg.includes("aborted")) {
-        setError(m.account.cancelled);
-      } else {
-        setError(msg);
-      }
+      const why = classifyPasskeyError(e, Date.now() - startedAt, timeout);
+      setError(
+        why
+          ? m.auth.passkeyError[why]
+          : (e as Error).message || m.account.passkeyRegisterFailed,
+      );
     }
   }
 
