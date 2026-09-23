@@ -24,12 +24,12 @@ export type Locale = "zh" | "ja" | "en";
 
 export const LOCALES: readonly Locale[] = ["zh", "ja", "en"];
 
-export const DEFAULT_LOCALE: Locale = "zh";
+const DEFAULT_LOCALE: Locale = "zh";
 
 /** The cookie the switch writes. See the header for why it is not renamed. */
 export const LOCALE_COOKIE = "cardLang";
 
-export function parseLocale(v: string | null | undefined): Locale | null {
+function parseLocale(v: string | null | undefined): Locale | null {
   return v === "zh" || v === "ja" || v === "en" ? v : null;
 }
 
