@@ -48,6 +48,31 @@ test("registers a passkey, then signs in with it", async ({ browser }) => {
   const errors: string[] = [];
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
+  // What the page asked the browser for, per ceremony. The virtual
+  // authenticator always verifies the user, so it cannot show the failure
+  // this guards against: a request for "preferred" UV that a real device may
+  // honour by skipping verification, which the server then rejects.
+  // Kept in sessionStorage because signing in navigates away from the page
+  // that made the request.
+  await page.addInitScript(() => {
+    const c = navigator.credentials;
+    const create = c.create.bind(c);
+    const get = c.get.bind(c);
+    c.create = (o?: CredentialCreationOptions) => {
+      sessionStorage.setItem(
+        "uv.create",
+        String(o?.publicKey?.authenticatorSelection?.userVerification),
+      );
+      return create(o);
+    };
+    c.get = (o?: CredentialRequestOptions) => {
+      sessionStorage.setItem("uv.get", String(o?.publicKey?.userVerification));
+      return get(o);
+    };
+  });
+  const askedFor = (k: "create" | "get") =>
+    page.evaluate((key) => sessionStorage.getItem(`uv.${key}`), k);
+
   await page.goto(`${BASE}/digimon/settings`);
   await expect(page.getByText("暂无 Passkey。")).toBeVisible();
 
@@ -57,6 +82,7 @@ test("registers a passkey, then signs in with it", async ({ browser }) => {
   // The list replaces the empty state once the server has stored it.
   await expect(page.getByText("虚拟钥匙")).toBeVisible({ timeout: 15_000 });
   expect(errors, errors.join("\n")).toHaveLength(0);
+  expect(await askedFor("create")).toBe("required");
 
   // Now sign in with it, from a session that has no cookie at all.
   await ctx.clearCookies();
@@ -65,6 +91,7 @@ test("registers a passkey, then signs in with it", async ({ browser }) => {
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), {
     timeout: 15_000,
   });
+  expect(await askedFor("get")).toBe("required");
   await page.goto(`${BASE}/digimon/settings`);
   await expect(page.getByText("虚拟钥匙")).toBeVisible();
   await ctx.close();

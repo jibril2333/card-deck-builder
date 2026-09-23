@@ -106,6 +106,20 @@ export function deleteCredential(id: string, userId: string): boolean {
   return r.changes > 0;
 }
 
+/**
+ * What both ceremonies ask the browser for, and it has to be "required".
+ *
+ * The verify calls below leave `requireUserVerification` at the library's
+ * default, which is true: a response without the UV flag is rejected. Asking
+ * for "preferred" while demanding it is a contract the browser is allowed to
+ * break, and Safari on a Mac with no Touch ID does — it skips verification,
+ * hands over the credential, and the server answers "User verification
+ * required, but user could not be verified". Asking for "required" makes that
+ * Mac prompt for the account password instead. Devices with Face ID or Touch
+ * ID verify either way, which is why this only ever failed on some machines.
+ */
+const USER_VERIFICATION = "required" as const;
+
 // ────────────────────────────────────────────────────────────────────────
 // Challenge storage
 // ────────────────────────────────────────────────────────────────────────
@@ -193,7 +207,8 @@ export async function beginRegistration(
       // Prefer platform authenticators (Touch ID / Windows Hello), but allow
       // cross-platform (security keys) too.
       residentKey: "preferred",
-      userVerification: "preferred",
+      // See USER_VERIFICATION.
+      userVerification: USER_VERIFICATION,
     },
   });
 
@@ -280,7 +295,7 @@ export async function beginAuthentication(rpID: string): Promise<{
   // returned credential's userHandle, which we resolved server-side.
   const options = await generateAuthenticationOptions({
     rpID,
-    userVerification: "preferred",
+    userVerification: USER_VERIFICATION,
   });
   const challengeId = storeChallenge(null, "authenticate", options.challenge);
   return { challengeId, options };
