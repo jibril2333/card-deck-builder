@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { pAtLeastOne, expectedCount, pNone } from "@/lib/probability";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Deck playtesting: an opening-hand simulator and a hypergeometric
@@ -77,6 +78,7 @@ function CardFace({
 }
 
 function FaceDown({ onClick }: { onClick?: () => void }) {
+  const { m: msg } = useI18n();
   return (
     <button
       type="button"
@@ -85,7 +87,7 @@ function FaceDown({ onClick }: { onClick?: () => void }) {
       className={`w-14 shrink-0 aspect-[5/7] rounded-md border border-[var(--color-border)] bg-gradient-to-br from-indigo-900 to-slate-800 flex items-center justify-center text-white/40 text-lg ${
         onClick ? "cursor-pointer hover:from-indigo-800" : ""
       }`}
-      title={onClick ? "点击翻开" : undefined}
+      title={onClick ? msg.playtest.flipOpen : undefined}
     >
       ◆
     </button>
@@ -99,6 +101,7 @@ export function Playtest({
   game: string;
   cards: PlaytestCard[];
 }) {
+  const { m: msg } = useI18n();
   const isDigimon = game === "digimon";
   const HAND = isDigimon ? 5 : 7;
   const SECURITY = isDigimon ? 5 : 0;
@@ -208,9 +211,10 @@ export function Playtest({
       {/* ── opening hand simulator ── */}
       <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="font-bold">🎲 起手模拟</h2>
+          <h2 className="font-bold">{msg.playtest.simTitle}</h2>
           <span className="text-xs text-[var(--color-muted-fg)]">
-            主卡组 {N} 张{isDigimon ? ` · 蛋卡 ${eggCount} 张(不参与抽卡)` : ""}
+            {msg.playtest.mainCount(N)}
+            {isDigimon ? msg.playtest.eggsNote(eggCount) : ""}
           </span>
           <div className="ml-auto flex items-center gap-2">
             <button
@@ -219,7 +223,7 @@ export function Playtest({
               disabled={!canSim}
               className="h-8 px-3 rounded-md text-sm font-medium bg-[var(--color-accent)] text-[var(--color-accent-fg)] hover:opacity-90 disabled:opacity-40 cursor-pointer"
             >
-              {sim ? "重新开局" : "开局"}
+              {sim ? msg.playtest.restart : msg.playtest.start}
             </button>
             {sim ? (
               <>
@@ -235,9 +239,9 @@ export function Playtest({
                   }
                   disabled={sim.mulliganed || sim.turnDraws > 0}
                   className="h-8 px-3 rounded-md text-sm border border-[var(--color-border)] hover:bg-[var(--color-muted)] disabled:opacity-40 cursor-pointer"
-                  title="调度:洗回全部手牌重抽一次(只能一次,抽完必须保留)"
+                  title={msg.playtest.mulliganTitle}
                 >
-                  ♻️ 调度
+                  {msg.playtest.mulligan}
                 </button>
                 <button
                   type="button"
@@ -256,7 +260,7 @@ export function Playtest({
                   disabled={sim.deck.length === 0}
                   className="h-8 px-3 rounded-md text-sm border border-[var(--color-border)] hover:bg-[var(--color-muted)] disabled:opacity-40 cursor-pointer"
                 >
-                  🃏 抽一张
+                  {msg.playtest.drawOne}
                 </button>
               </>
             ) : null}
@@ -265,7 +269,7 @@ export function Playtest({
 
         {!canSim ? (
           <p className="text-sm text-[var(--color-muted-fg)] mt-3">
-            主卡组至少需要 {HAND + SECURITY} 张才能模拟。
+            {msg.playtest.needMore(HAND + SECURITY)}
           </p>
         ) : null}
 
@@ -273,9 +277,9 @@ export function Playtest({
           <div className="mt-4 flex flex-col gap-4">
             <div>
               <div className="text-xs text-[var(--color-muted-fg)] mb-1.5">
-                手牌 {sim.hand.length} 张
-                {sim.turnDraws > 0 ? `(起手 ${HAND} + 抽 ${sim.turnDraws})` : ""}
-                {sim.mulliganed ? " · 已调度" : ""}
+                {msg.playtest.hand(sim.hand.length)}
+                {sim.turnDraws > 0 ? msg.playtest.handDetail(HAND, sim.turnDraws) : ""}
+                {sim.mulliganed ? msg.playtest.mulliganed : ""}
               </div>
               <div className="flex flex-wrap gap-2">
                 {sim.hand.map((c) => (
@@ -286,7 +290,7 @@ export function Playtest({
             {SECURITY > 0 ? (
               <div>
                 <div className="text-xs text-[var(--color-muted-fg)] mb-1.5">
-                  安防区 {sim.security.length} 张(点击翻开)
+                  {msg.playtest.security(sim.security.length)}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {sim.security.map((c, i) =>
@@ -314,7 +318,7 @@ export function Playtest({
               </div>
             ) : null}
             <div className="text-xs text-[var(--color-muted-fg)]">
-              牌库剩余 {sim.deck.length} 张
+              {msg.playtest.deckLeft(sim.deck.length)}
             </div>
           </div>
         ) : null}
@@ -327,7 +331,7 @@ export function Playtest({
       <div className="playtest-cols">
         {/* ── probability table ── */}
         <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-          <h2 className="font-bold">📈 抽到概率</h2>
+          <h2 className="font-bold">{msg.playtest.oddsTitle}</h2>
 
           {/* Fixed shape in every state — same two lines, same height, zeroes
               when nothing is ticked. Neither hiding the panel nor swapping in
@@ -337,11 +341,11 @@ export function Playtest({
               k=0, so the zeroes need no special case. */}
           <div className="mt-3 rounded-md border border-[var(--color-accent)]/40 bg-[var(--color-accent)]/5 p-3">
             <div className="text-sm font-medium">
-              已选 {picked.size} 张卡 · 共 {pickedQty} 份 —— 抽到任意一张的概率:
+              {msg.playtest.pickedLine(picked.size, pickedQty)}
             </div>
             <div className="flex flex-wrap gap-x-5 gap-y-1 mt-1.5 text-sm">
               <span>
-                起手 <b>{fmt(pAtLeastOne(N, pickedQty, HAND))}</b>
+                {msg.playtest.opening} <b>{fmt(pAtLeastOne(N, pickedQty, HAND))}</b>
               </span>
               {[1, 2, 3, 4, 5].map((t) => (
                 <span key={t}>
@@ -349,7 +353,7 @@ export function Playtest({
                 </span>
               ))}
               <span className="text-[var(--color-muted-fg)]">
-                起手期望 {expectedCount(N, pickedQty, HAND).toFixed(2)} 张
+                {msg.playtest.expectedOpening(expectedCount(N, pickedQty, HAND).toFixed(2))}
               </span>
             </div>
           </div>
@@ -364,9 +368,13 @@ export function Playtest({
                       a floor of their own (sm:min-w-[5.5rem]) so they read as a
                       block instead of a thin strip pushed to the far right —
                       absorbing ALL of it was the other half of the problem. */}
-                  <th className="py-1.5 pr-3 w-full">卡名</th>
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem]">张数</th>
-                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem]">起手</th>
+                  <th className="py-1.5 pr-3 w-full">{msg.playtest.colCardName}</th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem]">
+                    {msg.playtest.colCount}
+                  </th>
+                  <th className="py-1.5 pr-3 text-right whitespace-nowrap sm:min-w-[5.5rem]">
+                    {msg.playtest.opening}
+                  </th>
                   {/* The middle turns only appear once there's room for them.
                       Narrow screens keep 起手/T3/T5 — three points is enough to
                       read a curve — and a wide one gets every turn instead of
@@ -474,9 +482,9 @@ export function Playtest({
         {/* ── per-level draw odds ── */}
         {levelRows.length ? (
           <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
-            <h2 className="font-bold">🎯 各等级抽卡概率</h2>
+            <h2 className="font-bold">{msg.playtest.levelTitle}</h2>
             <p className="mt-1 text-xs text-[var(--color-muted-fg)] leading-snug">
-              「摸不到」= 起手 5 张之后再过 N 张牌,该等级一张都没见到的概率。
+              {msg.playtest.levelNote}
             </p>
             {/* A real table, not a stack of cards. The cards were four boxes
                 each cramming ten numbers into 240px at 9px type; as rows the
@@ -492,21 +500,21 @@ export function Playtest({
                 <thead>
                   <tr className="text-xs text-[var(--color-muted-fg)]">
                     <th className="py-1 pr-2 text-left font-normal" rowSpan={2}>
-                      等级
+                      {msg.playtest.colLevel}
                     </th>
                     <th className="py-1 px-1 text-right font-normal" rowSpan={2}>
-                      张数
+                      {msg.playtest.colCount}
                     </th>
                     <th className="py-1 px-1 text-right font-normal" rowSpan={2}>
-                      起手
+                      {msg.playtest.opening}
                       <br />
-                      期望
+                      {msg.playtest.expected}
                     </th>
                     <th
                       className="py-1 pl-3 text-center font-normal border-l border-[var(--color-border)]"
                       colSpan={DRAW_STEPS.length}
                     >
-                      摸不到 (%) · 起手后再过
+                      {msg.playtest.missHeader}
                     </th>
                   </tr>
                   <tr className="text-xs text-[var(--color-muted-fg)] border-b border-[var(--color-border)]">

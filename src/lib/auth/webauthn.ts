@@ -202,6 +202,9 @@ export async function beginRegistration(
 }
 
 export async function finishRegistration(input: {
+  /** What to call an unnamed single-device credential. Written to the row,
+   *  so it is chosen in the language of the moment by the caller. */
+  singleDeviceLabel: string;
   challengeId: string;
   response: RegistrationResponseJSON;
   expectedOrigin: string;
@@ -240,7 +243,7 @@ export async function finishRegistration(input: {
     input.label && input.label.trim()
       ? input.label.trim()
       : credentialDeviceType === "singleDevice"
-        ? "本设备"
+        ? input.singleDeviceLabel
         : "Passkey";
 
   db()

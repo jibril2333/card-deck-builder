@@ -82,7 +82,16 @@ const LINE_PATTERNS = [
 const COMMENT_OR_SECTION =
   /^\s*(?:\/\/|#|===|---|egg|eggs|main|main deck|side|sideboard|deck name)/i;
 
-export function parseDeckText(text: string): {
+export function parseDeckText(
+  text: string,
+  /**
+   * How to word a line this could not read. The importer passes the
+   * reader's language; the default is only for callers with no request to
+   * take one from (tests, scripts).
+   */
+  unparsed: (line: number, raw: string) => string = (line, raw) =>
+    `Line ${line}: cannot parse "${raw}"`,
+): {
   lines: ParsedLine[];
   errors: string[];
 } {
@@ -120,7 +129,7 @@ export function parseDeckText(text: string): {
       lines.push({ qty, code, name });
       continue;
     }
-    errors.push(`Line ${i + 1}: 无法解析 "${ln}"`);
+    errors.push(unparsed(i + 1, ln));
   }
   return { lines, errors };
 }

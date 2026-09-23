@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { clearImportReportAction } from "@/app/[game]/actions";
 import type { ImportReport } from "@/lib/import-report";
 import type { DeckRestrictionIssue } from "@/lib/db/digimon";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Everything wrong with this deck, in one place above 卡组分布.
@@ -40,6 +41,7 @@ export function DeckInfoBar({
   report: ImportReport | null;
   dismissable: boolean;
 }) {
+  const { m: msg } = useI18n();
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -76,21 +78,21 @@ export function DeckInfoBar({
   return (
     <div
       role="status"
-      aria-label="卡组信息"
+      aria-label={msg.deck.info}
       className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs space-y-1.5"
     >
       {sizeBad && size ? (
         <div className={row}>
-          <span className={tag}>数量</span>
+          <span className={tag}>{msg.deck.tagCount}</span>
           {size.main !== size.mainTarget ? (
             <span>
-              主卡组 <b className="text-amber-500">{size.main}</b> /{" "}
+              {msg.deck.mainDeck} <b className="text-amber-500">{size.main}</b> /{" "}
               {size.mainTarget}
             </span>
           ) : null}
           {size.eggs > size.eggTarget ? (
             <span>
-              蛋卡 <b className="text-amber-500">{size.eggs}</b> /{" "}
+              {msg.deck.eggs} <b className="text-amber-500">{size.eggs}</b> /{" "}
               {size.eggTarget}
             </span>
           ) : null}
@@ -99,31 +101,31 @@ export function DeckInfoBar({
 
       {banned.map((b) => (
         <div key={`b-${b.code}`} className={row}>
-          <span className={tag}>禁限</span>
+          <span className={tag}>{msg.deck.tagRestriction}</span>
           <span>
             <span className={code}>{b.code}</span> {b.name}{" "}
-            <b className="text-red-400">禁卡</b>
+            <b className="text-red-400">{msg.deck.bannedCard}</b>
           </span>
         </div>
       ))}
       {over.map((o) => (
         <div key={`o-${o.code}`} className={row}>
-          <span className={tag}>禁限</span>
+          <span className={tag}>{msg.deck.tagRestriction}</span>
           <span>
             <span className={code}>{o.code}</span> {o.name}{" "}
-            <b className="text-red-400">限 {o.max_count}</b>{" "}
-            <span className={tag}>(现有 {o.quantity})</span>
+            <b className="text-red-400">{msg.deck.limit(o.max_count)}</b>{" "}
+            <span className={tag}>{msg.deck.current(o.quantity)}</span>
           </span>
         </div>
       ))}
       {pairs.map((p) => (
         <div key={`p-${p.code}-${p.with_code}`} className={row}>
-          <span className={tag}>禁限</span>
+          <span className={tag}>{msg.deck.tagRestriction}</span>
           <span>
             <span className={code}>{p.code}</span> {p.name}{" "}
-            <b className="text-red-400">不能与</b>{" "}
+            <b className="text-red-400">{msg.deck.pairBefore}</b>{" "}
             <span className={code}>{p.with_code}</span> {p.with_name}{" "}
-            <b className="text-red-400">同组</b>
+            <b className="text-red-400">{msg.deck.pairAfter}</b>
           </span>
         </div>
       ))}
@@ -132,7 +134,7 @@ export function DeckInfoBar({
         <div className="space-y-1 border-t border-[var(--color-border)] pt-1.5">
           {report.missing?.length ? (
             <div className={row}>
-              <span className={tag}>未收录</span>
+              <span className={tag}>{msg.deck.tagMissing}</span>
               <span className="space-x-2">
                 {report.missing.map((m) => (
                   <span key={m.code}>
@@ -144,7 +146,7 @@ export function DeckInfoBar({
           ) : null}
           {report.banned?.length ? (
             <div className={row}>
-              <span className={tag}>禁卡未导入</span>
+              <span className={tag}>{msg.deck.tagBannedSkipped}</span>
               <span className="space-x-2">
                 {report.banned.map((m) => (
                   <span key={m.code}>
@@ -156,7 +158,7 @@ export function DeckInfoBar({
           ) : null}
           {report.capped?.length ? (
             <div className={row}>
-              <span className={tag}>导入时截到上限</span>
+              <span className={tag}>{msg.deck.tagCapped}</span>
               <span className="space-x-2">
                 {report.capped.map((m) => (
                   <span key={m.code}>
@@ -168,12 +170,12 @@ export function DeckInfoBar({
           ) : null}
           {report.pairs?.length ? (
             <div className={row}>
-              <span className={tag}>互斥未导入</span>
+              <span className={tag}>{msg.deck.tagPairSkipped}</span>
               <span className="space-x-2">
                 {report.pairs.map((m) => (
                   <span key={m.code}>
                     <span className={code}>{m.code}</span>
-                    <span className={tag}>（与 {m.with}）</span>
+                    <span className={tag}>{msg.deck.withWhom(m.with)}</span>
                   </span>
                 ))}
               </span>
@@ -181,7 +183,7 @@ export function DeckInfoBar({
           ) : null}
           {report.unparsed?.length ? (
             <div className={row}>
-              <span className={tag}>没读懂 {report.unparsed.length} 行</span>
+              <span className={tag}>{msg.deck.unparsed(report.unparsed.length)}</span>
               <span className="font-mono opacity-70 truncate max-w-full">
                 {report.unparsed[0]}
               </span>
@@ -194,7 +196,7 @@ export function DeckInfoBar({
               disabled={pending}
               className="mt-0.5 h-6 px-2 rounded-md border border-[var(--color-border)] hover:bg-[var(--color-muted)] cursor-pointer disabled:opacity-60"
             >
-              知道了
+              {msg.deck.gotIt}
             </button>
           ) : null}
         </div>

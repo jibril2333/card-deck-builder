@@ -22,17 +22,22 @@ test("egg first, then Digimon by level, then Tamers", async ({ page }) => {
   await page.getByRole("link", { name: /🛠 组建/ }).click();
 
   // Added in a deliberately unhelpful order: a Tamer first, the egg last.
+  //
+  // Searched by English name, clicked by the name the page shows. The card
+  // language follows the site's, which is Chinese in this suite, and BT1-086
+  // is the one fixture card with a Chinese name — the search still matches
+  // "Matt Ishida", but the button is labelled 石田大和.
   const search = page.getByPlaceholder("搜卡加入卡组…");
-  for (const name of [
-    "Matt Ishida",
-    "Sky Fissure",
-    "Dune Raptor",
-    "Omnimon",
-    "Cliff Raptor",
-    "Monodramon",
-    "Yokomon",
+  for (const [query, name] of [
+    ["Matt Ishida", "石田大和"],
+    ["Sky Fissure", "Sky Fissure"],
+    ["Dune Raptor", "Dune Raptor"],
+    ["Omnimon", "Omnimon"],
+    ["Cliff Raptor", "Cliff Raptor"],
+    ["Monodramon", "Monodramon"],
+    ["Yokomon", "Yokomon"],
   ]) {
-    await search.fill(name);
+    await search.fill(query);
     const add = page.getByLabel(`加入卡组 ${name}`);
     await add.waitFor();
     await add.click();

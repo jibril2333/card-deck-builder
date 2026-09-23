@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 type MissingCard = {
   code: string;
@@ -42,6 +43,7 @@ export function MissingCardsTool({
   decks: DeckShortfall[];
   onClose: () => void;
 }) {
+  const { m } = useI18n();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
 
@@ -95,11 +97,11 @@ export function MissingCardsTool({
 
   return (
     <section
-      aria-label="缺卡统计"
+      aria-label={m.decks.missingTool}
       className="mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3"
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">🛒 缺卡统计</h3>
+        <h3 className="text-sm font-semibold">{m.decks.missingToolButton}</h3>
         <button
           type="button"
           onClick={onClose}
@@ -193,11 +195,11 @@ export function MissingCardsTool({
         <>
           <div className="flex items-center justify-between border-t border-[var(--color-border)] pt-3">
             <div className="text-sm">
-              共缺{" "}
+              {m.decks.missingBefore}{" "}
               <b className="text-amber-600 dark:text-amber-400 tabular-nums">
                 {totalCards}
               </b>{" "}
-              张({totalKinds} 种)
+              {m.decks.missingAfter(totalCards, totalKinds)}
             </div>
             {totalKinds > 0 ? (
               <button
@@ -205,14 +207,14 @@ export function MissingCardsTool({
                 onClick={copyList}
                 className="px-2.5 h-7 rounded-md border border-[var(--color-border)] text-xs hover:bg-[var(--color-muted)] cursor-pointer"
               >
-                {copied ? "✓ 已复制" : "复制清单"}
+                {copied ? m.decks.copied : m.decks.copyList}
               </button>
             ) : null}
           </div>
 
           {totalKinds === 0 ? (
             <div className="text-xs text-green-600 dark:text-green-400 py-3 text-center">
-              已全部备齐
+              {m.decks.allSet}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
@@ -241,7 +243,7 @@ export function MissingCardsTool({
                       {c.name}
                     </div>
                     <div className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold tabular-nums">
-                      缺 {c.need}
+                      {m.decks.need(c.need)}
                     </div>
                   </div>
                 </Link>

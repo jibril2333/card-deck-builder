@@ -42,7 +42,9 @@ test("每一行说清楚是哪张卡、改了哪个字段", async ({ page }) => 
   // Rows carry the card's NAME, not just its code…
   const text = (await box.innerText()).replace(/\s+/g, " ");
   expect(text).toContain("BT1-084 Omnimon");
-  expect(text).toContain("BT1-086 Matt Ishida");
+  // Card names follow the site's language, and BT1-086 is the one fixture
+  // card with a Chinese name.
+  expect(text).toContain("BT1-086 石田大和");
   // …and the field is labelled in Chinese, not by its column name.
   expect(text).toContain("主要效果");
   expect(text).not.toContain("main_effect");

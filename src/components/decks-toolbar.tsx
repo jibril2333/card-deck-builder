@@ -11,6 +11,7 @@ import {
   MissingCardsTool,
   type DeckShortfall,
 } from "@/components/missing-cards-tool";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Compact decks-page toolbar.
@@ -40,6 +41,7 @@ export function DecksToolbar({
   deckCount: number;
   deckShortfalls: DeckShortfall[];
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [missingOpen, setMissingOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -85,14 +87,14 @@ export function DecksToolbar({
     } catch {
       setNotice({
         tone: "error",
-        text: "无法读取剪贴板。请检查浏览器权限(可能需要 HTTPS / 用户授权)。",
+        text: m.decks.clipboardDenied,
       });
       return;
     }
     if (!text.trim()) {
       setNotice({
         tone: "error",
-        text: "剪贴板是空的 — 先复制一份卡组文本再试。",
+        text: m.decks.clipboardEmpty,
       });
       inputRef.current?.focus();
       return;
@@ -102,9 +104,9 @@ export function DecksToolbar({
       if (r.ok && r.deckId) {
         // One line only — we're about to navigate to the deck, whose info
         // bar carries the detail (parse errors / banned / pair / overlimit).
-        const bits: string[] = [`导入 ${r.imported ?? 0} 张`];
+        const bits: string[] = [m.decks.imported(r.imported ?? 0)];
         if (r.missing && r.missing.length > 0) {
-          bits.push(`${r.missing.length} 张数据库里没找到`);
+          bits.push(m.decks.notInDb(r.missing.length));
         }
         setNotice({ tone: "ok", text: "✓ " + bits.join(" · ") });
         setName("");
@@ -112,7 +114,7 @@ export function DecksToolbar({
       } else {
         setNotice({
           tone: "error",
-          text: r.error ?? "导入失败",
+          text: r.error ?? m.decks.importFailed,
         });
       }
     });
@@ -129,7 +131,7 @@ export function DecksToolbar({
     <div className="mb-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold mr-auto">
-          我的卡组{" "}
+          {m.decks.mine}{" "}
           <span className="text-[var(--color-muted-fg)] font-normal text-sm">
             ({deckCount})
           </span>
@@ -144,7 +146,7 @@ export function DecksToolbar({
             name="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="卡组名(留空也可以,可后改)…"
+            placeholder={m.decks.namePlaceholder}
             className="flex-1 sm:w-56 h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
             disabled={pending}
           />
@@ -154,7 +156,7 @@ export function DecksToolbar({
             disabled={pending}
             
           >
-            ＋ 创建
+            {m.decks.create}
           </Button>
           <Button
             type="button"
@@ -162,9 +164,9 @@ export function DecksToolbar({
             variant="outline"
             onClick={onImport}
             disabled={pending}
-            title="从剪贴板里的卡组文本导入(支持 digimoncard.io / DCGO / Project Drasil / 通用 “数量 编号” 格式)"
+            title={m.decks.importTitle}
           >
-            {pending ? "处理中…" : "⇣ 导入"}
+            {pending ? m.decks.working : m.decks.import}
           </Button>
         </form>
 
@@ -180,7 +182,7 @@ export function DecksToolbar({
                   : "border-[var(--color-border)] hover:bg-[var(--color-muted)]"
               }`}
             >
-              🛒 缺卡统计
+              {m.decks.missingToolButton}
             </button>
           ) : null}
         </div>

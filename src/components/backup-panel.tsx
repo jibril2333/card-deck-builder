@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
+import { formatTimestamp } from "@/lib/i18n/format";
 
 type View = {
   r2: {
@@ -43,6 +45,7 @@ type Status = {
  * 更换 button rather than as an empty box that could mean "cleared".
  */
 export function BackupPanel() {
+  const { m, locale } = useI18n();
   const [cfg, setCfg] = useState<View | null>(null);
   const [status, setStatus] = useState<Status>(null);
   const [endpoint, setEndpoint] = useState("");
@@ -68,7 +71,7 @@ export function BackupPanel() {
     // The panel's data comes from an API call; there is nothing to render
     // until it lands.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load().catch(() => alive && setMsg({ ok: false, text: "读取配置失败" }));
+    load().catch(() => alive && setMsg({ ok: false, text: m.admin.readConfigFailed }));
     // The daemon writes its status once a minute; follow it while the page is
     // open so "启用" and "正在复制" don't disagree for ten minutes.
     const t = setInterval(() => {
@@ -115,9 +118,9 @@ export function BackupPanel() {
         }),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) throw new Error(j.error ?? "保存失败");
+      if (!r.ok || !j.ok) throw new Error(j.error ?? m.admin.saveFailed);
       apply(j.config as View);
-      setMsg({ ok: true, text: "已保存" });
+      setMsg({ ok: true, text: m.admin.saved });
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -138,19 +141,18 @@ export function BackupPanel() {
         ? "bg-red-500"
         : "bg-[var(--color-muted-fg)]";
 
-  const when = (iso: string | null | undefined) =>
-    iso ? new Date(iso).toLocaleString("zh-CN", { hour12: false }) : "—";
+  const when = (iso: string | null | undefined) => formatTimestamp(locale, iso);
 
   return (
     <section
-      aria-label="备份"
+      aria-label={m.admin.backup}
       className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3"
     >
       <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="text-sm font-semibold">备份</h2>
+        <h2 className="text-sm font-semibold">{m.admin.backup}</h2>
         <span className="inline-flex items-center gap-1.5 text-xs text-[var(--color-muted-fg)]">
           <span className={`w-2 h-2 rounded-full ${dot}`} />
-          {status ? status.message : "读取中…"}
+          {status ? status.message : m.admin.loading}
         </span>
       </div>
 
@@ -158,10 +160,10 @@ export function BackupPanel() {
       {status ? (
         <div className="text-xs text-[var(--color-muted-fg)] space-y-0.5">
           <div>
-            {status.target || "副本"} · {when(status.replicaLatest)}
+            {status.target || m.admin.replicaCopy} · {when(status.replicaLatest)}
           </div>
           <div>
-            本地快照 {status.snapshotCount} 份 · {when(status.snapshotLatest)}
+            {m.admin.localSnapshots(status.snapshotCount)} · {when(status.snapshotLatest)}
           </div>
           {status.lastError ? (
             <div className="text-amber-600 dark:text-amber-400">
@@ -176,7 +178,7 @@ export function BackupPanel() {
                   : "text-red-600 dark:text-red-400 font-medium"
               }
             >
-              恢复演练 {when(status.lastDrill.at)} · {status.lastDrill.message}
+              {m.admin.drill} {when(status.lastDrill.at)} · {status.lastDrill.message}
             </div>
           ) : null}
         </div>
@@ -190,24 +192,24 @@ export function BackupPanel() {
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
             />
-            异地备份到 R2
+            {m.admin.offsiteR2}
           </label>
 
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="space-y-1 sm:col-span-2">
-              <div className={label}>端点</div>
+              <div className={label}>{m.admin.endpoint}</div>
               <input
                 className={field}
                 value={endpoint}
                 onChange={(e) => setEndpoint(e.target.value)}
-                placeholder="https://<账号ID>.r2.cloudflarestorage.com"
+                placeholder={m.admin.endpointPlaceholder}
                 inputMode="url"
                 autoComplete="off"
                 spellCheck={false}
               />
             </label>
             <label className="space-y-1">
-              <div className={label}>存储桶</div>
+              <div className={label}>{m.admin.bucket}</div>
               <input
                 className={field}
                 value={bucket}
@@ -218,7 +220,7 @@ export function BackupPanel() {
               />
             </label>
             <label className="space-y-1">
-              <div className={label}>路径</div>
+              <div className={label}>{m.admin.path}</div>
               <input
                 className={field}
                 value={prefix}
@@ -258,7 +260,7 @@ export function BackupPanel() {
                     }}
                     className={`${btn} shrink-0 border border-[var(--color-border)] hover:bg-[var(--color-muted)]`}
                   >
-                    更换
+                    {m.admin.replace}
                   </button>
                 </div>
               ) : (
@@ -282,7 +284,7 @@ export function BackupPanel() {
                       }}
                       className={`${btn} shrink-0 border border-[var(--color-border)] hover:bg-[var(--color-muted)]`}
                     >
-                      取消
+                      {m.admin.cancel}
                     </button>
                   ) : null}
                 </div>
@@ -297,7 +299,7 @@ export function BackupPanel() {
               disabled={busy}
               className={`${btn} bg-[var(--color-accent)] text-[var(--color-accent-fg)]`}
             >
-              保存
+              {m.admin.save}
             </button>
             {msg ? (
               <span

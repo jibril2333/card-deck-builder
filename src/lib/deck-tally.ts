@@ -14,7 +14,8 @@ export type TallyCard = {
 };
 
 /** The label the multi-colour bucket goes under. */
-export const MULTI_COLOR = "多色";
+/** Sentinel, not a label: the word for it is `m.deckCards.multiColor`. */
+export const MULTI_COLOR = "multi";
 
 /**
  * Levels the game actually prints. Kept as a floor rather than derived purely

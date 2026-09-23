@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { KEYWORDS } from "@/lib/keywords";
 import { NON_KEYWORDS, keywordBase } from "@/lib/keyword-derive";
+import { LOCALES } from "@/lib/i18n/locale";
 
 /**
  * The keyword list on the game-knowledge page against the official one.
@@ -35,7 +36,11 @@ describe("KEYWORDS", () => {
       // rules (［DNA Digivolution］, 〔进化〕), and no brackets at all for the
       // requirement lines (组装-N:…), which are printed as their own line.
       expect(k.display).toMatch(/[＜［〔]|^[^＜［〔]+-N:/);
-      expect(k.zh.length).toBeGreaterThan(8);
+      // Every keyword is explained in every language the site speaks.
+      for (const locale of LOCALES) {
+        expect(k.explain[locale].length, `${locale} ${k.official}`)
+          .toBeGreaterThan(8);
+      }
       // All three names are required: the table's job is recognising a
       // keyword on a card, and which language that card is in varies.
       expect(k.ja.length).toBeGreaterThan(0);

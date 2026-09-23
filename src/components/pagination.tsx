@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * Numbered pagination, shared by the card browser and the collection.
@@ -22,7 +23,7 @@ import Link from "next/link";
  * phone and was sitting exactly on top of 下一页 once the page was scrolled to
  * the end.
  */
-export function Pagination({
+export async function Pagination({
   page,
   totalPages,
   hrefFor,
@@ -34,6 +35,7 @@ export function Pagination({
   hrefFor: (p: number) => string;
   className?: string;
 }) {
+  const m = await getMessages();
   if (totalPages <= 1) return null;
 
   const step =
@@ -70,22 +72,22 @@ export function Pagination({
   return (
     <nav
       className={`mt-8 touch:mb-20 flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap ${className}`}
-      aria-label="分页"
+      aria-label={m.common.pagination}
     >
       {page > 1 ? (
         <Link
           href={hrefFor(page - 1)}
           className={enabled}
           rel="prev"
-          aria-label="上一页"
+          aria-label={m.common.prev}
         >
           <span aria-hidden>←</span>
-          <span className="hidden sm:inline ml-1">上一页</span>
+          <span className="hidden sm:inline ml-1">{m.common.prev}</span>
         </Link>
       ) : (
-        <span className={disabled} aria-label="上一页">
+        <span className={disabled} aria-label={m.common.prev}>
           <span aria-hidden>←</span>
-          <span className="hidden sm:inline ml-1">上一页</span>
+          <span className="hidden sm:inline ml-1">{m.common.prev}</span>
         </span>
       )}
 
@@ -101,14 +103,14 @@ export function Pagination({
           href={hrefFor(page + 1)}
           className={enabled}
           rel="next"
-          aria-label="下一页"
+          aria-label={m.common.next}
         >
-          <span className="hidden sm:inline mr-1">下一页</span>
+          <span className="hidden sm:inline mr-1">{m.common.next}</span>
           <span aria-hidden>→</span>
         </Link>
       ) : (
-        <span className={disabled} aria-label="下一页">
-          <span className="hidden sm:inline mr-1">下一页</span>
+        <span className={disabled} aria-label={m.common.next}>
+          <span className="hidden sm:inline mr-1">{m.common.next}</span>
           <span aria-hidden>→</span>
         </span>
       )}

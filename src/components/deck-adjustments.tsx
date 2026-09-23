@@ -12,6 +12,7 @@ import {
   setDeckAdjustmentQuantityAction,
   searchCardsAction,
 } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 export type Adjustment = {
   id: string;
@@ -50,6 +51,7 @@ export function DeckAdjustments({
   /** Reader's card language, so picker results read like the rest of the page. */
   lang: string;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [q, setQ] = useState("");
@@ -174,7 +176,7 @@ export function DeckAdjustments({
   return (
     <section className="mt-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4">
       <header className="flex items-baseline gap-2 mb-3">
-        <h2 className="text-sm font-semibold">调整备忘</h2>
+        <h2 className="text-sm font-semibold">{m.deckCards.adjustments}</h2>
       </header>
 
       <div ref={boxRef} className="relative mb-4">
@@ -192,7 +194,7 @@ export function DeckAdjustments({
             // the box there would take the word still being typed.
             if (e.key === "Escape" && !e.nativeEvent.isComposing) clear();
           }}
-          placeholder="搜卡片（名称或编号），再选加入哪一栏…"
+          placeholder={m.deckCards.adjustmentsPlaceholder}
           className="w-full h-9 pl-3 pr-9 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
         />
         {/* Same clear affordance as the other two search boxes. */}
@@ -201,7 +203,7 @@ export function DeckAdjustments({
             type="button"
             onClick={clear}
             className="absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-fg)] text-sm cursor-pointer flex items-center justify-center"
-            aria-label="清空"
+            aria-label={m.deckCards.clear}
           >
             ×
           </button>
@@ -215,11 +217,11 @@ export function DeckAdjustments({
           >
             {searching && hits.length === 0 ? (
               <div className="px-3 py-2 text-xs text-[var(--color-muted-fg)]">
-                搜索中…
+                {m.deckCards.searching}
               </div>
             ) : hits.length === 0 ? (
               <div className="px-3 py-2 text-xs text-[var(--color-muted-fg)]">
-                没有匹配的卡
+                {m.deckCards.noMatch}
               </div>
             ) : (
               hits.map((h) => (
@@ -248,7 +250,7 @@ export function DeckAdjustments({
                     onClick={() => add(h.id, "add")}
                     className="text-[11px] px-2 h-7 rounded border border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-50"
                   >
-                    ＋想加
+                    {m.deckCards.plusWant}
                   </button>
                   <button
                     type="button"
@@ -256,7 +258,7 @@ export function DeckAdjustments({
                     onClick={() => add(h.id, "remove")}
                     className="text-[11px] px-2 h-7 rounded border border-amber-500/50 text-amber-500 hover:bg-amber-500/10 cursor-pointer disabled:opacity-50"
                   >
-                    －想减
+                    {m.deckCards.minusWant}
                   </button>
                 </div>
               ))
@@ -267,7 +269,7 @@ export function DeckAdjustments({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Column
-          title="考虑加入"
+          title={m.deckCards.considerAdd}
           accent="text-emerald-500"
           items={toAdd}
           game={game}
@@ -275,7 +277,7 @@ export function DeckAdjustments({
           run={run}
         />
         <Column
-          title="考虑换下"
+          title={m.deckCards.considerRemove}
           accent="text-amber-500"
           items={toCut}
           game={game}
@@ -302,17 +304,18 @@ function Column({
   pending: boolean;
   run: (action: (fd: FormData) => Promise<void>, fd: FormData) => void;
 }) {
+  const { m } = useI18n();
   return (
     <div>
       <div className={`text-xs font-semibold mb-1.5 ${accent}`}>
         {title}{" "}
         <span className="text-[var(--color-muted-fg)] font-normal">
-          ({items.length} 种 · {items.reduce((n, i) => n + i.quantity, 0)} 张)
+          {m.deckCards.kindsCopies(items.length, items.reduce((n, i) => n + i.quantity, 0))}
         </span>
       </div>
       {items.length === 0 ? (
         <div className="text-xs text-[var(--color-muted-fg)] border border-dashed border-[var(--color-border)] rounded-md py-6 text-center">
-          暂无
+          {m.deckCards.empty}
         </div>
       ) : (
         <ul className="space-y-1.5">
@@ -342,6 +345,7 @@ function Row({
   pending: boolean;
   run: (action: (fd: FormData) => Promise<void>, fd: FormData) => void;
 }) {
+  const { m } = useI18n();
   const [note, setNote] = useState(item.note ?? "");
 
   function saveNote() {
@@ -392,14 +396,14 @@ function Row({
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
           }}
-          placeholder="理由（可留空）"
+          placeholder={m.deckCards.reasonPlaceholder}
           className="mt-1 w-full h-6 px-1.5 rounded border border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-border)] bg-transparent text-[11px] text-[var(--color-muted-fg)]"
         />
       </div>
       <button
         type="button"
         disabled={pending}
-        title="移除"
+        title={m.deckCards.remove}
         onClick={() => {
           const fd = new FormData();
           fd.set("id", item.id);
@@ -423,6 +427,7 @@ function Stepper({
   pending: boolean;
   onChange: (q: number) => void;
 }) {
+  const { m } = useI18n();
   const btn =
     "w-5 h-5 rounded flex items-center justify-center text-xs leading-none " +
     "border border-[var(--color-border)] hover:border-[var(--color-fg)] " +
@@ -433,7 +438,7 @@ function Stepper({
         type="button"
         disabled={pending || value <= 1}
         onClick={() => onChange(value - 1)}
-        aria-label="减少一张"
+        aria-label={m.deckCards.minusOne}
         className={btn}
       >
         −
@@ -445,7 +450,7 @@ function Stepper({
         type="button"
         disabled={pending || value >= 20}
         onClick={() => onChange(value + 1)}
-        aria-label="增加一张"
+        aria-label={m.deckCards.plusOne}
         className={btn}
       >
         ＋

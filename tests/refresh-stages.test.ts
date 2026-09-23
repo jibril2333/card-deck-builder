@@ -4,8 +4,9 @@ import path from "node:path";
 import {
   REFRESH_STAGES,
   REFRESH_STAGE_IDS,
-  scriptLabel,
 } from "@/lib/refresh-stages";
+import { LOCALES } from "@/lib/i18n/locale";
+import { MESSAGES } from "@/lib/i18n/messages";
 
 /**
  * `REFRESH_STAGES` is now the only authority: the daemon runs
@@ -31,10 +32,17 @@ describe("refresh stages", () => {
     expect(REFRESH_STAGE_IDS).toContain("keywords");
   });
 
-  it("gives every stage a label and a hint", () => {
+  it("gives every stage a name and a hint, in every language", () => {
+    // The words moved to the dictionary when the site gained languages; a
+    // stage with no entry shows a blank button, which is what this caught
+    // before and still catches.
     for (const s of REFRESH_STAGES) {
-      expect(s.label.length, s.id).toBeGreaterThan(0);
-      expect(s.hint.length, s.id).toBeGreaterThan(0);
+      for (const locale of LOCALES) {
+        expect(MESSAGES[locale].admin.stageLabel[s.id], `${locale} ${s.id}`)
+          .toBeTruthy();
+        expect(MESSAGES[locale].admin.stageHint[s.id], `${locale} ${s.id}`)
+          .toBeTruthy();
+      }
     }
   });
 
@@ -44,7 +52,12 @@ describe("refresh stages", () => {
     // stage name.
     for (const stage of REFRESH_STAGES) {
       for (const script of stage.scripts) {
-        expect(scriptLabel(script), `${stage.id} → ${script}`).toBeTruthy();
+        for (const locale of LOCALES) {
+          expect(
+            MESSAGES[locale].admin.scriptLabel[script],
+            `${locale} ${stage.id} → ${script}`,
+          ).toBeTruthy();
+        }
       }
     }
   });

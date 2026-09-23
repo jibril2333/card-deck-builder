@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDeckLockedAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Close a finished deck to edits.
@@ -24,6 +25,7 @@ export function DeckLockButton({
   deckId: string;
   locked: boolean;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -46,8 +48,8 @@ export function DeckLockButton({
       aria-pressed={locked}
       title={
         locked
-          ? "已锁定:卡片、备注、颜色、封面都改不了,卡牌页也无法加入这副卡组。点一下解锁"
-          : "锁定这副卡组 —— 之后任何修改都会被拒绝,直到你解锁"
+          ? m.deck.lockedLongTitle
+          : m.deck.lockTitle
       }
       className={`h-8 px-3 rounded-md text-sm cursor-pointer border transition-colors disabled:opacity-50 ${
         locked
@@ -55,7 +57,7 @@ export function DeckLockButton({
           : "border-[var(--color-border)] hover:bg-[var(--color-muted)]"
       }`}
     >
-      {locked ? "🔒 已锁定" : "🔓 锁定"}
+      {locked ? m.deck.lockedBadge : m.deck.lockButton}
     </button>
   );
 }

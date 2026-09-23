@@ -88,6 +88,11 @@ export default defineConfig({
     // The session cookie is written here by global-setup.ts so every test
     // starts logged in (middleware would otherwise bounce to /login).
     storageState: "tests/e2e/.storageState.json",
+    // The site now picks its language from Accept-Language when no choice has
+    // been made, and Playwright's own default is en-US. The suite asserts the
+    // Chinese interface, so the browser says it reads Chinese; the specs that
+    // test the other languages set their own.
+    locale: "zh-CN",
   },
 
   projects: [

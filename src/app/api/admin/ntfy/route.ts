@@ -8,6 +8,7 @@ import {
   parseNtfyConfig,
   type NtfyConfig,
 } from "@/lib/ntfy-config";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * Push-notification settings.
@@ -52,13 +53,14 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const m = await getMessages();
   if (!(await isAdmin())) return new Response("forbidden", { status: 403 });
 
   let incoming: NtfyConfig;
   try {
     incoming = parseNtfyConfig(await req.json());
   } catch {
-    return Response.json({ ok: false, error: "请求格式不对" }, { status: 400 });
+    return Response.json({ ok: false, error: m.admin.badRequest }, { status: 400 });
   }
 
   // An empty token field means "leave the saved one alone" — the form can't
@@ -80,7 +82,7 @@ export async function PUT(req: Request) {
     fs.chmodSync(FILE, 0o600);
   } catch (err) {
     console.error("[admin/ntfy] write failed:", err);
-    return Response.json({ ok: false, error: "无法写入配置文件" }, { status: 500 });
+    return Response.json({ ok: false, error: m.admin.cannotWriteConfig }, { status: 500 });
   }
 
   return Response.json({ ok: true, config: publicView(next) });

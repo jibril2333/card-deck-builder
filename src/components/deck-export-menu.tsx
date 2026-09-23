@@ -5,6 +5,7 @@ import {
   DeckImageExport,
   type ExportCard,
 } from "@/components/deck-image-export";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * The deck's three export actions behind one toolbar button.
@@ -38,6 +39,7 @@ export function DeckExportMenu({
   subtitle: string;
   cards: ExportCard[];
 }) {
+  const { m } = useI18n();
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState<"text" | "url" | null>(null);
   const [failed, setFailed] = useState(false);
@@ -89,7 +91,7 @@ export function DeckExportMenu({
         // 复制失败 and back.
         className="px-3 h-8 min-w-[5.5rem] justify-center rounded-md text-sm border border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)] cursor-pointer flex items-center gap-1.5"
       >
-        {done ? "✓ 已复制" : failed ? "复制失败" : "⇡ 导出"}
+        {done ? m.deck.copied : failed ? m.deck.copyFailed : m.deck.export}
         <span
           aria-hidden
           className={`text-[9px] leading-none text-[var(--color-muted-fg)] transition-transform ${
@@ -118,7 +120,7 @@ export function DeckExportMenu({
             className={item}
             onClick={() => copy("text")}
           >
-            📄 文本
+            {m.deck.exportText}
           </button>
           <button
             type="button"
@@ -126,7 +128,7 @@ export function DeckExportMenu({
             className={item}
             onClick={() => copy("url")}
           >
-            🔗 链接
+            {m.deck.exportLink}
           </button>
           <DeckImageExport
             deckName={deckName}
@@ -145,9 +147,9 @@ export function DeckExportMenu({
                   run();
                   setOpen(false);
                 }}
-                title="把整个卡组排版成一张 PNG 图片下载"
+                title={m.deck.imageTitle}
               >
-                🖼️ {busy ? "生成中…" : "图片"}
+                🖼️ {busy ? m.deck.generating : m.deck.image}
               </button>
             )}
           />

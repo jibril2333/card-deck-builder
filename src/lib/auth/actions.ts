@@ -12,10 +12,11 @@ import {
 import { clearSessionCookie, setSessionCookie } from "./session";
 import {
   checkLogin,
-  describeWait,
+  waitMinutes,
   recordFailure,
   recordSuccess,
 } from "./throttle";
+import { getMessages } from "@/lib/i18n/server";
 
 export type AuthResult =
   | { ok: true }
@@ -26,31 +27,32 @@ export type AuthResult =
 // ────────────────────────────────────────────────────────────────────────
 
 export async function registerAction(formData: FormData): Promise<AuthResult> {
+  const m = await getMessages();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const displayName = String(formData.get("display_name") ?? "").trim();
   const inviteCode = String(formData.get("invite") ?? "").trim();
 
   if (!email || !email.includes("@")) {
-    return { ok: false, error: "请输入有效邮箱。" };
+    return { ok: false, error: m.auth.invalidEmail };
   }
   if (!password || password.length < 8) {
-    return { ok: false, error: "密码至少 8 位。" };
+    return { ok: false, error: m.auth.passwordTooShort };
   }
   if (!displayName) {
-    return { ok: false, error: "请填写昵称。" };
+    return { ok: false, error: m.auth.nicknameRequired };
   }
   if (!inviteCode) {
-    return { ok: false, error: "缺少邀请码。" };
+    return { ok: false, error: m.auth.inviteRequired };
   }
 
   // Pre-check invite + email uniqueness before doing the expensive bcrypt.
   const invite = findInvite(inviteCode);
-  if (!invite) return { ok: false, error: "邀请码无效。" };
-  if (invite.used_by) return { ok: false, error: "邀请码已被使用。" };
+  if (!invite) return { ok: false, error: m.auth.inviteInvalid };
+  if (invite.used_by) return { ok: false, error: m.auth.inviteUsed };
 
   if (await findUserByEmail(email)) {
-    return { ok: false, error: "该邮箱已注册,请直接登录。" };
+    return { ok: false, error: m.auth.emailTaken };
   }
 
   const user = await createUser({
@@ -68,7 +70,7 @@ export async function registerAction(formData: FormData): Promise<AuthResult> {
     // clear error and can ask for a new invite.
     return {
       ok: false,
-      error: "邀请码刚被别人用了。请联系管理员再要一个。",
+      error: m.auth.inviteRace,
     };
   }
 
@@ -81,10 +83,11 @@ export async function registerAction(formData: FormData): Promise<AuthResult> {
 // ────────────────────────────────────────────────────────────────────────
 
 export async function loginAction(formData: FormData): Promise<AuthResult> {
+  const m = await getMessages();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   if (!email || !password) {
-    return { ok: false, error: "请输入邮箱和密码。" };
+    return { ok: false, error: m.auth.credentialsRequired };
   }
 
   // Checked BEFORE the bcrypt compare: the point is to stop spending 200ms of
@@ -94,7 +97,7 @@ export async function loginAction(formData: FormData): Promise<AuthResult> {
   if (!gate.allowed) {
     return {
       ok: false,
-      error: `尝试次数过多,请 ${describeWait(gate.retryAfterMs)}后再试。`,
+      error: m.auth.tooManyAttempts(waitMinutes(gate.retryAfterMs)),
     };
   }
 
@@ -104,7 +107,7 @@ export async function loginAction(formData: FormData): Promise<AuthResult> {
     // Deliberately the same message as before, and the same one a locked-out
     // wrong password gets: which of the two fields is wrong, and whether the
     // account exists, are not things the form should say.
-    return { ok: false, error: "邮箱或密码不对。" };
+    return { ok: false, error: m.auth.wrongCredentials };
   }
   recordSuccess(keys);
   await setSessionCookie(user.id);

@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/auth/admin";
 import { REFRESH_STAGE_IDS } from "@/lib/refresh-stages";
 import { clearProgress, readProgress } from "@/lib/refresh-progress";
 import { healthReport } from "@/lib/scrape-health";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * Admin endpoint behind the "更新卡牌数据" button.
@@ -89,11 +90,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const m = await getMessages();
   if (!(await isAdmin())) return new Response("forbidden", { status: 403 });
 
   if (fs.existsSync(LOCK_DIR) || fs.existsSync(REQUEST_FILE)) {
     return Response.json(
-      { ok: false, error: "刷新已在进行中" },
+      { ok: false, error: m.admin.refreshInProgress },
       { status: 409 },
     );
   }
@@ -120,7 +122,7 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("[admin/refresh] could not write request file:", err);
     return Response.json(
-      { ok: false, error: "无法写入请求文件" },
+      { ok: false, error: m.admin.cannotWriteRequest },
       { status: 500 },
     );
   }

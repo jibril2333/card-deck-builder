@@ -20,6 +20,7 @@
 import Link from "next/link";
 import { Fragment } from "react";
 import { PoolHeldStepper } from "@/components/pool-held-stepper";
+import { getMessages } from "@/lib/i18n/server";
 
 export type PoolRow = {
   card_id: string;
@@ -50,7 +51,7 @@ const deckColor = (d: PoolDeck) =>
     ? `linear-gradient(135deg, ${d.accent_color}, ${d.accent_color2})`
     : d.accent_color;
 
-export function PoolTable({
+export async function PoolTable({
   game,
   groupId,
   memberDecks,
@@ -63,17 +64,18 @@ export function PoolTable({
   eggs: PoolRow[];
   mains: PoolRow[];
 }) {
+  const m = await getMessages();
   const colCount = 1 + memberDecks.length + 3;
   const sections: { label: string; rows: PoolRow[] }[] = [];
-  if (eggs.length) sections.push({ label: "蛋卡", rows: eggs });
-  sections.push({ label: eggs.length ? "主卡组" : "", rows: mains });
+  if (eggs.length) sections.push({ label: m.deck.eggs, rows: eggs });
+  sections.push({ label: eggs.length ? m.deck.mainDeck : "", rows: mains });
   return (
     <>
       <div className="pool-wide overflow-x-auto mt-5">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left text-xs text-[var(--color-muted-fg)] border-b border-[var(--color-border)]">
-              <th className="py-1.5 pr-3">卡</th>
+              <th className="py-1.5 pr-3">{m.pool.card}</th>
               {memberDecks.map((d) => (
                 <th key={d.id} className="py-1.5 px-1.5 text-center">
                   <span className="inline-flex items-center gap-1">
@@ -86,12 +88,12 @@ export function PoolTable({
                 </th>
               ))}
               <th className="py-1.5 px-2 text-center font-semibold text-[var(--color-fg)]">
-                需备
+                {m.pool.need}
               </th>
               <th className="py-1.5 px-2 text-center whitespace-nowrap">
-                持有(共享)
+                {m.pool.heldShared}
               </th>
-              <th className="py-1.5 px-2 text-center">缺</th>
+              <th className="py-1.5 px-2 text-center">{m.pool.missingShort}</th>
             </tr>
           </thead>
           <tbody>
@@ -246,7 +248,7 @@ function CardRow({
  * keeps its dot at low opacity rather than disappearing, so the decks stay in
  * the same order on every block and can be read down the list.
  */
-function CardBlock({
+async function CardBlock({
   c,
   game,
   groupId,
@@ -257,6 +259,7 @@ function CardBlock({
   groupId: string;
   memberDecks: PoolDeck[];
 }) {
+  const m = await getMessages();
   const href = `/${game}/card/${c.code
     .split("/")
     .map(encodeURIComponent)
@@ -290,9 +293,9 @@ function CardBlock({
             <span className="block truncate text-sm">{c.name}</span>
           </Link>
           <span className="shrink-0 text-xs tabular-nums text-[var(--color-muted-fg)]">
-            需备{" "}
+            {m.pool.need}{" "}
             <span className="font-bold text-[var(--color-fg)]">{c.need}</span>
-            {" · 缺 "}
+            {m.pool.missingSep}
             <span
               className={c.missing > 0 ? "text-red-500 font-medium" : undefined}
             >

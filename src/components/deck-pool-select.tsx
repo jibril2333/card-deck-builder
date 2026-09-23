@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setDeckGroupsAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 export type PoolOption = { id: string; name: string };
 
@@ -30,6 +31,7 @@ export function DeckPoolSelect({
   pools: PoolOption[];
   current: string | null;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [value, setValue] = useState(current ?? "");
@@ -51,14 +53,14 @@ export function DeckPoolSelect({
   return (
     <span className="inline-flex items-center gap-1 shrink-0">
       <select
-        aria-label="共享卡池"
+        aria-label={m.deck.pool}
         value={value}
         disabled={pending}
         onChange={(e) => save(e.target.value)}
-        title="同一个卡池里的卡组共用一套实体卡"
+        title={m.deck.poolTitle}
         className="h-8 max-w-[12rem] rounded-md border border-[var(--color-border)] bg-[var(--color-card)] px-2 text-sm cursor-pointer hover:bg-[var(--color-muted)] disabled:opacity-60"
       >
-        <option value="">无卡池</option>
+        <option value="">{m.deck.noPool}</option>
         {pools.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -69,8 +71,8 @@ export function DeckPoolSelect({
       {value ? (
         <Link
           href={`/${game}/groups/${value}`}
-          aria-label="打开卡池"
-          title="打开卡池"
+          aria-label={m.deck.openPool}
+          title={m.deck.openPool}
           className="h-8 w-7 rounded-md text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] hover:bg-[var(--color-muted)] flex items-center justify-center"
         >
           →

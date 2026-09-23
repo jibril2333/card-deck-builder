@@ -9,8 +9,9 @@
 import Link from "next/link";
 import { CartScriptButton } from "@/components/cart-script-button";
 import { formatPrice } from "@/lib/price-format";
+import { getMessages } from "@/lib/i18n/server";
 
-export function DeckPurchaseSummary({
+export async function DeckPurchaseSummary({
   game,
   deckId,
   kinds,
@@ -36,6 +37,7 @@ export function DeckPurchaseSummary({
   remainingPrice: number;
   missingOnly: boolean;
 }) {
+  const m = await getMessages();
   return (
     <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2">
       <div className="flex items-baseline justify-between gap-3">
@@ -44,24 +46,24 @@ export function DeckPurchaseSummary({
             {totalOwned}
           </span>
           <span className="text-[var(--color-muted-fg)]">
-            / {totalWanted} 已购
+            / {totalWanted} {m.deckCards.bought}
           </span>
           {totalMissing > 0 ? (
             <span className="text-amber-600 dark:text-amber-400">
-              · 还差 <b>{totalMissing}</b>
+              · {m.deckCards.stillNeed} <b>{totalMissing}</b>
               {remainingPrice > 0 ? (
-                <span> · 约 {formatPrice(remainingPrice)}</span>
+                <span> · {m.deckCards.about(formatPrice(remainingPrice))}</span>
               ) : null}
             </span>
           ) : totalWanted > 0 ? (
             <span className="text-green-600 dark:text-green-400">
-              · ✓ 已备齐
+              {m.deckCards.allSetSep}
             </span>
           ) : null}
         </div>
         <div className="text-[10px] text-[var(--color-muted-fg)] tabular-nums whitespace-nowrap">
-          {completedCards} / {kinds} 卡位齐全
-          {totalPrice > 0 ? ` · 总价 ${formatPrice(totalPrice)}` : ""}
+          {m.deckCards.slotsComplete(completedCards, kinds)}
+          {totalPrice > 0 ? m.deckCards.totalPriceSep(formatPrice(totalPrice)) : ""}
         </div>
       </div>
       <div className="h-1 rounded-full bg-[var(--color-muted)] overflow-hidden mt-1.5">
@@ -84,7 +86,7 @@ export function DeckPurchaseSummary({
                 : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
             }`}
           >
-            全部
+            {m.deckCards.all}
           </Link>
           <Link
             href={`/${game}/decks/${deckId}?mode=purchase`}
@@ -96,7 +98,7 @@ export function DeckPurchaseSummary({
                 : "text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
             }`}
           >
-            仅缺货
+            {m.deckCards.missingOnly}
             {totalMissing > 0 ? (
               <span className="inline-flex items-center justify-center min-w-[1rem] h-3.5 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold tabular-nums">
                 {totalMissing}
@@ -105,7 +107,7 @@ export function DeckPurchaseSummary({
           </Link>
         </div>
         <span className="text-[10px] text-[var(--color-muted-fg)] whitespace-nowrap">
-          绿=已备齐 · 橙=缺 · 灰=未买
+          {m.deckCards.legend}
         </span>
       </div>
       {/* What is still missing, ready to drop into the shop's cart.

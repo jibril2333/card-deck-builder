@@ -2,19 +2,23 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { isGameId } from "@/lib/games";
 import { MemoryBoard } from "@/components/memory-board";
+import { getMessages } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-  title: "内存条",
-  // Add to Home Screen from this page and iOS launches it standalone — no
-  // address bar, no toolbar. That is the only way to get a genuinely full
-  // screen on an iPhone: Safari has no Fullscreen API, and its chrome is worth
-  // roughly a hexagon and a half of board.
-  appleWebApp: {
-    capable: true,
-    title: "内存条",
-    statusBarStyle: "black-translucent",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const m = await getMessages();
+  return {
+    title: m.nav.memory,
+    // Add to Home Screen from this page and iOS launches it standalone — no
+    // address bar, no toolbar. That is the only way to get a genuinely full
+    // screen on an iPhone: Safari has no Fullscreen API, and its chrome is
+    // worth roughly a hexagon and a half of board.
+    appleWebApp: {
+      capable: true,
+      title: m.nav.memory,
+      statusBarStyle: "black-translucent",
+    },
+  };
+}
 
 // Scoped to this route on purpose. `viewport-fit=cover` lets the board reach
 // the physical screen edges (the component pays the safe-area insets back where

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { backupBeforeWrite } from "@/lib/db/connection";
 import { importUserData } from "@/lib/db/user-transfer";
 import { isUserExport, USER_EXPORT_VERSION } from "@/lib/user-data";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * Load an export into this account.
@@ -17,25 +18,26 @@ import { isUserExport, USER_EXPORT_VERSION } from "@/lib/user-data";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const m = await getMessages();
   // getCurrentUser + an explicit 401, not requireUser: that one throws a
   // plain Error for Server Actions to surface, and an uncaught throw in a
   // route handler is a 500. An unauthenticated GET should say "log in", not
   // "the server broke".
   const me = await getCurrentUser();
-  if (!me) return Response.json({ ok: false, error: "请先登录" }, { status: 401 });
+  if (!me) return Response.json({ ok: false, error: m.account.loginFirst }, { status: 401 });
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return Response.json({ ok: false, error: "文件不是有效的 JSON" }, { status: 400 });
+    return Response.json({ ok: false, error: m.account.notJson }, { status: 400 });
   }
 
   const payload = (body ?? {}) as { data?: unknown; replace?: boolean };
   const data = payload.data ?? body;
   if (!isUserExport(data)) {
     return Response.json(
-      { ok: false, error: "这不像是本站导出的数据文件" },
+      { ok: false, error: m.account.notOurExport },
       { status: 400 },
     );
   }
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
     return Response.json(
       {
         ok: false,
-        error: `文件版本 ${data.version} 比这个站点支持的 ${USER_EXPORT_VERSION} 新,请先更新站点`,
+        error: m.account.newerVersion(data.version, USER_EXPORT_VERSION),
       },
       { status: 400 },
     );
@@ -55,6 +57,6 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, report });
   } catch (err) {
     console.error("[account/import] failed:", err);
-    return Response.json({ ok: false, error: "导入失败,数据没有改动" }, { status: 500 });
+    return Response.json({ ok: false, error: m.account.importFailedUnchanged }, { status: 500 });
   }
 }

@@ -9,6 +9,7 @@ import {
 } from "@/app/[game]/actions";
 import { useComposition } from "@/lib/use-composition";
 import { isSearchableQuery } from "@/lib/search-terms";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Search-and-add box for build mode.
@@ -31,6 +32,7 @@ export function DeckCardSearch({
   deckId: string;
   lang: string;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [q, setQ] = useState("");
@@ -144,7 +146,7 @@ export function DeckCardSearch({
             // the box then would take the text the user is still working on.
             if (e.key === "Escape" && !e.nativeEvent.isComposing) clear();
           }}
-          placeholder="搜卡加入卡组…"
+          placeholder={m.deckCards.searchPlaceholder}
           className="w-full h-8 pl-8 pr-7 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] text-sm"
         />
         {/* Same clear affordance as the card browser's search field. */}
@@ -153,7 +155,7 @@ export function DeckCardSearch({
             type="button"
             onClick={clear}
             className="absolute right-1 top-1/2 -translate-y-1/2 w-5 h-5 rounded hover:bg-[var(--color-muted)] text-[var(--color-muted-fg)] text-xs cursor-pointer flex items-center justify-center"
-            aria-label="清空"
+            aria-label={m.deckCards.clear}
           >
             ×
           </button>
@@ -164,11 +166,11 @@ export function DeckCardSearch({
         <div className="absolute z-30 left-0 right-0 mt-1 max-h-96 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
           {searching && hits.length === 0 ? (
             <div className="px-3 py-3 text-xs text-[var(--color-muted-fg)]">
-              搜索中…
+              {m.deckCards.searching}
             </div>
           ) : hits.length === 0 ? (
             <div className="px-3 py-3 text-xs text-[var(--color-muted-fg)]">
-              没有匹配的卡
+              {m.deckCards.noMatch}
             </div>
           ) : (
             hits.map((h) => (
@@ -197,7 +199,7 @@ export function DeckCardSearch({
                     {h.collected > 0 ? (
                       <span
                         className="shrink-0 font-sans tabular-nums"
-                        title={`已收集 ${h.collected} 张`}
+                        title={m.deckCards.collected(h.collected)}
                       >
                         📦 {h.collected}
                       </span>
@@ -213,7 +215,7 @@ export function DeckCardSearch({
                       type="button"
                       disabled={pending}
                       onClick={() => add(h.id, -1)}
-                      aria-label={`从卡组减少一张 ${h.name}`}
+                      aria-label={m.deckCards.removeOne(h.name)}
                       className="w-7 h-7 rounded border border-[var(--color-border)] hover:border-[var(--color-fg)] cursor-pointer disabled:opacity-40 text-sm"
                     >
                       −
@@ -224,7 +226,7 @@ export function DeckCardSearch({
                   type="button"
                   disabled={pending}
                   onClick={() => add(h.id, 1)}
-                  aria-label={`加入卡组 ${h.name}`}
+                  aria-label={m.deckCards.addToDeck(h.name)}
                   className="w-7 h-7 rounded bg-[var(--color-accent)] text-[var(--color-accent-fg)] font-bold cursor-pointer disabled:opacity-40 text-sm"
                 >
                   ＋

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
+import { formatTimestamp } from "@/lib/i18n/format";
 
 type Change = {
   kind: string;
@@ -18,68 +20,9 @@ type Run = {
   sample: Change[];
 };
 
-const KIND_LABEL: Record<string, string> = {
-  card_added: "新卡",
-  card_removed: "卡片消失",
-  field_changed: "字段改动",
-  translation_added: "新译文",
-  translation_changed: "译文改动",
-  restriction_added: "新增禁限",
-  restriction_changed: "禁限变更",
-  restriction_removed: "解除禁限",
-  pair_added: "新增禁卡组合",
-  pair_removed: "解除禁卡组合",
-};
-
-/**
- * Column names as they read to a person. The changelog stores the database's
- * own field names, which are fine in a table and useless in a sentence.
- */
-const FIELD_LABEL: Record<string, string> = {
-  name: "名称",
-  rarity: "稀有度",
-  card_type: "类型",
-  color: "颜色",
-  color2: "第二颜色",
-  level: "等级",
-  play_cost: "登场费用",
-  dp: "DP",
-  attribute: "属性",
-  form: "形态",
-  digi_types: "特征",
-  main_effect: "主要效果",
-  security_effect: "安全区效果",
-  inherited_effect: "进化继承效果",
-  source_effect: "源池效果",
-  special_rule: "特别规则",
-  evolution_cost: "进化费用",
-  evolution_requirements: "进化条件",
-  set_names: "收录",
-  image_url: "卡图",
-  effect_main: "主要效果",
-  effect_2: "安全区效果",
-  effect_3: "进化继承效果",
-  traits: "特征",
-  evo_cost: "进化费用",
-  evo_req: "特殊进化",
-  link_requirement: "链接条件",
-  link_effect: "链接中效果",
-  dual_name: "双面名称",
-  dual_effect: "双面效果",
-  dual_rule: "双面规则",
-  status: "状态",
-  max_count: "上限",
-};
-
-const LANG_LABEL: Record<string, string> = { ja: "日文", zh: "中文", en: "英文" };
 
 /** A banlist move can invalidate a deck you already built; the rest can't. */
 const isBanlist = (k: string) => k.startsWith("restriction") || k.startsWith("pair");
-
-function fmt(iso: string) {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("zh-CN", { hour12: false });
-}
 
 /** Long enough for a whole effect line; the full text is in the tooltip. */
 function short(s: string | null) {
@@ -102,10 +45,11 @@ function ChangeList({
   rows: Change[] | "loading" | undefined;
   fallback: Change[];
 }) {
+  const { m } = useI18n();
   if (rows === "loading") {
     return (
       <div className="px-3 py-2 text-xs text-[var(--color-muted-fg)]">
-        读取中…
+        {m.admin.loading}
       </div>
     );
   }
@@ -125,7 +69,7 @@ function ChangeList({
               isBanlist(kind) ? "text-red-400" : "text-[var(--color-muted-fg)]"
             }`}
           >
-            {KIND_LABEL[kind] ?? kind} · {items.length}
+            {m.admin.kindLabel[kind] ?? kind} · {items.length}
           </div>
           <ul className="space-y-1">
             {items.map((c, i) => (
@@ -137,12 +81,12 @@ function ChangeList({
                   {c.name ? <span className="font-medium">{c.name}</span> : null}
                   {c.field ? (
                     <span className="px-1 rounded bg-[var(--color-muted)] text-[10px] text-[var(--color-muted-fg)]">
-                      {FIELD_LABEL[c.field] ?? c.field}
+                      {m.admin.fieldLabel[c.field] ?? c.field}
                     </span>
                   ) : null}
                   {c.lang ? (
                     <span className="text-[10px] text-[var(--color-muted-fg)]">
-                      {LANG_LABEL[c.lang] ?? c.lang}
+                      {m.admin.langLabel[c.lang] ?? c.lang}
                     </span>
                   ) : null}
                 </div>
@@ -167,7 +111,7 @@ function ChangeList({
       ))}
       {list.length === 0 ? (
         <div className="px-3 py-2 text-xs text-[var(--color-muted-fg)]">
-          暂无明细
+          {m.admin.noDetail}
         </div>
       ) : null}
     </div>
@@ -183,6 +127,7 @@ function ChangeList({
  * moves, which are the only changes here that can invalidate a deck.
  */
 export function RefreshChangesPanel() {
+  const { m, locale } = useI18n();
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -220,27 +165,29 @@ export function RefreshChangesPanel() {
     fetch("/api/admin/changes?runs=5")
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j) => alive && setRuns(j.runs))
-      .catch(() => alive && setError("读取变更记录失败"));
+      .catch(() => alive && setError(m.admin.readChangesFailed));
     return () => {
       alive = false;
     };
-  }, []);
+    // `m` is memoised per language by the provider — this re-reads only
+    // when the reader switches language.
+  }, [m]);
 
   return (
     <section
-      aria-label="更新变更"
+      aria-label={m.admin.changes}
       className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3"
     >
       <div className="flex items-baseline gap-2 flex-wrap">
-        <h2 className="text-sm font-semibold">更新变更</h2>
+        <h2 className="text-sm font-semibold">{m.admin.changes}</h2>
       </div>
 
       {error ? <div className="text-xs text-red-500">{error}</div> : null}
       {!runs ? (
-        <div className="text-xs text-[var(--color-muted-fg)]">读取中…</div>
+        <div className="text-xs text-[var(--color-muted-fg)]">{m.admin.loading}</div>
       ) : runs.length === 0 ? (
         <div className="text-xs text-[var(--color-muted-fg)]">
-          暂无记录,下次刷新后生成。
+          {m.admin.noChangeRecords}
         </div>
       ) : (
         <ul className="space-y-2">
@@ -260,20 +207,20 @@ export function RefreshChangesPanel() {
                   className="w-full px-3 py-2 text-left cursor-pointer hover:bg-[var(--color-muted)]/50"
                 >
                   <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-sm tabular-nums">{fmt(r.run_at)}</span>
+                    <span className="text-sm tabular-nums">{formatTimestamp(locale, r.run_at, r.run_at)}</span>
                     <span className="text-xs text-[var(--color-muted-fg)]">
-                      共 {r.total} 处
+                      {m.admin.totalChanges(r.total)}
                     </span>
                     {banlistTotal > 0 ? (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">
-                        禁限变动 {banlistTotal}
+                        {m.admin.banlistChanges(banlistTotal)}
                       </span>
                     ) : null}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-[var(--color-muted-fg)]">
                     {Object.entries(r.counts).map(([k, n]) => (
                       <span key={k}>
-                        {KIND_LABEL[k] ?? k} {n}
+                        {m.admin.kindLabel[k] ?? k} {n}
                       </span>
                     ))}
                   </div>

@@ -6,12 +6,12 @@ import { listCredentialsForUser } from "@/lib/auth/webauthn";
 import { PasskeySection } from "@/app/account/passkey-section";
 import { DataSection } from "@/app/account/data-section";
 import { summarizeUserData } from "@/lib/db/user-transfer";
-import { describeCounts } from "@/lib/user-data";
 import { RefreshCardsPanel } from "@/components/refresh-cards-panel";
 import { RefreshSchedulePanel } from "@/components/refresh-schedule-panel";
 import { RefreshChangesPanel } from "@/components/refresh-changes-panel";
 import { NtfyPanel } from "@/components/ntfy-panel";
 import { BackupPanel } from "@/components/backup-panel";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * One settings page, with the sections a person is allowed to see.
@@ -21,7 +21,10 @@ import { BackupPanel } from "@/components/backup-panel";
  * rather than along what the reader came to do. Now everyone signed in gets
  * their own account here, and the four data panels appear for admins.
  */
-export const metadata = { title: "设置 · DCG Deck Builder" };
+export async function generateMetadata() {
+  const m = await getMessages();
+  return { title: `${m.nav.settings} · DCG Deck Builder` };
+}
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({
@@ -29,6 +32,7 @@ export default async function SettingsPage({
 }: {
   params: Promise<{ game: string }>;
 }) {
+  const m = await getMessages();
   const { game } = await params;
   if (!isGameId(game)) notFound();
   const me = await getCurrentUser();
@@ -40,7 +44,7 @@ export default async function SettingsPage({
   return (
     <main className="w-full mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-4">
       <div>
-        <h1 className="text-lg font-semibold">设置</h1>
+        <h1 className="text-lg font-semibold">{m.nav.settings}</h1>
         <div className="text-sm text-[var(--color-muted-fg)]">
           {me.display_name} · {me.email}
         </div>
@@ -66,7 +70,7 @@ export default async function SettingsPage({
       />
       {/* What the export would contain, so the tile can say it before you
           click rather than after you open the file. */}
-      <DataSection mine={describeCounts(summarizeUserData(me.id))} />
+      <DataSection mine={m.account.counts(summarizeUserData(me.id))} />
     </main>
   );
 }

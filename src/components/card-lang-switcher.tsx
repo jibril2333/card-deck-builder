@@ -7,20 +7,24 @@ import {
   CARD_LANG_LABELS,
   type CardLang,
 } from "@/lib/card-lang";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
- * EN / 中 / 日 card-text language toggle (Digimon pages only). Writes the
- * preference cookie and refreshes — every server component re-reads the
- * cookie and re-renders with the chosen language.
+ * EN / 中 / 日 — the site's language, which is also the cards' (see
+ * lib/i18n/locale). Writes the preference cookie and refreshes: the root
+ * layout re-reads it, and every server and client component re-renders in
+ * the chosen language.
+ *
+ * The three labels stay in their own languages whatever the page is in: a
+ * reader who cannot read the current interface still has to find theirs.
  */
 export function CardLangSwitcher({
-  current,
   /** Extra classes — the sidebar rail stacks the three buttons vertically. */
   className,
 }: {
-  current: CardLang;
   className?: string;
 }) {
+  const { locale: current, m } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -38,7 +42,7 @@ export function CardLangSwitcher({
       className={`flex items-center gap-0.5 rounded-lg border border-[var(--color-border)] p-0.5 bg-[var(--color-card)] ${
         pending ? "opacity-60" : ""
       } ${className ?? ""}`}
-      title="卡牌文字语言(数码宝贝)"
+      title={m.nav.language}
     >
       {(Object.keys(CARD_LANG_LABELS) as CardLang[]).map((lang) => (
         <button

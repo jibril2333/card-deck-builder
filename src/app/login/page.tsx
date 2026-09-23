@@ -2,8 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { LoginForm } from "./login-form";
+import { getMessages } from "@/lib/i18n/server";
 
-export const metadata = { title: "登录 · DCG Deck Builder" };
+export async function generateMetadata() {
+  const m = await getMessages();
+  return { title: `${m.auth.login} · DCG Deck Builder` };
+}
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({
@@ -11,6 +15,7 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
+  const m = await getMessages();
   // If already logged in, redirect away from the login screen.
   const user = await getCurrentUser();
   if (user) redirect("/");
@@ -21,7 +26,7 @@ export default async function LoginPage({
     <main className="w-full mx-auto max-w-md px-4 py-16">
       <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-6 space-y-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">登录</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{m.auth.login}</h1>
           <p className="text-sm text-[var(--color-muted-fg)] mt-1">
             DCG Deck Builder
           </p>
@@ -30,14 +35,14 @@ export default async function LoginPage({
         <LoginForm next={next} />
 
         <div className="text-xs text-[var(--color-muted-fg)] pt-4 border-t border-[var(--color-border)]">
-          没有账号?需要
+          {m.auth.noAccountBefore}
           <Link
             href="/register"
             className="text-[var(--color-accent)] underline mx-1"
           >
-            邀请码
+            {m.auth.inviteCode}
           </Link>
-          才能注册,请向管理员申请。
+          {m.auth.noAccountAfter}
         </div>
       </div>
     </main>

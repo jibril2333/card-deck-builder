@@ -695,9 +695,94 @@ Read-only. Three-way (us / EN / JA), because two-way can't tell a bug from a
 decision. Run it after a refresh — it is the only thing that can answer "is
 anything else wrong?" with a number instead of a guess.
 
+## The site speaks three languages
+
+**One switch, not two.** The EN / 中 / 日 control in the sidebar used to change
+only the card text and art; it now changes every word on the page as well. A
+reader who picks 日 gets Japanese buttons over Japanese cards. The price,
+accepted deliberately, is that English card names come with an English
+interface — there is no way to ask for one and not the other, and offering two
+switches for something a person thinks of as "what language is this site in"
+buys a combination almost nobody wants at the cost of a setting everybody has
+to read twice.
+
+**The choice is a cookie, not a URL prefix.** Next's own guide recommends
+`/[locale]/…`, and it is the wrong shape here: every card and deck link is
+something people paste to each other, and a prefix either forks each of those
+into three URLs or drags the sender's language along to the reader. The cookie
+is `cardLang` — the name predates the widening and is **kept on purpose**,
+since renaming it would silently reset every existing reader's choice.
+
+With no cookie, `Accept-Language` decides (q-weights honoured, matched on the
+primary subtag, so `zh-TW` and `zh-Hans-CN` are both the one Chinese
+dictionary), and a header naming none of the three falls back to Chinese. The
+switch always beats the header. All of that is `src/lib/i18n/locale.ts`, which
+is pure — no `next/headers` — so the rules are tested without a request in
+`tests/i18n-locale.test.ts`.
+
+Two locale tables, and they are not the same table. `HTML_LANG` feeds
+`<html lang>`, which is not decoration: Chinese and Japanese share code points
+for most kanji and the browser picks the glyph shapes from that attribute, so a
+Japanese page declared `zh` renders 直 and 骨 in their Chinese forms.
+`INTL_LOCALE` feeds `Intl` — `zh-CN` rather than `zh-Hans`, because that is
+what these dates were formatted with before the site had a second language and
+a Chinese reader should see exactly the dates they always saw.
+
+### Adding a string
+
+Copy lives in `src/lib/i18n/sections/*.ts`, one section per area (nav, card,
+deck, pool, admin, …), written three languages side by side:
+
+```ts
+export const nav = section({
+  zh: { settings: "设置", cards: (n: number) => `${n} 张` },
+  ja: { settings: "設定", cards: (n) => `${n} 枚` },
+  en: { settings: "Settings", cards: (n) => `${n} card${n === 1 ? "" : "s"}` },
+});
+```
+
+`section()` is typed with `NoInfer`, so `zh` defines the shape and a key
+missing from `ja` or `en` — or one added to only one of them — is a compile
+error. There is no runtime fallback to Chinese and deliberately no need for
+one. A value that interpolates is a **function**, which is also why the
+dictionary cannot cross the RSC boundary as a prop: functions do not
+serialise, so `I18nProvider` takes the locale name and imports all three
+dictionaries itself.
+
+- Server components, server actions, route handlers: `await getMessages()`
+  (`getLocale` is `cache()`d per request).
+- Client components: `const { m, locale } = useI18n()`.
+
+A `useEffect` that reads `m` lists it in the dependency array; the provider
+memoises the dictionary per language, so it re-runs on a language switch and
+not otherwise.
+
+### What is deliberately NOT translated
+
+- **Anything written by the daemon** — `refresh.log`, the container's stdout,
+  the ntfy push, `describeSchedule`'s summary in the state file. None of them
+  is produced inside a request, so there is no reader whose language to take;
+  they are the operator's, and the operator is one person.
+- **Card data values.** Colours, card types and rarities in the filters are the
+  cards' own strings, not interface copy.
+- **`src/lib/keywords.ts`** is trilingual DATA: each keyword carries
+  `explain: { zh, ja, en }`. It is in the guard test's allowlist for that
+  reason, not as an exemption.
+
+`tests/i18n-no-hardcoded-text.test.ts` walks `src/**`, strips comments, and
+fails on any CJK outside a per-file allowlist where each entry states why —
+data, a pattern matched against card text, or output with no reader. The way
+this decays is not a bad translation; it is one more button next week with its
+label typed straight into the JSX, which renders fine for whoever wrote it and
+is invisible to everyone else. A third test fails on an allowlist entry whose
+file no longer has any CJK, so the list cannot quietly turn into a blanket.
+
+The e2e suite runs in Chinese (`playwright.config.ts` sets the browser's
+language); `tests/e2e/i18n.spec.ts` is where the other two are exercised.
+
 ## 界面文案
 
-界面语言是中文,写法按产品文案,不按说话:
+源语言是中文 —— 先写中文,再译日文和英文。写法按产品文案,不按说话:
 
 - 数量为 0 就写 `0 张`,不要换成「还没有」。同一个字段在任何取值下保持同一种措辞和
   格式 —— 在低值处换说法,读起来像换了一个字段,而不是同一个字段的另一个值。

@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setCardPriceAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Inline editable "expected price" for a card. Used on the card detail page and
@@ -26,6 +27,7 @@ export function CardPriceInput({
   market?: { price_yen: number; source: string } | null;
   className?: string;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -52,10 +54,10 @@ export function CardPriceInput({
         inputMode="decimal"
         defaultValue={price ?? ""}
         key={`price-${price ?? ""}`}
-        placeholder={market ? `${market.price_yen}` : "预期价"}
+        placeholder={market ? `${market.price_yen}` : m.card.expectedPriceShort}
         title={
           market
-            ? `未填写时按${market.source === "pao" ? "PAO" : "Cardrush"}的 ¥${market.price_yen} 计算`
+            ? m.card.defaultPriceHint(market.source === "pao" ? "PAO" : "Cardrush", market.price_yen)
             : undefined
         }
         onClick={(e) => {

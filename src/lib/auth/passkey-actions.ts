@@ -14,6 +14,7 @@ import {
 } from "./webauthn";
 import { requireUser } from "./session";
 import { setSessionCookie } from "./session";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * Extract `(origin, rpID)` from the inbound request. WebAuthn binds
@@ -62,6 +63,7 @@ export async function finishRegisterPasskeyAction(input: {
     expectedOrigin: origin,
     expectedRPID: rpID,
     label: input.label,
+    singleDeviceLabel: (await getMessages()).account.thisDevice,
   });
   if (!r.ok) return { ok: false, error: r.error };
   return { ok: true };

@@ -1,9 +1,14 @@
+"use client";
+
 /**
  * Loading UI shown while a [game] segment page is server-rendering.
  *  - A thin indeterminate bar at the top (so users get instant feedback on nav).
  *  - A subtle centered hint after a moment, in case the page is unusually slow.
  */
+import { useI18n } from "@/lib/i18n/client";
+
 export default function GameLoading() {
+  const { m } = useI18n();
   return (
     <>
       {/* Top progress bar */}
@@ -17,7 +22,7 @@ export default function GameLoading() {
             className="inline-block w-3 h-3 rounded-full border-2 border-[var(--color-muted)] border-t-[var(--color-accent)] animate-spin"
             aria-hidden
           />
-          加载中…
+          {m.common.loading}
         </div>
       </main>
 

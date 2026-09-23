@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CardRuling } from "@/lib/db/rulings-ddl";
 import { EffectText } from "@/components/effect-text";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Official card Q&A (カードQ&A) from Bandai's JP cardlist — the authoritative
@@ -12,6 +13,7 @@ import { EffectText } from "@/components/effect-text";
  * effect text.
  */
 export function CardRulings({ rulings }: { rulings: CardRuling[] }) {
+  const { m } = useI18n();
   const [open, setOpen] = useState(false);
   if (rulings.length === 0) return null;
 
@@ -24,9 +26,9 @@ export function CardRulings({ rulings }: { rulings: CardRuling[] }) {
         aria-expanded={open}
       >
         <span className="text-sm font-semibold flex items-center gap-2">
-          📖 官方裁定 Q&A
+          {m.card.rulings}
           <span className="text-xs font-normal text-[var(--color-muted-fg)]">
-            {rulings.length} 条 · 官方日文
+            {m.card.rulingsCount(rulings.length)}
           </span>
         </span>
         <span

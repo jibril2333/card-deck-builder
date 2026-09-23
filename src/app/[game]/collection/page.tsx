@@ -44,6 +44,7 @@ import { FilterPanel } from "@/components/filter-panel";
 import { ActiveFilters, type ChipSpec } from "@/components/active-filters";
 import { requireUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
+import { getMessages } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,7 @@ export default async function CollectionPage({
   params: Promise<{ game: string }>;
   searchParams: Promise<SearchParamsRecord>;
 }) {
+  const m = await getMessages();
   const me = await requireUser();
   const { game } = await params;
   if (!isGameId(game)) notFound();
@@ -97,34 +99,34 @@ export default async function CollectionPage({
     {
       type: "search",
       key: "q",
-      label: "关键词",
-      placeholder: "名称 / 编号 · 空格分词",
+      label: m.filters.keyword,
+      placeholder: m.filters.keywordPlaceholder,
       wideKey: "q_all",
-      wideLabel: "同时搜索效果和特征",
+      wideLabel: m.filters.searchEffectsAndTraits,
     },
     {
       // The page lists every card so you can tick off what arrives; this is
       // what turns it back into a view of the shelf, or of the holes in it.
       type: "select",
       key: "owned",
-      label: "拥有",
+      label: m.filters.owned,
       options: [
-        { value: "1", label: "已拥有" },
-        { value: "0", label: "未拥有" },
+        { value: "1", label: m.filters.ownedYes },
+        { value: "0", label: m.filters.ownedNo },
       ],
     },
     {
       type: "multi",
       key: "color",
-      label: "颜色",
+      label: m.filters.color,
       options: colors,
       colorChips: true,
       maxSelect: 2,
     },
-    { type: "multi", key: "card_type", label: "类型", options: types },
-    { type: "multi", key: "rarity", label: "稀有度", options: rarities },
-    { type: "range", key: "level", label: "等级", options: levels },
-    { type: "range", key: "play_cost", label: "费用", options: playCosts },
+    { type: "multi", key: "card_type", label: m.filters.type, options: types },
+    { type: "multi", key: "rarity", label: m.filters.rarity, options: rarities },
+    { type: "range", key: "level", label: m.filters.level, options: levels },
+    { type: "range", key: "play_cost", label: m.filters.cost, options: playCosts },
     {
       type: "range",
       key: "dp",
@@ -134,15 +136,15 @@ export default async function CollectionPage({
     {
       type: "group",
       key: "more",
-      label: "更多筛选",
+      label: m.filters.moreFilters,
       fields: [
         { type: "multi", key: "form", label: "Form", options: forms },
         { type: "multi", key: "stage", label: "Stage", options: stages },
-        { type: "multi", key: "attribute", label: "属性", options: attributes },
+        { type: "multi", key: "attribute", label: m.filters.attribute, options: attributes },
         {
           type: "multi-scroll",
           key: "set",
-          label: "卡包 / Card Set",
+          label: m.filters.cardSetLong,
           options: setNames,
         },
       ],
@@ -150,44 +152,44 @@ export default async function CollectionPage({
   ];
 
   const sortOptions: { value: string; label: string }[] = [
-    { value: "code", label: "编号 ↑" },
-    { value: "-code", label: "编号 ↓" },
-    { value: "name", label: "名称 ↑" },
-    { value: "-name", label: "名称 ↓" },
-    { value: "level", label: "等级 ↑" },
-    { value: "-level", label: "等级 ↓" },
-    { value: "play_cost", label: "费用 ↑" },
-    { value: "-play_cost", label: "费用 ↓" },
+    { value: "code", label: `${m.filters.code} ↑` },
+    { value: "-code", label: `${m.filters.code} ↓` },
+    { value: "name", label: `${m.filters.name} ↑` },
+    { value: "-name", label: `${m.filters.name} ↓` },
+    { value: "level", label: `${m.filters.level} ↑` },
+    { value: "-level", label: `${m.filters.level} ↓` },
+    { value: "play_cost", label: `${m.filters.cost} ↑` },
+    { value: "-play_cost", label: `${m.filters.cost} ↓` },
     { value: "dp", label: "DP ↑" },
     { value: "-dp", label: "DP ↓" },
   ];
 
   const chipSpecs: ChipSpec[] = [
-    { kind: "terms", key: "q", label: "关键词" },
+    { kind: "terms", key: "q", label: m.filters.keyword },
     {
       kind: "single",
       key: "owned",
-      label: "拥有",
-      labelMap: { "1": "已拥有", "0": "未拥有" },
+      label: m.filters.owned,
+      labelMap: { "1": m.filters.ownedYes, "0": m.filters.ownedNo },
     },
-    { kind: "list", key: "color", label: "颜色" },
-    { kind: "list", key: "card_type", label: "类型" },
-    { kind: "list", key: "rarity", label: "稀有度" },
+    { kind: "list", key: "color", label: m.filters.color },
+    { kind: "list", key: "card_type", label: m.filters.type },
+    { kind: "list", key: "rarity", label: m.filters.rarity },
     { kind: "list", key: "form", label: "Form" },
     { kind: "list", key: "stage", label: "Stage" },
-    { kind: "list", key: "attribute", label: "属性" },
-    { kind: "list", key: "set", label: "卡包" },
+    { kind: "list", key: "attribute", label: m.filters.attribute },
+    { kind: "list", key: "set", label: m.filters.cardSet },
     {
       kind: "range",
       minKey: "level_min",
       maxKey: "level_max",
-      label: "等级",
+      label: m.filters.level,
     },
     {
       kind: "range",
       minKey: "play_cost_min",
       maxKey: "play_cost_max",
-      label: "费用",
+      label: m.filters.cost,
     },
     { kind: "range", minKey: "dp_min", maxKey: "dp_max", label: "DP" },
   ];
@@ -270,13 +272,13 @@ export default async function CollectionPage({
         <section className="min-w-0">
           <div className="flex items-baseline justify-between mb-3">
             <h1 className="text-lg font-semibold">
-              已收集{" "}
+              {m.search.collectionTitle}{" "}
               <span className="text-[var(--color-muted-fg)] font-normal text-sm">
-                {ownedSummary.cards} 种 · 共 {ownedSummary.copies} 张
+                {m.search.ownedSummary(ownedSummary.cards, ownedSummary.copies)}
               </span>
             </h1>
             <div className="text-xs text-[var(--color-muted-fg)]">
-              第 {page} / {totalPages} 页 · 共 {total.toLocaleString()} 张
+              {m.search.pageOfTotal(page, totalPages, total)}
             </div>
           </div>
 
@@ -284,7 +286,7 @@ export default async function CollectionPage({
 
           {rows.length === 0 ? (
             <div className="text-sm text-[var(--color-muted-fg)] py-12 text-center border border-dashed border-[var(--color-border)] rounded-lg">
-              没有符合条件的卡牌
+              {m.search.noResults}
             </div>
           ) : (
             <div className="card-grid">

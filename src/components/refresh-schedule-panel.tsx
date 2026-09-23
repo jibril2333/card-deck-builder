@@ -7,6 +7,8 @@ import {
   TIMEZONE_CHOICES,
   type RefreshSchedule,
 } from "@/lib/refresh-schedule";
+import { useI18n } from "@/lib/i18n/client";
+import { formatTimestamp } from "@/lib/i18n/format";
 
 type State = {
   describe?: string;
@@ -15,16 +17,6 @@ type State = {
   lastStartedAt?: string;
   checkedAt?: string;
 };
-
-const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
-
-function fmt(iso?: string | null) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? "—"
-    : d.toLocaleString("zh-CN", { hour12: false });
-}
 
 /**
  * Settings for the AUTOMATIC refresh, kept apart from the manual button above
@@ -37,6 +29,7 @@ function fmt(iso?: string | null) {
  * never computes a next-run time itself: it shows what the host's tick wrote.
  */
 export function RefreshSchedulePanel() {
+  const { m: msg, locale } = useI18n();
   const [schedule, setSchedule] = useState<RefreshSchedule>(DEFAULT_SCHEDULE);
   const [state, setState] = useState<State>({});
   const [loaded, setLoaded] = useState(false);
@@ -56,11 +49,14 @@ export function RefreshSchedulePanel() {
         setState(j.state ?? {});
         setLoaded(true);
       })
-      .catch(() => alive && setError("读取排程失败"));
+      .catch(() => alive && setError(msg.admin.readScheduleFailed));
     return () => {
       alive = false;
     };
-  }, []);
+    // `msg` is memoised per language by the provider, so this re-reads only
+    // when the reader switches language — which is when the error text would
+    // be stale anyway.
+  }, [msg]);
 
   function patch(p: Partial<RefreshSchedule>) {
     setSchedule((s) => ({ ...s, ...p }));
@@ -87,11 +83,11 @@ export function RefreshSchedulePanel() {
         body: JSON.stringify(schedule),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) throw new Error(j.error ?? "保存失败");
+      if (!r.ok || !j.ok) throw new Error(j.error ?? msg.admin.saveFailed);
       setSchedule(j.schedule);
       // The host recomputes the next run on its next tick (within 15 minutes),
       // so don't pretend to know it here — say what actually happens.
-      setSaved("已保存,下次 tick(15 分钟内)生效");
+      setSaved(msg.admin.scheduleSaved);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -104,15 +100,15 @@ export function RefreshSchedulePanel() {
 
   return (
     <section
-      aria-label="自动更新"
+      aria-label={msg.admin.autoUpdate}
       className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 space-y-3"
     >
       <div className="flex items-baseline gap-2 flex-wrap">
-        <h2 className="text-sm font-semibold">自动更新</h2>
+        <h2 className="text-sm font-semibold">{msg.admin.autoUpdate}</h2>
       </div>
 
       {!loaded ? (
-        <div className="text-xs text-[var(--color-muted-fg)]">读取中…</div>
+        <div className="text-xs text-[var(--color-muted-fg)]">{msg.admin.loading}</div>
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-3">
@@ -122,7 +118,7 @@ export function RefreshSchedulePanel() {
                 checked={schedule.enabled}
                 onChange={(e) => patch({ enabled: e.target.checked })}
               />
-              启用
+              {msg.admin.enable}
             </label>
 
             <select
@@ -135,8 +131,8 @@ export function RefreshSchedulePanel() {
               }
               disabled={!schedule.enabled}
             >
-              <option value="weekly">每周</option>
-              <option value="daily">每天</option>
+              <option value="weekly">{msg.admin.weekly}</option>
+              <option value="daily">{msg.admin.daily}</option>
             </select>
 
             {schedule.frequency === "weekly" ? (
@@ -146,9 +142,9 @@ export function RefreshSchedulePanel() {
                 onChange={(e) => patch({ weekday: Number(e.target.value) })}
                 disabled={!schedule.enabled}
               >
-                {WEEKDAYS.map((w, i) => (
+                {msg.admin.weekdays.map((w, i) => (
                   <option key={w} value={i + 1}>
-                    周{w}
+                    {msg.admin.weekdayPrefix(w)}
                   </option>
                 ))}
               </select>
@@ -160,7 +156,7 @@ export function RefreshSchedulePanel() {
                 value={schedule.hour}
                 onChange={(e) => patch({ hour: Number(e.target.value) })}
                 disabled={!schedule.enabled}
-                aria-label="小时"
+                aria-label={msg.admin.hour}
               >
                 {Array.from({ length: 24 }, (_, h) => (
                   <option key={h} value={h}>
@@ -174,7 +170,7 @@ export function RefreshSchedulePanel() {
                 value={schedule.minute}
                 onChange={(e) => patch({ minute: Number(e.target.value) })}
                 disabled={!schedule.enabled}
-                aria-label="分钟"
+                aria-label={msg.admin.minute}
               >
                 {[0, 15, 30, 45].map((m) => (
                   <option key={m} value={m}>
@@ -191,11 +187,11 @@ export function RefreshSchedulePanel() {
                 value={schedule.timezone}
                 onChange={(e) => patch({ timezone: e.target.value })}
                 disabled={!schedule.enabled}
-                aria-label="时区"
+                aria-label={msg.admin.timezone}
               >
                 {TIMEZONE_CHOICES.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.label}
+                  <option key={z} value={z}>
+                    {msg.admin.timezones[z] ?? z}
                   </option>
                 ))}
               </select>
@@ -212,7 +208,7 @@ export function RefreshSchedulePanel() {
                     type="button"
                     onClick={() => toggleStage(s.id)}
                     disabled={!schedule.enabled}
-                    title={s.hint}
+                    title={msg.admin.stageHint[s.id]}
                     aria-pressed={on}
                     className={`px-2.5 h-7 rounded-md border text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                       on
@@ -220,7 +216,7 @@ export function RefreshSchedulePanel() {
                         : "border-[var(--color-border)] text-[var(--color-muted-fg)] hover:text-[var(--color-fg)]"
                     }`}
                   >
-                    {s.label}
+                    {msg.admin.stageLabel[s.id]}
                   </button>
                 );
               })}
@@ -234,7 +230,7 @@ export function RefreshSchedulePanel() {
               disabled={saving}
               className="h-8 px-3 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg)] text-sm font-medium cursor-pointer disabled:opacity-60"
             >
-              {saving ? "保存中…" : "保存"}
+              {saving ? msg.admin.saving : msg.admin.save}
             </button>
             {saved ? (
               <span className="text-xs text-[var(--color-accent)]">
@@ -247,12 +243,12 @@ export function RefreshSchedulePanel() {
           </div>
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-[var(--color-muted-fg)] pt-1 border-t border-[var(--color-border)]">
-            <dt>下次自动运行</dt>
-            <dd className="tabular-nums">{fmt(state.nextRunAt)}</dd>
-            <dt>上次自动运行</dt>
-            <dd className="tabular-nums">{fmt(state.lastStartedAt)}</dd>
-            <dt>调度器最后心跳</dt>
-            <dd className="tabular-nums">{fmt(state.checkedAt)}</dd>
+            <dt>{msg.admin.nextRun}</dt>
+            <dd className="tabular-nums">{formatTimestamp(locale, state.nextRunAt)}</dd>
+            <dt>{msg.admin.lastRun}</dt>
+            <dd className="tabular-nums">{formatTimestamp(locale, state.lastStartedAt)}</dd>
+            <dt>{msg.admin.lastHeartbeat}</dt>
+            <dd className="tabular-nums">{formatTimestamp(locale, state.checkedAt)}</dd>
           </dl>
         </>
       )}

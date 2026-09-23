@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import { isGameId } from "@/lib/games";
-import { CARD_LANG_COOKIE, parseCardLang } from "@/lib/card-lang";
+import { getLocale } from "@/lib/i18n/server";
 import { Playtest, type PlaytestCard } from "@/components/playtest";
 import * as digimon from "@/lib/db/digimon";
 import { deckThemeCss } from "@/lib/deck-theme";
+import { getMessages } from "@/lib/i18n/server";
 
 /**
  * Deck playtesting page: opening-hand simulator + draw-probability table.
@@ -16,15 +16,14 @@ export default async function PlaytestPage({
 }: {
   params: Promise<{ game: string; id: string }>;
 }) {
+  const m = await getMessages();
   const { game, id } = await params;
   if (!isGameId(game)) notFound();
 
   const deck = digimon.getDeck(id);
   if (!deck) notFound();
   const deckName: string = deck.name;
-  const cardLang = parseCardLang(
-    (await cookies()).get(CARD_LANG_COOKIE)?.value,
-  );
+  const cardLang = await getLocale();
   const cards: PlaytestCard[] = digimon.overlayDisplay(
     digimon.getDeckCards(id).map((c) => ({
       id: c.id,
@@ -56,9 +55,9 @@ export default async function PlaytestPage({
           href={`/${game}/decks/${id}`}
           className="text-sm text-[var(--color-muted-fg)] hover:text-[var(--color-fg)] inline-flex items-center gap-1 mb-3"
         >
-          ← 返回卡组
+          {m.playtest.backToDeck}
         </Link>
-        <h1 className="text-2xl font-bold mb-4">{deckName} · 试玩</h1>
+        <h1 className="text-2xl font-bold mb-4">{m.playtest.playtestOf(deckName)}</h1>
         <Playtest game={game} cards={cards} />
       </main>
     </>

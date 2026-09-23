@@ -10,6 +10,8 @@ import {
   TIMEZONE_CHOICES,
   type RefreshSchedule,
 } from "@/lib/refresh-schedule";
+import { LOCALES } from "@/lib/i18n/locale";
+import { MESSAGES } from "@/lib/i18n/messages";
 
 /**
  * Wall clock in the schedule's own zone — which is what the config means.
@@ -211,8 +213,11 @@ describe("timezones", () => {
 
   it("every zone the panel offers is one Intl accepts", () => {
     for (const z of TIMEZONE_CHOICES) {
-      expect(isKnownTimezone(z.id), z.id).toBe(true);
-      expect(z.label.length, z.id).toBeGreaterThan(0);
+      expect(isKnownTimezone(z), z).toBe(true);
+      // The name the panel shows comes from the dictionary, in every language.
+      for (const locale of LOCALES) {
+        expect(MESSAGES[locale].admin.timezones[z], `${locale} ${z}`).toBeTruthy();
+      }
     }
   });
 });

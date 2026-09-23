@@ -37,15 +37,16 @@ const COLORS: Record<string, string> = {
   白: "White",
 };
 
-/** Chinese labels for the popover — the UI chrome is Chinese throughout. */
-const COLOR_ZH: Record<string, string> = {
-  Red: "红",
-  Blue: "蓝",
-  Yellow: "黄",
-  Green: "绿",
-  Black: "黑",
-  Purple: "紫",
-  White: "白",
+/**
+ * How a parsed condition is worded for the reader. Supplied by the caller
+ * from the dictionary (`m.tile.words`): this module parses Japanese card text
+ * and must not care which language the page is in.
+ */
+export type JogressWords = {
+  nameContains: (s: string) => string;
+  traits: (s: string) => string;
+  mentions: (s: string) => string;
+  colors: Record<string, string>;
 };
 
 /**
@@ -246,24 +247,27 @@ export function matchesSide(card: JogressCard, side: JogressSide): boolean {
   return true;
 }
 
-/** The condition in Chinese, for the popover header. */
-function describeSide(side: JogressSide): string {
+/** The condition in the reader's language, for the popover header. */
+function describeSide(side: JogressSide, w: JogressWords): string {
   if (!side.parsed) return side.raw;
   if (side.exactName) return `「${side.exactName}」`;
   const bits: string[] = [];
-  if (side.nameContains) bits.push(`名称含「${side.nameContains}」`);
-  if (side.traits.length) bits.push(`特征「${side.traits.join("/")}」`);
-  if (side.mentions) bits.push(`提及「${side.mentions}」`);
+  if (side.nameContains) bits.push(w.nameContains(side.nameContains));
+  if (side.traits.length) bits.push(w.traits(side.traits.join("/")));
+  if (side.mentions) bits.push(w.mentions(side.mentions));
   if (side.colors.length)
-    bits.push(side.colors.map((c) => COLOR_ZH[c] ?? c).join("/"));
+    bits.push(side.colors.map((c) => w.colors[c] ?? c).join("/"));
   if (side.level !== null) bits.push(`Lv.${side.level}`);
   return bits.join(" ");
 }
 
-export function describeCondition(cond: JogressCondition): string {
+export function describeCondition(
+  cond: JogressCondition,
+  w: JogressWords,
+): string {
   const [a, b] = cond.sides;
   if (!a.parsed || !b.parsed) return cond.raw;
-  return `${describeSide(a)} ＋ ${describeSide(b)}`;
+  return `${describeSide(a, w)} ＋ ${describeSide(b, w)}`;
 }
 
 /**
@@ -282,6 +286,7 @@ export function describeCondition(cond: JogressCondition): string {
  */
 export function computeDeckJogress(
   cards: JogressCard[],
+  w: JogressWords,
 ): Map<string, JogressOption[]> {
   const out = new Map<string, JogressOption[]>();
   const digimon = cards.filter((c) => c.card_type === "Digimon");
@@ -309,7 +314,7 @@ export function computeDeckJogress(
         }
       }
       return {
-        label: describeCondition(cond),
+        label: describeCondition(cond, w),
         cost: cond.cost,
         pairs,
         parsed: sa.parsed && sb.parsed,

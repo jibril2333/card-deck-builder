@@ -10,8 +10,10 @@ import {
   beginLoginWithPasskeyAction,
   finishLoginWithPasskeyAction,
 } from "@/lib/auth/passkey-actions";
+import { useI18n } from "@/lib/i18n/client";
 
 export function LoginForm({ next }: { next?: string }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -52,9 +54,9 @@ export function LoginForm({ next }: { next?: string }) {
         router.refresh();
       });
     } catch (e) {
-      const msg = (e as Error).message ?? "Passkey 登录失败";
+      const msg = (e as Error).message ?? m.auth.passkeyFailed;
       if (msg.includes("NotAllowedError") || msg.includes("aborted")) {
-        setError("已取消");
+        setError(m.auth.cancelled);
       } else {
         setError(msg);
       }
@@ -70,19 +72,19 @@ export function LoginForm({ next }: { next?: string }) {
         variant="outline"
         className="w-full"
       >
-        {pending ? "处理中…" : "🔑 使用 Passkey 登录"}
+        {pending ? m.auth.working : m.auth.passkeyLogin}
       </Button>
 
       <div className="flex items-center gap-3 text-[10px] uppercase tracking-wide text-[var(--color-muted-fg)]">
         <span className="flex-1 h-px bg-[var(--color-border)]" />
-        <span>或邮箱密码</span>
+        <span>{m.auth.orEmail}</span>
         <span className="flex-1 h-px bg-[var(--color-border)]" />
       </div>
 
       <form action={onSubmit} className="space-y-3">
       <label className="block">
         <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]">
-          邮箱
+          {m.auth.email}
         </span>
         <Input
           name="email"
@@ -99,7 +101,7 @@ export function LoginForm({ next }: { next?: string }) {
 
       <label className="block">
         <span className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted-fg)]">
-          密码
+          {m.auth.password}
         </span>
         <Input
           name="password"
@@ -118,7 +120,7 @@ export function LoginForm({ next }: { next?: string }) {
       ) : null}
 
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "登录中…" : "登录"}
+        {pending ? m.auth.loggingIn : m.auth.login}
       </Button>
       </form>
     </div>

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { buildCartScriptAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
  * Hands over a snippet that fills the shop's cart with what this deck still
@@ -24,6 +25,7 @@ export function CartScriptButton({
   game: string;
   deckId: string;
 }) {
+  const { m } = useI18n();
   const [pending, start] = useTransition();
   const [done, setDone] = useState<{ cards: number; yen: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export function CartScriptButton({
         setDone({ cards: r.cards, yen: r.yen });
         setTimeout(() => setDone(null), 8000);
       } catch {
-        setError("复制失败,请检查浏览器剪贴板权限");
+        setError(m.deckCards.cartCopyFailed);
       }
     });
   }
@@ -63,11 +65,11 @@ export function CartScriptButton({
         ) : (
           "🛒"
         )}
-        {pending ? "正在向 PAO 查询…" : "复制 PAO 加购脚本"}
+        {pending ? m.deckCards.cartQuerying : m.deckCards.cartCopyScript}
       </button>
       {done ? (
         <span className="text-xs text-[var(--color-muted-fg)]">
-          已复制 {done.cards} 张 · ¥{done.yen.toLocaleString()} · 在{" "}
+          {m.deckCards.cartCopied(done.cards, done.yen)}{" "}
           <a
             href="https://pao-onlineshop.com/"
             target="_blank"
@@ -76,7 +78,7 @@ export function CartScriptButton({
           >
             PAO
           </a>{" "}
-          页面按 F12 粘贴到 Console
+          {m.deckCards.cartPasteAfter}
         </span>
       ) : null}
       {error ? <span className="text-xs text-amber-500">{error}</span> : null}

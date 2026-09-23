@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "@/lib/i18n/client";
 
 export type ComparableDeck = {
   id: string;
@@ -34,6 +35,7 @@ export function DeckComparePicker({
   hrefPrefix: string;
   clearHref: string;
 }) {
+  const { m } = useI18n();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -78,10 +80,10 @@ export function DeckComparePicker({
             ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
             : "border-[var(--color-border)] bg-[var(--color-card)] hover:bg-[var(--color-muted)]"
         }`}
-        title="和另一副卡组比较"
+        title={m.deck.compareTitle}
       >
         <span className="shrink-0">🔀</span>
-        <span className="truncate">{current ? current.name : "对比"}</span>
+        <span className="truncate">{current ? current.name : m.deck.compare}</span>
         <span
           aria-hidden
           className={`text-[9px] leading-none text-[var(--color-muted-fg)] transition-transform shrink-0 ${
@@ -103,7 +105,7 @@ export function DeckComparePicker({
                 autoFocus
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="筛选卡组"
+                placeholder={m.deck.filterDecks}
                 className="w-full h-7 px-2 rounded border border-[var(--color-border)] bg-[var(--color-bg)] text-xs outline-none focus:border-[var(--color-accent)]"
               />
             </div>
@@ -112,7 +114,7 @@ export function DeckComparePicker({
           <div className="max-h-72 overflow-y-auto">
             {shown.length === 0 ? (
               <div className="px-3 py-4 text-xs text-[var(--color-muted-fg)] text-center">
-                无匹配卡组
+                {m.deck.noMatchDeck}
               </div>
             ) : (
               shown.map((d) => {
@@ -141,7 +143,7 @@ export function DeckComparePicker({
                     ) : null}
                     {on ? (
                       <span className="text-[10px] text-[var(--color-muted-fg)] shrink-0">
-                        取消
+                        {m.deck.cancel}
                       </span>
                     ) : null}
                   </Link>

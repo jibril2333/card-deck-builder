@@ -65,10 +65,13 @@ export function succeed(attempts: Attempts, key: string): void {
   attempts.delete(key);
 }
 
-/** How long to wait, in the words the form shows. */
-export function describeWait(retryAfterMs: number): string {
-  const minutes = Math.ceil(retryAfterMs / 60_000);
-  return minutes <= 1 ? "1 分钟" : `${minutes} 分钟`;
+/**
+ * Whole minutes to wait, never less than one. The sentence around it belongs
+ * to the dictionary (`m.auth.tooManyAttempts`), which is what lets English
+ * say "1 minute" where Chinese and Japanese have no plural to choose.
+ */
+export function waitMinutes(retryAfterMs: number): number {
+  return Math.max(1, Math.ceil(retryAfterMs / 60_000));
 }
 
 // ---------- The process-wide store ----------

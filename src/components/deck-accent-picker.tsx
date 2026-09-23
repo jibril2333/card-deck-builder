@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateDeckMetaAction } from "@/app/[game]/actions";
+import { useI18n } from "@/lib/i18n/client";
 
 /** Same debounce the deck's other inline edits use. */
 const SAVE_DEBOUNCE_MS = 500;
@@ -38,6 +39,7 @@ export function DeckAccentPicker({
   coverAccent: string | null;
   coverAccent2: string | null;
 }) {
+  const { m } = useI18n();
   const router = useRouter();
   const [a, setA] = useState(accent);
   const [b, setB] = useState(accent2 ?? accent);
@@ -80,10 +82,10 @@ export function DeckAccentPicker({
         className={`flex items-center gap-1.5 rounded-full p-1 transition-shadow ${
           onCover ? "" : "ring-2 ring-[var(--color-fg)]/70"
         }`}
-        title="自选颜色"
+        title={m.deck.customColor}
       >
-        <Dot value={a} onChange={(v) => setCustom(v, b)} label="主色" />
-        <Dot value={b} onChange={(v) => setCustom(a, v)} label="副色" />
+        <Dot value={a} onChange={(v) => setCustom(v, b)} label={m.deck.primaryColor} />
+        <Dot value={b} onChange={(v) => setCustom(a, v)} label={m.deck.secondaryColor} />
       </span>
 
       {coverAccent ? (
@@ -91,7 +93,7 @@ export function DeckAccentPicker({
           type="button"
           onClick={() => setCustom(coverAccent, coverB ?? coverAccent)}
           aria-pressed={onCover}
-          title="使用封面卡的颜色"
+          title={m.deck.coverColor}
           className={`w-6 h-6 rounded-full border border-black/20 shadow-sm cursor-pointer transition-shadow ${
             onCover
               ? "ring-2 ring-offset-2 ring-offset-[var(--color-bg)] ring-[var(--color-fg)]/70"
