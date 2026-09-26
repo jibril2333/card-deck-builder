@@ -817,6 +817,12 @@ Run these in the TrueNAS shell, from the directory holding
 - Apply a compose CHANGE (mounts, `user:`, `TZ`, `init`): the same command.
   Watchtower alone will not — it reuses the running container's configuration.
 - Logs: `docker compose -f docker-compose.nas.yml logs -f` (the entrypoint, both
-  daemons and Litestream all log to stdout).
+  daemons and Litestream all log to stdout). **Stdout does not survive a
+  deploy** — watchtower replaces the container and its log with it.
+- An error page someone saw: its 详情 shows a digest. Every server error is
+  also kept, with its cause, in the data directory (`src/instrumentation.ts` →
+  `lib/server-errors.ts`, last 200), so this works however many deploys later:
+  `docker exec card-deck-builder grep <digest> /app/data.nosync/server-errors.log`.
+  What the browser reported is beside it in `client-errors.log`.
 - One-off refresh: `docker exec card-deck-builder node /app/scripts-dist/refresh-daemon.js --once cards sets`
 - Verify a restore: `docker exec card-deck-builder node /app/scripts-dist/backup-daemon.js --verify`
