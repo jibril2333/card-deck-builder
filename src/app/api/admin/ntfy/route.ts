@@ -1,15 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
 import { isAdmin } from "@/lib/auth/admin";
 import {
-  EMPTY_NTFY,
   maskToken,
   ntfyReady,
   parseNtfyConfig,
   type NtfyConfig,
 } from "@/lib/ntfy-config";
+import { readNtfyConfig, writeNtfyConfig } from "@/lib/ntfy-store";
 import { getMessages } from "@/lib/i18n/server";
-import { readJsonFile } from "@/lib/json-file";
 
 /**
  * Push-notification settings.
@@ -24,15 +21,6 @@ import { readJsonFile } from "@/lib/json-file";
  * can read back is one XSS away from being someone else's.
  */
 export const dynamic = "force-dynamic";
-
-const DATA_DIR =
-  process.env.CDB_DATA_DIR ?? path.join(process.cwd(), "data.nosync");
-const FILE = path.join(DATA_DIR, "ntfy.json");
-
-export function readNtfyConfig(): NtfyConfig {
-  const raw = readJsonFile(FILE);
-  return raw === undefined ? EMPTY_NTFY : parseNtfyConfig(raw);
-}
 
 function publicView(c: NtfyConfig) {
   return {
@@ -71,13 +59,7 @@ export async function PUT(req: Request) {
   };
 
   try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    const tmp = `${FILE}.tmp`;
-    // 0600 from the moment it exists: this file holds a credential, and it
-    // lives in the same directory the databases are backed up out of.
-    fs.writeFileSync(tmp, JSON.stringify(next, null, 2), { mode: 0o600 });
-    fs.renameSync(tmp, FILE);
-    fs.chmodSync(FILE, 0o600);
+    writeNtfyConfig(next);
   } catch (err) {
     console.error("[admin/ntfy] write failed:", err);
     return Response.json({ ok: false, error: m.admin.cannotWriteConfig }, { status: 500 });

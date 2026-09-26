@@ -1,6 +1,6 @@
 import { isAdmin } from "@/lib/auth/admin";
 import { buildTestNotification, sendNtfy } from "@/lib/refresh-notify";
-import { readNtfyConfig } from "../route";
+import { readNtfyConfig } from "@/lib/ntfy-store";
 
 /**
  * Send one test push.
