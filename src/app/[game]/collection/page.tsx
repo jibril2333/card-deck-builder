@@ -42,7 +42,7 @@ import {
 import { FilterForm, type FilterField } from "@/components/filter-form";
 import { FilterPanel } from "@/components/filter-panel";
 import { ActiveFilters, type ChipSpec } from "@/components/active-filters";
-import { requireUser } from "@/lib/auth/session";
+import { requirePageUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import { getMessages } from "@/lib/i18n/server";
 
@@ -66,9 +66,9 @@ export default async function CollectionPage({
   searchParams: Promise<SearchParamsRecord>;
 }) {
   const m = await getMessages();
-  const me = await requireUser();
   const { game } = await params;
   if (!isGameId(game)) notFound();
+  const me = await requirePageUser(`/${game}/collection`);
   const sp = await searchParams;
   const page = Math.max(1, pickNum(sp, "page") ?? 1);
   const offset = (page - 1) * PAGE_SIZE;

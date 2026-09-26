@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { safeReturnTo } from "@/lib/auth/return-to";
 import { getCurrentUser } from "@/lib/auth/session";
 import { LoginForm } from "./login-form";
 import { getMessages } from "@/lib/i18n/server";
@@ -16,11 +17,11 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const m = await getMessages();
-  // If already logged in, redirect away from the login screen.
+  const { next: rawNext } = await searchParams;
+  const next = safeReturnTo(rawNext);
+  // Already signed in: go where the link was taking you.
   const user = await getCurrentUser();
-  if (user) redirect("/");
-
-  const { next } = await searchParams;
+  if (user) redirect(next);
 
   return (
     <main className="w-full mx-auto max-w-md px-4 py-16">

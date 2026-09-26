@@ -6,7 +6,7 @@ import { getLocale } from "@/lib/i18n/server";
 import { GroupEditor } from "@/components/group-editor";
 import { PoolTable } from "@/components/pool-table";
 import { PoolSwap } from "@/components/pool-swap";
-import { requireUser } from "@/lib/auth/session";
+import { requirePageUser } from "@/lib/auth/session";
 import * as digimon from "@/lib/db/digimon";
 import { getMessages } from "@/lib/i18n/server";
 
@@ -24,9 +24,9 @@ export default async function GroupPage({
   params: Promise<{ game: string; id: string }>;
 }) {
   const m = await getMessages();
-  const me = await requireUser();
   const { game, id } = await params;
   if (!isGameId(game)) notFound();
+  const me = await requirePageUser(`/${game}/groups/${id}`);
 
   const group = digimon.getGroup(me.id, id);
   if (!group) notFound();

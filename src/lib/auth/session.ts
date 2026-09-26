@@ -14,6 +14,7 @@
  */
 
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import {
   createSession as repoCreateSession,
   deleteSession as repoDeleteSession,
@@ -69,6 +70,22 @@ export async function getCurrentUser(): Promise<User | null> {
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) throw new Error("UNAUTHENTICATED");
+  return user;
+}
+
+/**
+ * For a PAGE that only makes sense signed in: the user, or a redirect to
+ * /login that comes back to `returnTo` afterwards.
+ *
+ * requireUser() throws, and a page that throws renders the error boundary —
+ * "an error occurred in the Server Components render" for what is just an
+ * expired session (2026-09-14, a deck group opened from a link). The proxy
+ * cannot stand in for this: it only sees whether a session cookie is
+ * PRESENT, and a cookie for a session that expired or was deleted passes.
+ */
+export async function requirePageUser(returnTo: string): Promise<User> {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent(returnTo)}`);
   return user;
 }
 

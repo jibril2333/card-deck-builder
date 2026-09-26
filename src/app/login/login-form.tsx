@@ -13,7 +13,8 @@ import {
 import { classifyPasskeyError } from "@/lib/auth/passkey-error";
 import { useI18n } from "@/lib/i18n/client";
 
-export function LoginForm({ next }: { next?: string }) {
+/** `next` arrives already checked by safeReturnTo in page.tsx. */
+export function LoginForm({ next }: { next: string }) {
   const { m } = useI18n();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +27,7 @@ export function LoginForm({ next }: { next?: string }) {
       if (res.ok) {
         // Successful login set the session cookie server-side. Navigate to
         // the post-login destination, defaulting to the digimon home.
-        router.push(next ?? "/");
+        router.push(next);
         router.refresh();
       } else {
         setError(res.error);
@@ -55,7 +56,7 @@ export function LoginForm({ next }: { next?: string }) {
           setError(r.error);
           return;
         }
-        router.push(next ?? "/");
+        router.push(next);
         router.refresh();
       });
     } catch (e) {

@@ -26,11 +26,17 @@ import { SESSION_COOKIE } from "@/lib/auth/types";
  * Patterns:
  *   - `/account`              — personal settings
  *   - `/<game>/collection`    — the logged-in user's own collection
+ *   - `/<game>/groups/…`      — a deck group, visible to its members only
+ *
+ * This only checks that a session cookie is present. A cookie for a session
+ * that has expired gets through, so these pages also call requirePageUser(),
+ * which sends that case to /login instead of the error page.
  *
  * (Login / register are not listed here because they're meant to be
  * accessed unauthenticated; gating them would create a redirect loop.)
  */
-const PROTECTED_RE = /^\/(?:account(?:\/|$)|digimon\/collection(?:\/|$))/;
+const PROTECTED_RE =
+  /^\/(?:account(?:\/|$)|digimon\/(?:collection|groups)(?:\/|$))/;
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
