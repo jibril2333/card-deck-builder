@@ -149,7 +149,15 @@ export function createCards(
         )
         .run(deckId);
     });
-    tx(quantity);
+    // BEGIN IMMEDIATE, not better-sqlite3's default DEFERRED. A deferred
+    // transaction starts as a read (the ownership check above) and asks for
+    // the write lock at the INSERT; if Litestream holds it at that moment,
+    // SQLite fails at once instead of waiting, because it never runs the
+    // busy handler for a connection already inside a read. That was the
+    // "database is locked" error page of 2026-09-24. Every write
+    // transaction in src/lib/db is taken this way, and
+    // tests/deck-write-contention.test.ts holds the lock to prove it.
+    tx.immediate(quantity);
   }
 
   /** Locked too: 已购 is stored on the deck's own row, and "any change" was

@@ -581,6 +581,19 @@ the ATTACHed file; the bare `journal_mode = WAL` only covers the card DB).
 Litestream replicates by streaming the WAL — in rollback mode there is nothing
 to stream.
 
+**Litestream is a second writer of the user database**, not a reader: it keeps
+`_litestream_seq` / `_litestream_lock` in that file and writes them on every
+sync (every 10s against R2). So every write transaction in `src/lib/db` is run
+as `tx.immediate(…)` — BEGIN IMMEDIATE — rather than better-sqlite3's default
+`tx(…)`, which is BEGIN DEFERRED. A deferred transaction that reads first and
+then writes asks for the write lock mid-transaction, and if Litestream holds it
+at that moment SQLite fails at once: it never runs the busy handler for a
+connection already inside a read, so the 5s timeout does not apply. That was
+an intermittent "database is locked" error page adding a card to a deck
+(2026-09-24). `tests/deck-write-contention.test.ts` holds the lock from another
+process to prove the wait, and fails if a `.transaction(` in `src/lib/db` is
+not run through `.immediate(`.
+
 ### ⚠️ A migration that touches `user.*` must be idempotent
 
 `PRAGMA user_version` lives on the **cards** database, but several migrations

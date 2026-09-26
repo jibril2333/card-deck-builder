@@ -1348,7 +1348,7 @@ export function runMigrations(db: Database.Database): void {
       db.exec(`PRAGMA user_version = ${m.id}`);
     });
     try {
-      tx();
+      tx.immediate();
       console.log(`[db] migration ${m.id} applied: ${m.name}`);
     } catch (err) {
       console.error(`[db] migration ${m.id} (${m.name}) failed:`, err);

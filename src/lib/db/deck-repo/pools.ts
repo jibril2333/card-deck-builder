@@ -133,7 +133,7 @@ export function createPools(db: DbFn) {
       );
       for (const deckId of deckIds) ins.run(groupId, deckId, currentUserId);
     });
-    tx();
+    tx.immediate();
     // Newly-pooled decks inherit the best-stocked deck's held count per card.
     levelGroupPurchased(groupId);
   }
@@ -181,7 +181,7 @@ export function createPools(db: DbFn) {
       );
       for (const groupId of groupIds) ins.run(deckId, groupId, currentUserId);
     });
-    tx();
+    tx.immediate();
     // Every pool whose membership moved has to re-level, exactly as it would
     // have if the same edit had been made from the group side.
     for (const groupId of new Set([...before, ...groupIds])) {
@@ -358,7 +358,7 @@ export function createPools(db: DbFn) {
         )
         .run(...deckIds);
     });
-    tx();
+    tx.immediate();
   }
 
   /**
@@ -396,7 +396,7 @@ export function createPools(db: DbFn) {
         )
         .run(...members);
     });
-    tx();
+    tx.immediate();
   }
 
   return {

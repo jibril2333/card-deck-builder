@@ -27,7 +27,13 @@ export function getDB(game: GameId): Database.Database {
           `.env.local 里设置),或确认默认路径下的 .db 文件存在。`,
       );
     }
-    db = new Database(dbPath);
+    // How long a statement waits for another writer's lock before failing.
+    // Written out rather than left at better-sqlite3's default (the same
+    // 5s): the user database has a second writer — Litestream — and this is
+    // the number that decides whether meeting it is a pause or an error.
+    // It only helps a transaction that asks for the write lock up front,
+    // though; see the note on `.immediate()` in deck-repo/cards.ts.
+    db = new Database(dbPath, { timeout: 5_000 });
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
     // Attach the per-user data file; ATTACH auto-creates it if missing.

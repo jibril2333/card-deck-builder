@@ -161,7 +161,7 @@ export function createMeta(
         )
         .run(flag, place, deckId, currentUserId);
     });
-    tx();
+    tx.immediate();
   }
 
   /**
@@ -201,7 +201,7 @@ export function createMeta(
     const tx = db().transaction((ids: string[]) => {
       ids.forEach((id, i) => stmt.run(i, id, currentUserId));
     });
-    tx(orderedIds);
+    tx.immediate(orderedIds);
   }
 
   /**

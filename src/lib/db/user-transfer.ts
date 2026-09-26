@@ -333,7 +333,7 @@ export function importUserData(
       ).run(userId, id, p.price);
       report.prices++;
     }
-  })();
+  }).immediate();
 
   report.missingCards = [...missing].sort();
   return report;
